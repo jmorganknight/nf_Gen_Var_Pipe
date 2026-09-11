@@ -1,0 +1,7 @@
+references:
+  reference_genome: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+  reference_fai: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
+  reference_dict: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
+  bwa_index_base: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+  expected_sha256:
+    reference_genome: "0000000000000000000000000000000000000000000000000000000000000000"

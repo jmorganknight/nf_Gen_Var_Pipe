@@ -1,0 +1,36 @@
+# ==============================================================================
+# STAGE 1 INFRASTRUCTURE CONTRACT
+# Purpose: Host storage roots, governed container identities, and process-level
+#          resource envelopes used by the Stage 1 alignment/read-processing gate.
+# Regulatory note: these values should stay aligned with Stage 0 governance so
+#                  cross-stage audits can confirm container and mount consistency.
+# ==============================================================================
+
+storage:
+  work_root: "/scratch/nextflow_work"  # Scratch work directory for ephemeral Nextflow task state.
+  tmp_root: "/scratch/tmp"  # Shared temporary directory mounted into containers as /tmp.
+  reference_host_root: "/media/jmk/Extreme Pro/WES_Onco_References"  # Host path mounted read-only to /opt/reference for governed reference assets.
+
+containers:
+  core:
+    image: "wes-onco-core:1.0.0"  # Primary runtime image used for alignment, audit, and banking tasks.
+    sif: "file://containers/wes-onco-core.sif"  # Apptainer/Singularity image URI for offline or HPC execution.
+    # digest: "sha256:..."  # Populate before clinical release to freeze the runtime artifact.
+  annotation:
+    image: "wes-onco-annotation:latest"  # Downstream annotation image tracked here for governed stack transparency.
+    sif: "file://containers/wes-onco-annotation.sif"  # Apptainer/SIF URI for the annotation container.
+    # digest: "sha256:..."  # Populate with immutable registry digest before production sign-off.
+  multiomics:
+    image: "wes-onco-multiomics:1.0.0"  # Downstream multiomics image tracked for end-to-end governance.
+    sif: "file://containers/wes-onco-multiomics.sif"  # Apptainer/SIF URI for the multiomics container.
+    # digest: "sha256:..."  # Populate with immutable registry digest before production sign-off.
+
+process_resources:
+  process_low:
+    cpus: 2  # CPU cores reserved for lightweight audit, manifest, and indexing tasks.
+    memory_gb: 4  # Memory reservation in gibibyte-scale GB units.
+    time_hours: 4  # Wall-clock limit in hours.
+  process_high:
+    cpus: 16  # CPU cores reserved for alignment and identity-gate workloads.
+    memory_gb: 256  # Memory reservation in GB; sized for elPrep-intensive runs.
+    time_hours: 24  # Wall-clock limit in hours.

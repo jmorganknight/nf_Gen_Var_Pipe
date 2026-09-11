@@ -1,0 +1,16 @@
+samples:
+  - sample_id: "FMEA_UNVALIDATED_STAGE0"
+    sample_type: "germline"
+    gender: "male"
+    consent:
+      prs_opt_in: true
+      sf_opt_in: true
+    sequencer:
+      platform: "illumina"
+      model: "NovaSeqX"
+      flowcell_geometry: "native"
+    fastq_forward: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/fixtures/banked_stage0/validated_fastqs/HG002_FULL_CONTROL_WES_R1.validated.fastq.gz"
+    fastq_reverse: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/fixtures/banked_stage0/validated_fastqs/HG002_FULL_CONTROL_WES_R2.validated.fastq.gz"
+    intake_validation_token: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_1_Alignment_Read_Processing/tests/fmea/inputs/invalid_stage0_token.txt"
+    intake_validation_report: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/fixtures/banked_stage0/HG002_FULL_CONTROL_WES/audit_and_qc/HG002_FULL_CONTROL_WES.intake_validation_report.json"
+    save_dir: "tests/fixtures/banked_stage1"

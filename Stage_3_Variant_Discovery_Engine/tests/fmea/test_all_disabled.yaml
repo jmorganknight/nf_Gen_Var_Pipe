@@ -1,0 +1,22 @@
+samples:
+  - sample_id: "HG002_FULL_CONTROL_WES"
+    validation_token: "VALID_PASS|SAMPLE_VALIDATED"
+    sorted_bam: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/fmea/stage3_safe.bam"
+    sorted_bai: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/fmea/stage3_safe.bam.bai"
+    stage2_router_token: "WES|TARGET_VALIDATED"
+    variant_branches:
+      snv_indel: false
+      structural_variants: false
+      copy_number_cnv: false
+      str_expansions: false
+      trisomy_aneuploidy: false
+      homologous_pseudogenes: false
+    reference_build:
+      reference_genome: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+      reference_dict: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
+      reference_fai: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
+      capture_wes_bed: "/opt/reference/beds/OncoPanel_v4.2_Master_hs38DH.bed"
+      onco_target_bed: "/opt/reference/beds/OncoPanel_v4.2_Master_hs38DH.bed"
+      sf_bed: "/opt/reference/beds/ACMG_SF_v3.2_hs38DH.bed"
+      clinvar_db: "/opt/reference/clinvar/clinvar_20260601.vcf.gz"
+    save_dir: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/fmea/stage3_fmea_out"

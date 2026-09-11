@@ -1,0 +1,6 @@
+references:
+  reference_genome: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+  reference_fai: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
+  reference_dict: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
+  bwa_index_base: "/opt/reference/reference/TRUNCATED_OR_MISSING_INDEX"
+  sf_bed: "/opt/reference/resources/SecondaryFindings_BEDs/acmg_sf59_hs38.bed"

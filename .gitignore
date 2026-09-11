@@ -1,0 +1,47 @@
+# Nextflow Execution Directories & Local Logs
+.nextflow/
+.nextflow.log*
+work/
+/scratch/
+*.log
+
+# Docker & Temp Directories
+tmp/
+.tmp/
+
+# Binary Genomic Assets & Big Data (BAM, CRAM, VCF, FASTQ, BigWig)
+*.bam
+*.bai
+*.cram
+*.crai
+*.vcf.gz
+*.vcf.gz.tbi
+*.fastq.gz
+*.fq.gz
+*.pgen
+*.pvar
+*.psam
+
+# Local Test Output Sinks & Banked Fixtures (Kept locally for debugging)
+tests/fixtures/banked_stage*/
+tests/fmea/runs/
+results/
+out/
+bin_cache/
+
+# Local Environment & Secrets
+.env
+*.token
+*.key
+*.pem
+
+# Local agent/editor instruction artifacts
+copilot-instructions.mb
+
+# Python cache artifacts
+__pycache__/
+*.pyc
+
+# Stage-local fixture/output sinks (recursive)
+**/tests/fixtures/banked_stage*/
+**/tests/fmea/runs/

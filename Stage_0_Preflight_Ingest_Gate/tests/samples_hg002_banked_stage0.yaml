@@ -1,0 +1,73 @@
+# ==============================================================================
+# STAGE 0 BANKED MANIFEST
+# Purpose: Immutable Stage 0 handoff after intake validation, consent routing,
+#          reference snapshot locking, and audit bundle creation.
+# Regulatory note: This file is intended to be human-auditable. Each field is
+#                  annotated inline so clinicians and external reviewers can
+#                  inspect provenance without cross-referencing source code.
+# ==============================================================================
+samples:
+  # ---------------------------------------------------------------------------
+  # Stage 0 banked record. All paths below are immutable outputs from the run
+  # that validated this sample at intake.
+  - sample_id: "HG002_FULL_CONTROL_WES"  # Stable sample identifier propagated across all stages.
+    patient_id: "HG002_FULL_CONTROL_WES"  # Clinical or LIMS patient identifier; may equal sample_id for controls.
+    case_id: "HG002_FULL_CONTROL_WES"  # Case, family, or accession-group identifier used for multi-sample context.
+    accession_id: ""  # Laboratory accession identifier assigned at order intake.
+    encounter_id: ""  # Clinical encounter or visit identifier tied to the order.
+    specimen_id: ""  # Physical specimen identifier from accessioning or biobank custody.
+    analysis_batch_id: ""  # Batch or run-set identifier used for operational grouping.
+    sample_type: "germline"  # Primary biological context enum such as germline or somatic.
+    pathologist_tumor_burden: 0.0  # Tumor burden fraction on a 0-1 scale; 0.0 is expected for germline controls.
+    gender: "male"  # Declared sex/gender field required by the Stage 0 sex concordance gate.
+    # Locked consent declarations copied from the source manifest.
+    consent:
+      prs_opt_in: true  # True permits downstream polygenic risk scoring branches.
+      sf_opt_in: true  # True permits ACMG secondary findings analysis and reporting.
+      research_opt_in: false  # Optional research-only use permission captured at intake.
+      data_sharing_opt_in: false  # Optional controlled data sharing permission for approved repositories.
+      recontact_opt_in: false  # Optional permission allowing future clinically relevant recontact.
+      consent_version: "UNSPECIFIED"  # Human-readable consent form or policy revision identifier.
+      consent_signed_utc: null  # Timestamp when consent was signed, in ISO 8601 UTC form.
+      consent_source: "DECLARED_IN_SAMPLESHEET"  # System or workflow source from which consent values were ingested.
+    # Derived route tokens used by downstream optional clinical branches.
+    consent_tokens:
+      prs_reporting: "CONSENTED|PRS_ENABLED"  # Deterministic route token used to gate PRS-producing downstream tasks.
+      secondary_findings: "CONSENTED|SF_ENABLED"  # Deterministic route token used to gate secondary-findings tasks.
+      research_use: "WITHHELD|RESEARCH_DISABLED"  # Deterministic route token for research-only derivative workflows.
+      data_sharing: "WITHHELD|DATA_SHARING_DISABLED"  # Deterministic route token for any controlled federation/export path.
+      recontact: "WITHHELD|RECONTACT_PROHIBITED"  # Deterministic route token indicating whether future recontact is permitted.
+    # Stage 0 variant branch toggles carried forward into Stage 2 and Stage 3 routing.
+    variant_branches:
+      snv_indel: true  # Enable short-variant discovery branch for SNVs and indels.
+      structural_variants: true  # Enable structural-variant discovery branch.
+      copy_number_cnv: true  # Enable copy-number and CNV discovery branch.
+      str_expansions: false  # Enable short tandem repeat expansion discovery branch.
+      trisomy_aneuploidy: true  # Enable aneuploidy/trisomy discovery branch.
+    # Optional upstream biological descriptors preserved for interpretation context.
+    biological_context:
+      {}  # Upstream manifest did not provide this optional metadata section.
+    # Optional diagnosis block preserved exactly from the intake contract.
+    diagnosis:
+      {}  # Upstream manifest did not provide this optional metadata section.
+    # Optional specimen descriptors preserved for laboratory provenance.
+    specimen:
+      {}  # Upstream manifest did not provide this optional metadata section.
+    # Optional clinical context preserved for downstream interpretation and reporting.
+    clinical_context:
+      {}  # Upstream manifest did not provide this optional metadata section.
+    # Raw intake QC hints and integrity expectations captured from the source manifest.
+    ingest_manifest:
+      {}  # Upstream manifest did not provide this optional metadata section.
+    # Instrument metadata used for platform-specific gating in later stages.
+    sequencer:
+      platform: "illumina"  # Permitted short-read platform enum: illumina, element, complete_genomics, or ultima.
+      model: "NovaSeqX"  # Instrument or chemistry model string from LIMS.
+      flowcell_geometry: "native"  # Run geometry enum such as native or DNBSEQ_PATTERNED.
+    fastq_forward: "tests/fixtures/banked_stage0_rerun/validated_fastqs/HG002_FULL_CONTROL_WES_R1.validated.fastq.gz"  # Validated Stage 0 forward-read FASTQ path; downstream stages must consume this, not raw ingress data.
+    fastq_reverse: "tests/fixtures/banked_stage0_rerun/validated_fastqs/HG002_FULL_CONTROL_WES_R2.validated.fastq.gz"  # Validated Stage 0 reverse-read FASTQ path paired with fastq_forward.
+    intake_validation_token: "tests/fixtures/banked_stage0_rerun/intake_token/HG002_FULL_CONTROL_WES.intake_validation_token"  # Machine-readable Stage 0 pass token required by Stage 1 preconditions.
+    stage0_audit_bundle: "tests/fixtures/banked_stage0_rerun/audit_bundle/HG002_FULL_CONTROL_WES.stage0.audit_bundle.tar.gz"  # Compressed audit bundle containing validation, routing, and reference-lock artifacts.
+    intake_validation_report: "tests/fixtures/banked_stage0_rerun/HG002_FULL_CONTROL_WES/audit_and_qc/HG002_FULL_CONTROL_WES.intake_validation_report.json"  # Detailed JSON audit for Stage 0 intake validation decisions.
+    intake_route_decision: "tests/fixtures/banked_stage0_rerun/HG002_FULL_CONTROL_WES/audit_and_qc/HG002_FULL_CONTROL_WES.intake_route_decision.json"  # JSON record showing deterministic Stage 0 routing after token evaluation.
+    save_dir: "tests/fixtures/banked_stage0_rerun"  # Root banking directory in which Stage 0 published all sample-scoped outputs.

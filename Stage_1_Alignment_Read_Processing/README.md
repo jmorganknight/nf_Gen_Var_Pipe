@@ -1,0 +1,117 @@
+# Stage_1_Alignment_Read_Processing
+
+Standalone short-read Stage 1 micro-pipeline for platform-aware trimming, alignment/read processing, coordinate normalization, identity auditing, and Stage 2 contract banking.
+
+## Local rerun guidance
+
+- Recommended scratch volume: /scratch
+- Default Stage 1 work directory: /scratch/nextflow_work
+- Default Stage 1 temp directory: /scratch/tmp
+- Heavy-path CPU ceiling: 30 cores
+
+To run a fresh local Stage 1 rerun with the scratch directories cleared first, use:
+
+`./run_local_stage1.sh`
+
+The wrapper clears the Stage 1 scratch work and temp directories before launching Nextflow, so it is intended for fresh reruns rather than resume-based recovery.
+
+## Architecture Flow
+
+```mermaid
+flowchart TD
+    A[Stage 0 banked manifest] --> B{Precondition Guard}
+    B -->|token != VALID_PASS| R[STAGE1_PRECONDITION_FAILURE\nstage1_rejection_audit.json]
+    B -->|token valid| C[PLATFORM_INIT_ROUTER]
+
+    C --> D[Illumina/Element/Complete\nFASTP_TRIM]
+    D --> E[ELPREP_ALIGN_MARKDUP\n(single-pass align/sort/markdup)]
+
+    C --> F[Ultima\nBWA_MEM2_ALIGN single-end fallback]
+    F --> G[STAGE1_BWA_FINALIZE]
+
+    C --> H[Mapped BAM path (optional)]
+    H --> I[VALIDATE_MAPPED_BAM_RG]
+    I -->|invalid| R
+
+    E --> J[FORCE_CRAM_GRCh38_TAGS]
+    G --> J
+    I -->|valid| J
+
+    J --> K[COORDINATE_STANDARDIZED_CRAM_JUNCTION_HUB]
+    K --> L[CROSS_SAMPLE_IDENTITY_GATE]
+    L --> M[STAGE1_FLAGSTAT]
+
+    C --> N[route audits]
+    D --> O[fastp.json]
+    E --> P[elprep_metrics.json]
+    G --> Q[bwa_metrics.json]
+    K --> S[junction_audit.json]
+    L --> T[identity_audit.json]
+    M --> U[samtools flagstat]
+
+    N --> V[STAGE1_AUDIT_SINK]
+    O --> V
+    P --> V
+    Q --> V
+    S --> V
+    T --> V
+    U --> V
+
+    L --> W[BANK_STAGE1_CONTRACT]
+    W --> X[ASSEMBLE_STAGE1_BANKED_MANIFEST]
+```
+
+### ASCII Alternative
+
+```text
+Stage0 manifest --> precondition gate --> platform router --> [fastp + elprep] OR [ultima bwa fallback] OR [mapped BAM RG guard]
+                                                   --> force_cram_tags --> coordinate_junction --> identity_gate --> flagstat
+                                                                                                 --> stage1 audit sink
+                                                                                                 --> banked_stage1 contract yaml
+```
+
+## Module Inventory
+
+| Module | Inputs | Outputs | Platforms | Failure Behavior |
+|---|---|---|---|---|
+| `PLATFORM_INIT_ROUTER` | `meta, fastq_1, fastq_2, intake_token, intake_report` | routed payload, `platform_init_route.json` | all short-read | route audit generated; unsupported platform is blocked in precondition guard. |
+| `FASTP_TRIM` | `meta, r1, r2` | trimmed FASTQs, `fastp.json` | illumina, element, complete_genomics | process failure on I/O/tool errors. |
+| `ELPREP_ALIGN_MARKDUP` | trimmed FASTQs + references | sorted markdup BAM/BAI, optical metrics, `elprep_metrics.json` | illumina, element, complete_genomics | fails closed on align/markdup/index errors. |
+| `BWA_MEM2_ALIGN` + `STAGE1_BWA_FINALIZE` | FASTQ lane + references | aligned BAM/BAI, `bwa_metrics.json` | ultima | single-end fallback path for flow chemistry/specialized routing. |
+| `VALIDATE_MAPPED_BAM_RG` | mapped BAM/BAI | guard token (+ optional rejection audit) | mapped short-read handoff | emits invalid token if `@RG` or required tags are missing. |
+| `STAGE1_FAIL_CLOSED` | rejection audit path | `stage1_rejection_audit.json` | mapped invalid path | hard exits with `STAGE1_PRECONDITION_FAILURE`. |
+| `FORCE_CRAM_GRCh38_TAGS` | BAM/BAI + ref dict | reheadered BAM/BAI | all short-read | fails on reheader/index errors. |
+| `COORDINATE_STANDARDIZED_CRAM_JUNCTION_HUB` | normalized BAM/BAI | junction-verified BAM/BAI, `junction_audit.json` | all short-read | fails on `samtools quickcheck`/index issues. |
+| `CROSS_SAMPLE_IDENTITY_GATE` | verified BAM/BAI + SVD/freemix config | identity audit + identity-verified BAM/BAI | all short-read | fail closed on contamination threshold breach; skip mode if insufficient markers. |
+| `STAGE1_FLAGSTAT` | identity-verified BAM/BAI | `flagstat.txt` | all short-read | fails on samtools errors. |
+| `STAGE1_AUDIT_SINK` | route/fastp/align/identity/junction/flagstat artifacts | `stage1_audit_payload.json` | all short-read | fails on sink assembly/write failure. |
+| `BANK_STAGE1_CONTRACT` + `ASSEMBLE_STAGE1_BANKED_MANIFEST` | final BAM/BAI + ref metadata | banked files and `samples_hg002_banked_stage1.yaml` | all short-read | fails if banking/manifest write fails. |
+
+## Platform Geometry Matrix
+
+| Platform | Read Mode | Trimming | Alignment/Processing | Geometry Preservation |
+|---|---|---|---|---|
+| Illumina | paired-end | `fastp` with poly-G support | `elprep 5` (`bwa-mem2` stream + sort + markdup) | `@RG` includes `ID,PL,PU,SM,LB,DS` and flow metadata propagated from sample/meta. |
+| Element (AVITI) | paired-end | `fastp` adapter/quality trimming | `elprep 5` pathway | same `@RG` preservation guarantees. |
+| Complete Genomics / DNBseq | paired-end | `fastp` filtering | `elprep 5` pathway | patterned geometry encoded in `DS` and carried through reheader/junction checks. |
+| Ultima | single-end fallback (workflow route) | no mandatory fastp trim in fallback lane | `bwa-mem2` fallback + finalize index/metrics | `@RG` includes full required tag set with flow geometry in `DS`. |
+
+## Banked Deliverables Contract
+
+Published under `tests/fixtures/banked_stage1/`:
+
+- `aligned/*.identity_verified.bam`
+- `aligned/*.identity_verified.bam.bai`
+- `audit_and_qc/stage1/stage1_audit_payload.json`
+- `audit_and_qc/stage1/*.flagstat.txt`
+- `audit_and_qc/stage1/stage1_rejection_audit.json` (failure scenarios)
+- `samples_hg002_banked_stage1.yaml`
+
+`samples_hg002_banked_stage1.yaml` carries Stage 2 handoff fields:
+
+- `mapped_bam`
+- `mapped_bai`
+- `reference_build.reference_genome`
+- `reference_build.reference_fai`
+- `reference_build.reference_dict`
+- `reference_build.bwa_index_base`
