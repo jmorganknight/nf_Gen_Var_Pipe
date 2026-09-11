@@ -4,7 +4,7 @@
 
 This repository is **Under Construction and Being Refactored**.
 
-The pipeline is actively being reworked into stage-scoped Nextflow DSL2 modules with stricter preconditions, deterministic contracts, and fail-closed behavior for clinical-grade auditability.
+The pipeline is being actively expanded and restructured into stage-scoped Nextflow DSL2 modules to dynamically support multi-platform sequencing data and multi-modal variant discovery with clinical-grade auditability.
 
 ## What This Repository Contains
 
