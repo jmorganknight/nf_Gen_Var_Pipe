@@ -145,9 +145,10 @@ def main() -> int:
     run_root.mkdir(parents=True, exist_ok=True)
 
     main_nf = stage_root / "main.nf"
-    thresholds_yaml = Path("/media/drive_c/nf_pipes/nf_WES_Onco_Risk/thresholds.yaml")
-    default_refs_yaml = Path("/media/drive_c/nf_pipes/nf_WES_Onco_Risk/references.yaml")
-    infrastructure_yaml = stage_root / "infrastructure.yaml"
+    repo_root = stage_root.parent
+    thresholds_yaml = repo_root / "conf" / "thresholds.yaml"
+    default_refs_yaml = repo_root / "conf" / "references.yaml"
+    infrastructure_yaml = repo_root / "conf" / "infrastructure.yaml"
 
     scenarios = [
         {
