@@ -11,6 +11,49 @@ def mapOrEmpty(Object value) {
     value instanceof Map ? (value as Map) : [:]
 }
 
+def resolveRefPath(String entryPath, String yamlRefDataRoot) {
+    if (!entryPath) {
+        return entryPath
+    }
+    if (entryPath.startsWith('/')) {
+        return entryPath
+    }
+    def baseRoot = yamlRefDataRoot?.trim() ? yamlRefDataRoot.toString().trim() : '/opt/reference'
+    return new File(baseRoot, entryPath).path
+}
+
+def resolveReferencePathValue(Object value, String yamlRefDataRoot, String keyName = null) {
+    if (value instanceof Map) {
+        return (value as Map).collectEntries { key, nested ->
+            [(key): resolveReferencePathValue(nested, yamlRefDataRoot, key.toString())]
+        }
+    }
+    if (value instanceof List) {
+        return (value as List).collect { nested -> resolveReferencePathValue(nested, yamlRefDataRoot, keyName) }
+    }
+    if (!(value instanceof CharSequence)) {
+        return value
+    }
+
+    def pathText = value.toString()
+    if (['reference_checksum_manifest', 'stage3_vcf_schema'].contains(keyName)) {
+        return pathText
+    }
+    return resolveRefPath(pathText, yamlRefDataRoot)
+}
+
+def loadResolvedReferences(def referencesFile) {
+    def ys = new groovy.yaml.YamlSlurper()
+    def referencesDoc = mapOrEmpty(ys.parse(referencesFile))
+    def yamlRefDataRoot = referencesDoc.ref_data_root?.toString()?.trim()
+    def refsParsed = mapOrEmpty(resolveReferencePathValue(mapOrEmpty(referencesDoc.references ?: referencesDoc), yamlRefDataRoot))
+    def stage3Refs = mapOrEmpty(refsParsed.stage3)
+    if (stage3Refs.stage3_vcf_schema && !refsParsed.stage3_vcf_schema) {
+        refsParsed.stage3_vcf_schema = stage3Refs.stage3_vcf_schema
+    }
+    [document: referencesDoc, refs: refsParsed, yamlRefDataRoot: yamlRefDataRoot]
+}
+
 def isStubMode() {
     def commandLine = workflow.hasProperty('commandLine') ? (workflow.commandLine ?: '') : ''
     def stubFlag = workflow.hasProperty('stubRun') ? workflow.stubRun : null
@@ -174,15 +217,17 @@ def hostPathForReference(String pathText, String refDir) {
     if (!pathText) {
         return null
     }
-    def candidate = new File(pathText)
-    if (!pathText.startsWith('/opt/reference')) {
-        return candidate
+    if (pathText.startsWith('/opt/reference') && refDir) {
+        def suffix = pathText.replaceFirst('^/opt/reference/?', '')
+        return suffix ? new File(refDir, suffix) : new File(refDir)
     }
-    if (!refDir) {
-        return null
+    if (pathText.startsWith('/')) {
+        return new File(pathText)
     }
-    def suffix = pathText.replaceFirst('^/opt/reference', '')
-    return new File(refDir + suffix)
+    if (refDir) {
+        return new File(refDir, pathText)
+    }
+    return new File(pathText)
 }
 
 
@@ -362,28 +407,30 @@ workflow {
     def referencesFile = resolveStageConfigPath(readOptionalParam('ref_config'), params.references, 'references.yaml')
     def thresholdsFile = resolveStageConfigPath(readOptionalParam('thresh_config'), params.thresholds, 'thresholds.yaml')
     def infrastructureFile = resolveStageConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
+    def referenceInfo = loadResolvedReferences(referencesFile)
 
     def samplesParsed = ys.parse(samplesFile).samples
     def thresholdsParsed = ys.parse(thresholdsFile)
     def infrastructureParsed = ys.parse(infrastructureFile) ?: [:]
     def reportingCfg = thresholdsParsed.reporting ?: thresholdsParsed.clinical?.reporting ?: [:]
     def effectiveOutdir = params.outdir.toString()
-    def refsParsed = ys.parse(referencesFile).references
+    def refsParsed = referenceInfo.refs
 
     if (!(samplesParsed instanceof List) || samplesParsed.isEmpty()) {
         throw new IllegalArgumentException('FATAL: samples manifest contains no samples')
     }
 
     def infrastructureRoot = infrastructureFile.parent ? infrastructureFile.parent.toString() : projectDir.toString()
-    def referenceMountRoot = (params.ref_data_root ?: params.ref_dir ?: infrastructureParsed?.storage?.reference_host_root ?: '../assets/references')?.toString()
-    def referencesText = referencesFile.text
-    if (referencesText.contains('/opt/reference') && !referenceMountRoot) {
-        throw new IllegalArgumentException(
-            'FATAL: references manifest uses /opt/reference assets but no host reference mount is configured. Set storage.reference_host_root in infrastructure.yaml or provide --ref_dir.'
-        )
+    def refDir = null
+    [params.ref_data_root, params.ref_dir, infrastructureParsed?.storage?.reference_host_root, referenceInfo.yamlRefDataRoot, '/opt/reference'].find { candidate ->
+        def text = candidate?.toString()?.trim()
+        if (!text) {
+            return false
+        }
+        def resolved = resolvePathWithBases(text, [infrastructureRoot, projectDir.toString(), repoRoot])
+        refDir = resolved.toString()
+        resolved.exists()
     }
-
-    def refDir = resolvePathWithBases(referenceMountRoot, [infrastructureRoot, projectDir.toString()]).toString()
     def checksumManifest = resolvePathWithBases('../assets/reference_checksums.sha256', [projectDir.toString(), thresholdsFile.parent?.toString() ?: projectDir.toString()])
     if (checksumManifest.exists()) {
         validateChecksumManifest(checksumManifest, refDir, projectDir.toString())

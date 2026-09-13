@@ -12,6 +12,49 @@ def mapOrEmpty(Object value) {
     value instanceof Map ? (value as Map) : [:]
 }
 
+def resolveRefPath(String entryPath, String yamlRefDataRoot) {
+    if (!entryPath) {
+        return entryPath
+    }
+    if (entryPath.startsWith('/')) {
+        return entryPath
+    }
+    def baseRoot = yamlRefDataRoot?.trim() ? yamlRefDataRoot.toString().trim() : '/opt/reference'
+    return new File(baseRoot, entryPath).path
+}
+
+def resolveReferencePathValue(Object value, String yamlRefDataRoot, String keyName = null) {
+    if (value instanceof Map) {
+        return (value as Map).collectEntries { key, nested ->
+            [(key): resolveReferencePathValue(nested, yamlRefDataRoot, key.toString())]
+        }
+    }
+    if (value instanceof List) {
+        return (value as List).collect { nested -> resolveReferencePathValue(nested, yamlRefDataRoot, keyName) }
+    }
+    if (!(value instanceof CharSequence)) {
+        return value
+    }
+
+    def pathText = value.toString()
+    if (['reference_checksum_manifest', 'stage3_vcf_schema'].contains(keyName)) {
+        return pathText
+    }
+    return resolveRefPath(pathText, yamlRefDataRoot)
+}
+
+def loadResolvedReferences(def referencesFile) {
+    def ys = new groovy.yaml.YamlSlurper()
+    def referencesDoc = mapOrEmpty(ys.parse(referencesFile))
+    def yamlRefDataRoot = referencesDoc.ref_data_root?.toString()?.trim()
+    def refsParsed = mapOrEmpty(resolveReferencePathValue(mapOrEmpty(referencesDoc.references ?: referencesDoc), yamlRefDataRoot))
+    def stage3Refs = mapOrEmpty(refsParsed.stage3)
+    if (stage3Refs.stage3_vcf_schema && !refsParsed.stage3_vcf_schema) {
+        refsParsed.stage3_vcf_schema = stage3Refs.stage3_vcf_schema
+    }
+    [document: referencesDoc, refs: refsParsed, yamlRefDataRoot: yamlRefDataRoot]
+}
+
 def resolvePath(String rawPath, String rootDir) {
     def candidate = new File(rawPath)
     if (candidate.isAbsolute()) {
@@ -80,15 +123,17 @@ def hostPathForReference(String pathText, String refDir) {
     if (!pathText) {
         return null
     }
-    def candidate = new File(pathText)
-    if (!pathText.startsWith('/opt/reference')) {
-        return candidate
+    if (pathText.startsWith('/opt/reference') && refDir) {
+        def suffix = pathText.replaceFirst('^/opt/reference/?', '')
+        return suffix ? new File(refDir, suffix) : new File(refDir)
     }
-    if (!refDir) {
-        return null
+    if (pathText.startsWith('/')) {
+        return new File(pathText)
     }
-    def suffix = pathText.replaceFirst('^/opt/reference', '')
-    return new File(refDir + suffix)
+    if (refDir) {
+        return new File(refDir, pathText)
+    }
+    return new File(pathText)
 }
 
 def normalizeSexToken(Object rawSex) {
@@ -132,8 +177,8 @@ def buildStage2InputChannel() {
     def infrastructureFile = resolveStageConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
 
     def samplesParsed = ys.parse(samplesFile).samples
-    def refsPayload = ys.parse(referencesFile)
-    def refsParsed = mapOrEmpty(refsPayload?.references ?: refsPayload)
+    def referenceInfo = loadResolvedReferences(referencesFile)
+    def refsParsed = referenceInfo.refs
     def thresholdsParsed = ys.parse(thresholdsFile)
     def infrastructureParsed = ys.parse(infrastructureFile) ?: [:]
 
@@ -156,7 +201,16 @@ def buildStage2InputChannel() {
     ]
 
     def infrastructureRoot = infrastructureFile.parent ? infrastructureFile.parent.toString() : projectDir.toString()
-    def refDir = resolvePath((params.ref_data_root ?: params.ref_dir ?: infrastructureParsed?.storage?.reference_host_root ?: '../assets/references').toString(), infrastructureRoot).toString()
+    def refDir = null
+    [params.ref_data_root, params.ref_dir, infrastructureParsed?.storage?.reference_host_root, referenceInfo.yamlRefDataRoot, '/opt/reference'].find { candidate ->
+        def text = candidate?.toString()?.trim()
+        if (!text) {
+            return false
+        }
+        def resolved = resolvePath(text, infrastructureRoot)
+        refDir = resolved.toString()
+        resolved.exists()
+    }
     [
         reference_genome: refsNormalized.reference_genome,
         reference_fai   : refsNormalized.reference_fai,

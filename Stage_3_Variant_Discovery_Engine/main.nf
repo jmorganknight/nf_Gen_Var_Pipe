@@ -9,16 +9,60 @@ def mapOrEmpty(Object value) {
     value instanceof Map ? (value as Map) : [:]
 }
 
+def resolveRefPath(String entryPath, String yamlRefDataRoot) {
+    if (!entryPath) {
+        return entryPath
+    }
+    if (entryPath.startsWith('/')) {
+        return entryPath
+    }
+    def baseRoot = yamlRefDataRoot?.trim() ? yamlRefDataRoot.toString().trim() : '/opt/reference'
+    return new File(baseRoot, entryPath).path
+}
+
+def resolveReferencePathValue(Object value, String yamlRefDataRoot, String keyName = null) {
+    if (value instanceof Map) {
+        return (value as Map).collectEntries { key, nested ->
+            [(key): resolveReferencePathValue(nested, yamlRefDataRoot, key.toString())]
+        }
+    }
+    if (value instanceof List) {
+        return (value as List).collect { nested -> resolveReferencePathValue(nested, yamlRefDataRoot, keyName) }
+    }
+    if (!(value instanceof CharSequence)) {
+        return value
+    }
+
+    def pathText = value.toString()
+    if (['reference_checksum_manifest', 'stage3_vcf_schema'].contains(keyName)) {
+        return pathText
+    }
+    return resolveRefPath(pathText, yamlRefDataRoot)
+}
+
+def loadResolvedReferences(def referencesFile) {
+    def ys = new groovy.yaml.YamlSlurper()
+    def referencesDoc = mapOrEmpty(ys.parse(referencesFile))
+    def yamlRefDataRoot = referencesDoc.ref_data_root?.toString()?.trim()
+    def refsParsed = mapOrEmpty(resolveReferencePathValue(mapOrEmpty(referencesDoc.references ?: referencesDoc), yamlRefDataRoot))
+    def stage3Refs = mapOrEmpty(refsParsed.stage3)
+    if (stage3Refs.stage3_vcf_schema && !refsParsed.stage3_vcf_schema) {
+        refsParsed.stage3_vcf_schema = stage3Refs.stage3_vcf_schema
+    }
+    [document: referencesDoc, refs: refsParsed, yamlRefDataRoot: yamlRefDataRoot]
+}
+
 def resolveHostPath(def rawPath, String refDir) {
     if (!rawPath) {
         return null
     }
     def p = rawPath.toString()
-    if (p.startsWith('/opt/reference')) {
-        if (!refDir) {
-            throw new IllegalStateException("STAGE3_PRECONDITION_FAILURE: ref_dir is required to resolve host path for ${p}")
-        }
-        return new File(refDir + p.replaceFirst('^/opt/reference', '')).toString()
+    if (p.startsWith('/opt/reference') && refDir) {
+        def suffix = p.replaceFirst('^/opt/reference/?', '')
+        return suffix ? new File(refDir, suffix).toString() : new File(refDir).toString()
+    }
+    if (p.startsWith('/')) {
+        return p
     }
     def direct = new File(p)
     if (direct.exists()) {
@@ -39,6 +83,9 @@ def resolveHostPath(def rawPath, String refDir) {
     def recovered = stageLocalCandidates.find { candidate -> candidate.exists() }
     if (recovered != null) {
         return recovered.toString()
+    }
+    if (refDir) {
+        return new File(refDir, p).toString()
     }
     return p
 }
@@ -111,21 +158,30 @@ workflow STAGE3_VARIANT_DISCOVERY {
     def referencesFile = resolveStageConfigPath(readOptionalParam('ref_config'), params.references, 'references.yaml')
     def thresholdsFile = resolveStageConfigPath(readOptionalParam('thresh_config'), params.thresholds, 'thresholds.yaml')
     def infrastructureFile = resolveStageConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
-    def refsRaw = ys.parse(referencesFile)
-    def refsParsed = mapOrEmpty(refsRaw?.references ?: refsRaw)
+    def referenceInfo = loadResolvedReferences(referencesFile)
+    def refsParsed = referenceInfo.refs
     def refsFromParams = mapOrEmpty(params.refs)
     def refsCombined = refsParsed + refsFromParams
     ys.parse(thresholdsFile)
     def infrastructureParsed = ys.parse(infrastructureFile) ?: [:]
     def infrastructureRoot = infrastructureFile.parent ? infrastructureFile.parent.toString() : projectDir.toString()
-    def refDir = resolveHostPath((params.ref_data_root ?: params.ref_dir ?: infrastructureParsed?.storage?.reference_host_root ?: '../assets/references').toString(), infrastructureRoot)
+    def refDir = null
+    [params.ref_data_root, params.ref_dir, infrastructureParsed?.storage?.reference_host_root, referenceInfo.yamlRefDataRoot, '/opt/reference'].find { candidate ->
+        def text = candidate?.toString()?.trim()
+        if (!text) {
+            return false
+        }
+        def resolved = resolveHostPath(text, infrastructureRoot)
+        refDir = resolved.toString()
+        new File(resolved.toString()).exists()
+    }
 
     def stage3Refs = [
         reference_genome  : refsCombined.reference_genome ?: refsCombined.grch38_fasta ?: refsCombined.fasta,
         capture_wes_bed   : refsCombined.capture_wes_bed ?: refsCombined.onco_target_bed ?: refsCombined.target_bed_onco,
         onco_target_bed   : refsCombined.onco_target_bed ?: refsCombined.capture_wes_bed ?: refsCombined.target_bed_onco,
         mane_transcripts  : refsCombined.mane_transcripts ?: refsCombined.mane_db,
-        stage3_vcf_schema : refsCombined.stage3_vcf_schema,
+        stage3_vcf_schema : refsCombined.stage3_vcf_schema ?: refsCombined.stage3?.stage3_vcf_schema,
     ]
 
     ['reference_genome', 'mane_transcripts', 'stage3_vcf_schema'].each { key ->

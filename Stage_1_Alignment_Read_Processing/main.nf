@@ -7,6 +7,49 @@ def mapOrEmpty(Object value) {
     value instanceof Map ? (value as Map) : [:]
 }
 
+def resolveRefPath(String entryPath, String yamlRefDataRoot) {
+    if (!entryPath) {
+        return entryPath
+    }
+    if (entryPath.startsWith('/')) {
+        return entryPath
+    }
+    def baseRoot = yamlRefDataRoot?.trim() ? yamlRefDataRoot.toString().trim() : '/opt/reference'
+    return new File(baseRoot, entryPath).path
+}
+
+def resolveReferencePathValue(Object value, String yamlRefDataRoot, String keyName = null) {
+    if (value instanceof Map) {
+        return (value as Map).collectEntries { key, nested ->
+            [(key): resolveReferencePathValue(nested, yamlRefDataRoot, key.toString())]
+        }
+    }
+    if (value instanceof List) {
+        return (value as List).collect { nested -> resolveReferencePathValue(nested, yamlRefDataRoot, keyName) }
+    }
+    if (!(value instanceof CharSequence)) {
+        return value
+    }
+
+    def pathText = value.toString()
+    if (['reference_checksum_manifest', 'stage3_vcf_schema'].contains(keyName)) {
+        return pathText
+    }
+    return resolveRefPath(pathText, yamlRefDataRoot)
+}
+
+def loadResolvedReferences(def referencesFile) {
+    def ys = new groovy.yaml.YamlSlurper()
+    def referencesDoc = mapOrEmpty(ys.parse(referencesFile))
+    def yamlRefDataRoot = referencesDoc.ref_data_root?.toString()?.trim()
+    def refsParsed = mapOrEmpty(resolveReferencePathValue(mapOrEmpty(referencesDoc.references ?: referencesDoc), yamlRefDataRoot))
+    def stage3Refs = mapOrEmpty(refsParsed.stage3)
+    if (stage3Refs.stage3_vcf_schema && !refsParsed.stage3_vcf_schema) {
+        refsParsed.stage3_vcf_schema = stage3Refs.stage3_vcf_schema
+    }
+    [document: referencesDoc, refs: refsParsed, yamlRefDataRoot: yamlRefDataRoot]
+}
+
 
 def normalizeConsent(Object rawConsent) {
     def source = mapOrEmpty(rawConsent)
@@ -195,14 +238,20 @@ def resolveStage1IntakeToken(Map sample, String samplesRoot, String outdir, bool
 
 
 def hostPathForReference(String pathText, String refDir) {
-    if (!pathText.startsWith('/opt/reference')) {
-        return new File(pathText)
-    }
-    if (!refDir) {
+    if (!pathText) {
         return null
     }
-    def suffix = pathText.replaceFirst('^/opt/reference', '')
-    return new File(refDir + suffix)
+    if (pathText.startsWith('/opt/reference') && refDir) {
+        def suffix = pathText.replaceFirst('^/opt/reference/?', '')
+        return suffix ? new File(refDir, suffix) : new File(refDir)
+    }
+    if (pathText.startsWith('/')) {
+        return new File(pathText)
+    }
+    if (refDir) {
+        return new File(refDir, pathText)
+    }
+    return new File(pathText)
 }
 
 
@@ -280,12 +329,12 @@ def loadAtomicStage1Contract() {
     def infrastructureFile = resolveStage1ConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
 
     def samplesDoc = ys.parse(samplesFile) ?: [:]
-    def referencesDoc = ys.parse(referencesFile) ?: [:]
+    def referenceInfo = loadResolvedReferences(referencesFile)
     def thresholdsDoc = ys.parse(thresholdsFile) ?: [:]
     def infrastructureDoc = ys.parse(infrastructureFile) ?: [:]
 
     def samplesParsed = samplesDoc.samples
-    def refsParsed = referencesDoc.references
+    def refsParsed = referenceInfo.refs
     if (!(samplesParsed instanceof List) || samplesParsed.isEmpty()) {
         throw new IllegalArgumentException('STAGE1_PRECONDITION_FAILURE: samples manifest contains no samples')
     }
@@ -301,6 +350,7 @@ def loadAtomicStage1Contract() {
         infrastructureFile: infrastructureFile,
         samplesParsed     : samplesParsed,
         refsParsed        : refsParsed,
+        yamlRefDataRoot   : referenceInfo.yamlRefDataRoot,
         thresholdsParsed  : thresholdsDoc,
         infrastructureParsed: infrastructureDoc,
         samplesRoot       : samplesFile.parent ? samplesFile.parent.toString() : projectRoot,
@@ -325,7 +375,16 @@ workflow STAGE1_ALIGNMENT {
     def allowedPlatforms = ['illumina', 'element', 'complete', 'complete_genomics', 'ultima', 'ont'] as Set
     def samplesRoot = intake.samplesRoot.toString()
     def infrastructureRoot = intake.infrastructureRoot.toString()
-    def refDir = resolvePath((params.ref_data_root ?: params.ref_dir ?: infrastructureParsed?.storage?.reference_host_root ?: '../assets/references').toString(), infrastructureRoot).toString()
+    def refDir = null
+    [params.ref_data_root, params.ref_dir, infrastructureParsed?.storage?.reference_host_root, intake.yamlRefDataRoot, '/opt/reference'].find { candidate ->
+        def text = candidate?.toString()?.trim()
+        if (!text) {
+            return false
+        }
+        def resolved = resolvePath(text, infrastructureRoot)
+        refDir = resolved.toString()
+        resolved.exists()
+    }
     def preflightLockPublishedPath = "${params.outdir}/audit_and_qc/preflight_lock/preflight_lock.json"
 
     def chPreflightRows = channel.fromList(samplesParsed).map { sample ->
@@ -487,10 +546,6 @@ workflow STAGE1_ALIGNMENT {
     }
 
     def hostBwaBase = hostPathForReference(bwaBase.toString(), refDir)
-    if (hostBwaBase == null) {
-        writeStage1Rejection(params.outdir.toString(), 'GLOBAL', 'REFERENCE_MOUNT_UNSET', 'references use /opt/reference but --ref_dir is unset')
-        throw new IllegalStateException('STAGE1_PRECONDITION_FAILURE: references use /opt/reference but --ref_dir is unset')
-    }
     def indexSuffixes = ['.0123', '.amb', '.ann', '.bwt.2bit.64', '.pac']
     indexSuffixes.each { suffix ->
         def idxFile = new File("${hostBwaBase}${suffix}")

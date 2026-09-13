@@ -13,6 +13,49 @@ def mapOrEmpty(Object value) {
     value instanceof Map ? (value as Map) : [:]
 }
 
+def resolveRefPath(String entryPath, String yamlRefDataRoot) {
+    if (!entryPath) {
+        return entryPath
+    }
+    if (entryPath.startsWith('/')) {
+        return entryPath
+    }
+    def baseRoot = yamlRefDataRoot?.trim() ? yamlRefDataRoot.toString().trim() : '/opt/reference'
+    return new File(baseRoot, entryPath).path
+}
+
+def resolveReferencePathValue(Object value, String yamlRefDataRoot, String keyName = null) {
+    if (value instanceof Map) {
+        return (value as Map).collectEntries { key, nested ->
+            [(key): resolveReferencePathValue(nested, yamlRefDataRoot, key.toString())]
+        }
+    }
+    if (value instanceof List) {
+        return (value as List).collect { nested -> resolveReferencePathValue(nested, yamlRefDataRoot, keyName) }
+    }
+    if (!(value instanceof CharSequence)) {
+        return value
+    }
+
+    def pathText = value.toString()
+    if (['reference_checksum_manifest', 'stage3_vcf_schema'].contains(keyName)) {
+        return pathText
+    }
+    return resolveRefPath(pathText, yamlRefDataRoot)
+}
+
+def loadResolvedReferences(def referencesFile) {
+    def ys = new groovy.yaml.YamlSlurper()
+    def referencesDoc = mapOrEmpty(ys.parse(referencesFile))
+    def yamlRefDataRoot = referencesDoc.ref_data_root?.toString()?.trim()
+    def refsParsed = mapOrEmpty(resolveReferencePathValue(mapOrEmpty(referencesDoc.references ?: referencesDoc), yamlRefDataRoot))
+    def stage3Refs = mapOrEmpty(refsParsed.stage3)
+    if (stage3Refs.stage3_vcf_schema && !refsParsed.stage3_vcf_schema) {
+        refsParsed.stage3_vcf_schema = stage3Refs.stage3_vcf_schema
+    }
+    [document: referencesDoc, refs: refsParsed, yamlRefDataRoot: yamlRefDataRoot]
+}
+
 def isStubMode() {
     def commandLine = workflow.hasProperty('commandLine') ? (workflow.commandLine ?: '') : ''
     def stubFlag = workflow.hasProperty('stubRun') ? workflow.stubRun : null
@@ -171,14 +214,17 @@ def hostPathForReference(String pathText, String refDir) {
     if (!pathText) {
         return null
     }
-    if (!pathText.startsWith('/opt/reference')) {
+    if (pathText.startsWith('/opt/reference') && refDir) {
+        def suffix = pathText.replaceFirst('^/opt/reference/?', '')
+        return suffix ? new File(refDir, suffix) : new File(refDir)
+    }
+    if (pathText.startsWith('/')) {
         return new File(pathText)
     }
-    if (!refDir) {
-        return null
+    if (refDir) {
+        return new File(refDir, pathText)
     }
-    def suffix = pathText.replaceFirst('^/opt/reference', '')
-    return new File(refDir + suffix)
+    return new File(pathText)
 }
 
 def resolveStage5Artifact(File stage5Root, String artifactName, String fallbackName = null) {
@@ -206,12 +252,12 @@ def loadAtomicIntakeContract() {
     def infrastructureFile = file(params.infrastructure.toString())
 
     def samplesDoc = ys.parse(inputManifest) ?: [:]
-    def referencesDoc = ys.parse(referencesFile) ?: [:]
+    def referenceInfo = loadResolvedReferences(referencesFile)
     def thresholdsDoc = ys.parse(thresholdsFile) ?: [:]
     def infrastructureDoc = ys.parse(infrastructureFile) ?: [:]
 
     def samplesParsed = samplesDoc.samples
-    def refsParsed = referencesDoc.references
+    def refsParsed = referenceInfo.refs
     if (!(samplesParsed instanceof List) || samplesParsed.isEmpty()) {
         throw new IllegalArgumentException('FATAL: orchestrator input manifest contains no samples')
     }
@@ -227,6 +273,7 @@ def loadAtomicIntakeContract() {
         infrastructureFile: infrastructureFile,
         samplesParsed     : samplesParsed,
         refsParsed        : refsParsed,
+        yamlRefDataRoot   : referenceInfo.yamlRefDataRoot,
         thresholdsParsed  : thresholdsDoc,
         infrastructureParsed: infrastructureDoc,
         inputRoot         : inputManifest.parent ? inputManifest.parent.toString() : projectRoot,
@@ -251,8 +298,16 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
     def projectRoot = intake.projectRoot.toString()
     def inputRoot = intake.inputRoot.toString()
     def infrastructureRoot = intake.infrastructureRoot.toString()
-    def configuredRefRoot = (params.ref_data_root ?: params.ref_dir ?: infrastructureParsed?.storage?.reference_host_root ?: 'assets/references').toString()
-    def refDir = resolvePathWithBases(configuredRefRoot, [projectRoot, infrastructureRoot]).toString()
+    def refDir = null
+    [params.ref_data_root, params.ref_dir, infrastructureParsed?.storage?.reference_host_root, intake.yamlRefDataRoot, '/opt/reference'].find { candidate ->
+        def text = candidate?.toString()?.trim()
+        if (!text) {
+            return false
+        }
+        def resolved = resolvePathWithBases(text, [projectRoot, infrastructureRoot])
+        refDir = resolved.toString()
+        resolved.exists()
+    }
 
     def reportingCfg = thresholdsParsed.reporting ?: thresholdsParsed.clinical?.reporting ?: [:]
     def thresholdRoot = intake.thresholdRoot.toString()
@@ -433,7 +488,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         capture_wes_bed   : refsParsed.capture_wes_bed ?: refsParsed.onco_target_bed,
         onco_target_bed   : refsParsed.onco_target_bed ?: refsParsed.capture_wes_bed,
         mane_transcripts  : refsParsed.mane_transcripts ?: refsParsed.mane_db,
-        stage3_vcf_schema : params.refs?.stage3_vcf_schema ?: "${projectDir}/Stage_3_Variant_Discovery_Engine/tests/schemas/v4.2_Production_Schema.json",
+        stage3_vcf_schema : params.refs?.stage3_vcf_schema ?: refsParsed.stage3_vcf_schema ?: "${projectDir}/Stage_3_Variant_Discovery_Engine/tests/schemas/v4.2_Production_Schema.json",
     ]
 
     def stage3RefsValidated = stage3Refs.collectEntries { key, value ->

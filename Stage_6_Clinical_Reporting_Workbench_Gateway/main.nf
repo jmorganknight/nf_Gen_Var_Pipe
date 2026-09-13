@@ -15,6 +15,49 @@ def mapOrEmpty(Object value) {
     value instanceof Map ? (value as Map) : [:]
 }
 
+def resolveRefPath(String entryPath, String yamlRefDataRoot) {
+    if (!entryPath) {
+        return entryPath
+    }
+    if (entryPath.startsWith('/')) {
+        return entryPath
+    }
+    def baseRoot = yamlRefDataRoot?.trim() ? yamlRefDataRoot.toString().trim() : '/opt/reference'
+    return new File(baseRoot, entryPath).path
+}
+
+def resolveReferencePathValue(Object value, String yamlRefDataRoot, String keyName = null) {
+    if (value instanceof Map) {
+        return (value as Map).collectEntries { key, nested ->
+            [(key): resolveReferencePathValue(nested, yamlRefDataRoot, key.toString())]
+        }
+    }
+    if (value instanceof List) {
+        return (value as List).collect { nested -> resolveReferencePathValue(nested, yamlRefDataRoot, keyName) }
+    }
+    if (!(value instanceof CharSequence)) {
+        return value
+    }
+
+    def pathText = value.toString()
+    if (['reference_checksum_manifest', 'stage3_vcf_schema'].contains(keyName)) {
+        return pathText
+    }
+    return resolveRefPath(pathText, yamlRefDataRoot)
+}
+
+def loadResolvedReferences(def referencesFile) {
+    def ys = new groovy.yaml.YamlSlurper()
+    def referencesDoc = mapOrEmpty(ys.parse(referencesFile))
+    def yamlRefDataRoot = referencesDoc.ref_data_root?.toString()?.trim()
+    def refsParsed = mapOrEmpty(resolveReferencePathValue(mapOrEmpty(referencesDoc.references ?: referencesDoc), yamlRefDataRoot))
+    def stage3Refs = mapOrEmpty(refsParsed.stage3)
+    if (stage3Refs.stage3_vcf_schema && !refsParsed.stage3_vcf_schema) {
+        refsParsed.stage3_vcf_schema = stage3Refs.stage3_vcf_schema
+    }
+    [document: referencesDoc, refs: refsParsed, yamlRefDataRoot: yamlRefDataRoot]
+}
+
 
 def resolvePath(String rawPath, String rootDir) {
     def candidate = new File(rawPath)
@@ -78,14 +121,20 @@ def readOptionalParam(String paramName) {
 
 
 def hostPathForReference(String pathText, String refDir) {
-    if (!pathText?.startsWith('/opt/reference')) {
-        return new File(pathText)
-    }
-    if (!refDir) {
+    if (!pathText) {
         return null
     }
-    def suffix = pathText.replaceFirst('^/opt/reference', '')
-    return new File(refDir + suffix)
+    if (pathText.startsWith('/opt/reference') && refDir) {
+        def suffix = pathText.replaceFirst('^/opt/reference/?', '')
+        return suffix ? new File(refDir, suffix) : new File(refDir)
+    }
+    if (pathText.startsWith('/')) {
+        return new File(pathText)
+    }
+    if (refDir) {
+        return new File(refDir, pathText)
+    }
+    return new File(pathText)
 }
 
 
@@ -182,13 +231,23 @@ workflow {
     }
 
     def stage5Parsed = ys.parse(stage5ManifestFile)
-    def refsParsed = referencesFile ? mapOrEmpty(ys.parse(referencesFile)?.references) : [:]
+    def referenceInfo = referencesFile ? loadResolvedReferences(referencesFile) : [refs: [:], refDataRoot: null]
+    def refsParsed = mapOrEmpty(referenceInfo.refs)
     def refsMerged = mapOrEmpty(refsParsed) + mapOrEmpty(params.refs)
     def thresholdsParsed = thresholdsFile ? mapOrEmpty(ys.parse(thresholdsFile)) : [:]
     def infrastructureParsed = infrastructureFile ? mapOrEmpty(ys.parse(infrastructureFile)) : [:]
     def samples = stage5Parsed.samples
     def infrastructureRoot = infrastructureFile?.parent ? infrastructureFile.parent.toString() : projectDir.toString()
-    def refDir = resolvePath((params.ref_data_root ?: params.ref_dir ?: infrastructureParsed?.storage?.reference_host_root ?: '../assets/references').toString(), infrastructureRoot).toString()
+    def refDir = null
+    [params.ref_data_root, params.ref_dir, infrastructureParsed?.storage?.reference_host_root, referenceInfo.yamlRefDataRoot, '/opt/reference'].find { candidate ->
+        def text = candidate?.toString()?.trim()
+        if (!text) {
+            return false
+        }
+        def resolved = resolvePath(text, infrastructureRoot)
+        refDir = resolved.toString()
+        resolved.exists()
+    }
     def stage5Root = new File(stage5ManifestFile.toString()).parentFile ?: new File(projectDir.toString())
 
     if (!(samples instanceof List) || samples.isEmpty()) {

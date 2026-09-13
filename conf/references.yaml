@@ -4,6 +4,8 @@
 # `references` for existing stage configs that parse `references.yaml` as
 # `references.*`.
 
+ref_data_root: "/opt/reference"
+
 # Core Genome Assembly & Index
 fasta: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
 fai: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
