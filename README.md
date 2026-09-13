@@ -37,11 +37,11 @@ Stage 0 remains the intake/preflight control gate that validates incoming manife
 
 ```mermaid
 flowchart LR
-		S1[Stage 1 Alignment] --> S2[Stage 2 Identity and QC Gate]
-		S2 --> S3[Stage 3 Variant Discovery]
-		S3 --> S4[Stage 4 Phasing and PopPCA]
-		S4 --> S5[Stage 5 Clinical Triage]
-		S5 --> S6[Stage 6 Telemetry and FHIR]
+		S1["Stage 1 Alignment"] --> S2["Stage 2 Identity and QC Gate"]
+		S2 --> S3["Stage 3 Variant Discovery"]
+		S3 --> S4["Stage 4 Phasing and PopPCA"]
+		S4 --> S5["Stage 5 Clinical Triage"]
+		S5 --> S6["Stage 6 Telemetry and FHIR"]
 ```
 
 ### Stage 1: Alignment Read Processing

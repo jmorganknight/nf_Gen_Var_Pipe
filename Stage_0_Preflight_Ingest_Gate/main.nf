@@ -1,6 +1,6 @@
 nextflow.enable.dsl = 2
 
-include { REF_MANIFEST_SNAPSHOT_LOCK } from './modules/local/ref_manifest_snapshot_lock.nf'
+include { PREFLIGHT_INGESTION_GUARD } from './modules/local/preflight_ingestion_guard.nf'
 include { AUTOMATED_INGEST_GATE } from './modules/local/automated_ingest_gate.nf'
 include { EVALUATE_INTAKE_STATUS } from './modules/local/evaluate_intake_status.nf'
 include { INGEST_FAIL_REJECT } from './modules/local/ingest_fail_reject.nf'
@@ -223,12 +223,32 @@ workflow STAGE0_PREFLIGHT_INGEST {
     ch_signer_pub
 
     main:
-    REF_MANIFEST_SNAPSHOT_LOCK(ch_references_yaml, ch_samples_yaml, ch_thresholds_yaml, ch_infrastructure_yaml)
+    def ch_preflight_rows = ch_raw_reads.map { meta, fastq1, fastq2 ->
+        [
+            sample_id: meta.sample_id?.toString() ?: 'UNKNOWN',
+            patient_id: meta.patient_id?.toString() ?: '',
+            case_id: meta.case_id?.toString() ?: '',
+            sample_type: meta.sample_type?.toString() ?: '',
+            fastq_forward: fastq1.toString(),
+            fastq_reverse: fastq2.toString(),
+            mapped_bam: meta.mapped_bam?.toString() ?: '',
+            mapped_bai: meta.mapped_bai?.toString() ?: '',
+            intake_validation_token: meta.intake_validation_token?.toString() ?: '',
+            variant_branches: mapOrEmpty(meta.variant_branches)
+        ]
+    }.collect()
 
-    def ch_snapshot_tokens = REF_MANIFEST_SNAPSHOT_LOCK.out.snapshot_tokens
-    def ch_yaml_bundle = REF_MANIFEST_SNAPSHOT_LOCK.out.yaml_bundle
+    PREFLIGHT_INGESTION_GUARD(ch_preflight_rows, ch_references_yaml, ch_samples_yaml, ch_thresholds_yaml, ch_infrastructure_yaml)
 
-    AUTOMATED_INGEST_GATE(ch_raw_reads, ch_thresholds_yaml)
+    def ch_preflight_lock = PREFLIGHT_INGESTION_GUARD.out.preflight_lock
+    def ch_snapshot_tokens = PREFLIGHT_INGESTION_GUARD.out.snapshot_tokens
+    def ch_yaml_bundle = PREFLIGHT_INGESTION_GUARD.out.yaml_bundle
+
+    def ch_guarded_reads = ch_raw_reads.combine(ch_preflight_lock).map { meta, fastq1, fastq2, _preflightLock ->
+        tuple(meta, fastq1, fastq2)
+    }
+
+    AUTOMATED_INGEST_GATE(ch_guarded_reads, ch_thresholds_yaml)
     EVALUATE_INTAKE_STATUS(AUTOMATED_INGEST_GATE.out.intake_payload)
 
     def intake_gate_routes = EVALUATE_INTAKE_STATUS.out.evaluated_payload.branch { row ->
@@ -250,6 +270,7 @@ workflow STAGE0_PREFLIGHT_INGEST {
 
     BANK_STAGE0_SUCCESS(
         bankable_valid_payload,
+        ch_preflight_lock,
         ch_snapshot_tokens,
         ch_yaml_bundle,
         ch_infrastructure_yaml
@@ -262,6 +283,7 @@ workflow STAGE0_PREFLIGHT_INGEST {
     intake_token = BANK_STAGE0_SUCCESS.out.intake_token
     audit_bundle = BANK_STAGE0_SUCCESS.out.audit_bundle
     banked_samplesheet = ASSEMBLE_STAGE0_BANKED_MANIFEST.out.banked_samplesheet
+    preflight_lock = ch_preflight_lock
 }
 
 workflow {

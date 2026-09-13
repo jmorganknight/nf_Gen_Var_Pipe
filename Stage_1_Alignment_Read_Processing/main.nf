@@ -1,5 +1,6 @@
 nextflow.enable.dsl = 2
 
+include { PREFLIGHT_INGESTION_GUARD } from '../Stage_0_Preflight_Ingest_Gate/modules/local/preflight_ingestion_guard.nf'
 include { STAGE1_ALIGNMENT as STAGE1_ALIGNMENT_SUBFLOW } from './workflows/stage1_alignment.nf'
 
 def mapOrEmpty(Object value) {
@@ -124,7 +125,7 @@ def inferAssayRoute(Map sample) {
 }
 
 
-def buildMetaRow(Map sample, String outdir, String branchTargetCatalogDefault = null) {
+def buildMetaRow(Map sample, String outdir, String branchTargetCatalogDefault = null, String preflightLockPath = null) {
     def platformRaw = sample.sequencing_platform ?: sample.platform ?: sample.sequencer?.platform ?: 'illumina'
     def platform = normalizePlatform(platformRaw.toString())
     def consent = normalizeConsent(sample.consent)
@@ -161,29 +162,93 @@ def buildMetaRow(Map sample, String outdir, String branchTargetCatalogDefault = 
         branch_target_catalog: (sample.branch_target_catalog ?: branchTargetCatalogDefault),
         mapped_bam: sample.mapped_bam,
         mapped_bai: sample.mapped_bai,
+        preflight_lock: (sample.preflight_lock ?: preflightLockPath),
+        preflight_lock_status: (sample.preflight_lock_status ?: 'STAGE0_PREFLIGHT_LOCK_PASS'),
+        reference_snapshot_tokens: sample.reference_snapshot_tokens,
         save_dir: outdir
     ]
 }
 
 
-workflow STAGE1_ALIGNMENT {
+def loadAtomicStage1Contract() {
     def ys = new groovy.yaml.YamlSlurper()
+    def projectRoot = projectDir.toString()
+    def samplesFile = file(((params.input ?: params.samples) ?: '').toString())
+    def referencesFile = file(params.references.toString())
+    def thresholdsFile = file(params.thresholds.toString())
+    def infrastructureFile = file(params.infrastructure.toString())
 
-    def samplesFilePath = (params.input ?: params.samples).toString()
-    def samplesFile = file(samplesFilePath)
-    def referencesFile = file(params.references)
-    def thresholdsFile = file(params.thresholds)
+    def samplesDoc = ys.parse(samplesFile) ?: [:]
+    def referencesDoc = ys.parse(referencesFile) ?: [:]
+    def thresholdsDoc = ys.parse(thresholdsFile) ?: [:]
+    def infrastructureDoc = ys.parse(infrastructureFile) ?: [:]
 
-    def samplesParsed = ys.parse(samplesFile).samples
-    def refsParsed = ys.parse(referencesFile).references
-    def thresholdsParsed = ys.parse(thresholdsFile)
-
+    def samplesParsed = samplesDoc.samples
+    def refsParsed = referencesDoc.references
     if (!(samplesParsed instanceof List) || samplesParsed.isEmpty()) {
         throw new IllegalArgumentException('STAGE1_PRECONDITION_FAILURE: samples manifest contains no samples')
     }
+    if (!(refsParsed instanceof Map) || refsParsed.isEmpty()) {
+        throw new IllegalArgumentException('STAGE1_PRECONDITION_FAILURE: references manifest contains no references block')
+    }
+
+    [
+        projectRoot       : projectRoot,
+        samplesFile       : samplesFile,
+        referencesFile    : referencesFile,
+        thresholdsFile    : thresholdsFile,
+        infrastructureFile: infrastructureFile,
+        samplesParsed     : samplesParsed,
+        refsParsed        : refsParsed,
+        thresholdsParsed  : thresholdsDoc,
+        infrastructureParsed: infrastructureDoc,
+        samplesRoot       : samplesFile.parent ? samplesFile.parent.toString() : projectRoot,
+        infrastructureRoot: infrastructureFile.parent ? infrastructureFile.parent.toString() : projectRoot,
+    ]
+}
+
+
+workflow STAGE1_ALIGNMENT {
+    def intake = loadAtomicStage1Contract()
+
+    def samplesFile = intake.samplesFile
+    def referencesFile = intake.referencesFile
+    def thresholdsFile = intake.thresholdsFile
+    def infrastructureFile = intake.infrastructureFile
+    def samplesParsed = intake.samplesParsed as List
+    def refsParsed = intake.refsParsed as Map
+    def thresholdsParsed = intake.thresholdsParsed as Map
+    def infrastructureParsed = intake.infrastructureParsed as Map
 
     def allowedPlatforms = ['illumina', 'element', 'complete', 'complete_genomics', 'ultima', 'ont'] as Set
-    def samplesRoot = samplesFile.parent ? samplesFile.parent.toString() : projectDir.toString()
+    def samplesRoot = intake.samplesRoot.toString()
+    def infrastructureRoot = intake.infrastructureRoot.toString()
+    def refDir = resolvePath((params.ref_data_root ?: params.ref_dir ?: infrastructureParsed?.storage?.reference_host_root ?: '../assets/references').toString(), infrastructureRoot).toString()
+    def preflightLockPublishedPath = "${params.outdir}/audit_and_qc/preflight_lock/preflight_lock.json"
+
+    def chPreflightRows = channel.fromList(samplesParsed).map { sample ->
+        [
+            sample_id: (sample.sample_id ?: 'UNKNOWN').toString(),
+            patient_id: (sample.patient_id ?: sample.sample_id ?: '').toString(),
+            case_id: (sample.case_id ?: sample.patient_id ?: sample.sample_id ?: '').toString(),
+            sample_type: (sample.sample_type ?: 'germline').toString(),
+            fastq_forward: sample.fastq_forward?.toString() ?: sample.read_file_paths?.read1?.toString() ?: '',
+            fastq_reverse: sample.fastq_reverse?.toString() ?: sample.read_file_paths?.read2?.toString() ?: '',
+            mapped_bam: sample.mapped_bam?.toString() ?: '',
+            mapped_bai: sample.mapped_bai?.toString() ?: '',
+            intake_validation_token: sample.intake_validation_token?.toString() ?: '',
+            branch_target_catalog: sample.branch_target_catalog?.toString() ?: '',
+            variant_branches: mapOrEmpty(sample.variant_branches)
+        ]
+    }.collect()
+
+    PREFLIGHT_INGESTION_GUARD(
+        chPreflightRows,
+        channel.value(referencesFile),
+        channel.value(samplesFile),
+        channel.value(thresholdsFile),
+        channel.value(infrastructureFile)
+    )
 
     samplesParsed.each { sample ->
         def sid = (sample.sample_id ?: 'UNKNOWN').toString()
@@ -219,7 +284,7 @@ workflow STAGE1_ALIGNMENT {
                 writeStage1Rejection(params.outdir.toString(), sid, 'REJECT_MISSING_BRANCH_CATALOG', 'branch_target_catalog missing for enabled variant branches')
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: branch_target_catalog missing for sample '${sid}'")
             }
-            def branchCatalogFile = branchCatalogPath.startsWith('/opt/reference') ? hostPathForReference(branchCatalogPath, params.ref_dir?.toString()) : resolvePath(branchCatalogPath, samplesRoot)
+            def branchCatalogFile = branchCatalogPath.startsWith('/opt/reference') ? hostPathForReference(branchCatalogPath, refDir) : resolvePath(branchCatalogPath, samplesRoot)
             if (branchCatalogFile == null || !branchCatalogFile.exists() || branchCatalogFile.length() == 0L) {
                 writeStage1Rejection(params.outdir.toString(), sid, 'REJECT_MISSING_BRANCH_CATALOG', branchCatalogPath)
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: branch_target_catalog missing or empty for sample '${sid}'")
@@ -303,14 +368,14 @@ workflow STAGE1_ALIGNMENT {
 
     ['reference_genome', 'reference_fai', 'reference_dict', 'onco_target_bed', 'capture_wes_bed', 'sf_bed', 'elprep_intervals'].each { key ->
         def p = requiredRefMap[key].toString()
-        def f = hostPathForReference(p, params.ref_dir?.toString())
+        def f = hostPathForReference(p, refDir)
         if (f == null || !f.exists()) {
             writeStage1Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', "${key}=${p}")
             throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}=${p}'")
         }
     }
 
-    def hostBwaBase = hostPathForReference(bwaBase.toString(), params.ref_dir?.toString())
+    def hostBwaBase = hostPathForReference(bwaBase.toString(), refDir)
     if (hostBwaBase == null) {
         writeStage1Rejection(params.outdir.toString(), 'GLOBAL', 'REFERENCE_MOUNT_UNSET', 'references use /opt/reference but --ref_dir is unset')
         throw new IllegalStateException('STAGE1_PRECONDITION_FAILURE: references use /opt/reference but --ref_dir is unset')
@@ -324,8 +389,10 @@ workflow STAGE1_ALIGNMENT {
         }
     }
 
-    def chPlatformPayload = channel.fromList(samplesParsed.findAll { s -> !s.mapped_bam }).map { sample ->
-        def meta = buildMetaRow(sample as Map, params.outdir.toString(), branchTargetCatalogDefault)
+    def chPlatformPayload = channel.fromList(samplesParsed.findAll { s -> !s.mapped_bam })
+        .combine(PREFLIGHT_INGESTION_GUARD.out.preflight_lock)
+        .map { sample, _preflightLock ->
+        def meta = buildMetaRow(sample as Map, params.outdir.toString(), branchTargetCatalogDefault, preflightLockPublishedPath)
         def fq1Raw = sample.fastq_forward?.toString() ?: sample.read_file_paths?.read1?.toString()
         def fq2Raw = sample.fastq_reverse?.toString() ?: sample.read_file_paths?.read2?.toString()
         def fq1 = resolvePath(fq1Raw, samplesRoot)
@@ -355,7 +422,11 @@ workflow STAGE1_ALIGNMENT {
         bwa_index_base: bwaBase.toString(),
         onco_target_bed: (refsParsed.onco_target_bed ?: refsParsed.capture_wes_bed),
         sf_bed: refsParsed.sf_bed,
-        clinvar_db: refsParsed.clinvar_db
+        clinvar_db: refsParsed.clinvar_db,
+        preflight_lock: preflightLockPublishedPath,
+        preflight_lock_status: 'STAGE0_PREFLIGHT_LOCK_PASS',
+        reference_snapshot_tokens: "${params.outdir}/audit_and_qc/preflight_lock/reference_snapshot.tokens",
+        yaml_snapshot_bundle: "${params.outdir}/audit_and_qc/preflight_lock/yaml_snapshot_bundle.tar.gz"
     ]
     def chReferenceMeta = channel.value(referenceMeta)
 

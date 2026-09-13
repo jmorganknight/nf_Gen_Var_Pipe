@@ -10,16 +10,16 @@ Stage 4 transforms Stage 3 harmonized variants into ancestry- and phasing-aware 
 
 ```mermaid
 flowchart TD
-    A[Stage 3 banked manifest] --> B{Precondition Guard}
-    B -->|token != VALID_PASS\nVARIANTS_HARMONIZED| R[STAGE4_PRECONDITION_FAILURE\nstage4_rejection_audit.json]
-    B -->|normalized VCF/TBI + BAM/BAI valid| C[POPPCA_REFERENCE_PROJECTION]
-    C --> D[ancestry_metrics.json\nPC1-PC10 + ancestry label]
-    C --> E[WHATSHAP_SHAPEIT_PHASER]
-    E --> F[phased.vcf.gz + phased.vcf.gz.tbi]
-    F --> G[BANK_STAGE4_CONTRACT]
+    A["Stage 3 banked manifest"] --> B{"Precondition Guard"}
+    B -->|token != VALID_PASS\nVARIANTS_HARMONIZED| R["STAGE4_PRECONDITION_FAILURE\nstage4_rejection_audit.json"]
+    B -->|normalized VCF/TBI + BAM/BAI valid| C["POPPCA_REFERENCE_PROJECTION"]
+    C --> D["ancestry_metrics.json\nPC1-PC10 + ancestry label"]
+    C --> E["WHATSHAP_SHAPEIT_PHASER"]
+    E --> F["phased.vcf.gz + phased.vcf.gz.tbi"]
+    F --> G["BANK_STAGE4_CONTRACT"]
     D --> G
-    G --> H[ASSEMBLE_STAGE4_BANKED_MANIFEST]
-    H --> I[tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml]
+    G --> H["ASSEMBLE_STAGE4_BANKED_MANIFEST"]
+    H --> I["tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml"]
 ```
 
 ## Population Projection and Phasing Stack

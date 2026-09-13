@@ -29,18 +29,18 @@ This stage validates that Stage 1 contract prerequisites are present and clinica
 
 ```mermaid
 flowchart TD
-    A[Stage 1 banked manifest input] --> B[VALIDATE_STAGE1_PRECONDITION]
-    B --> C[VALIDATE_CHROMOSOMAL_SEX]
-    C --> D[SPECIMEN_PARADIGM_PURITY_RESOLVER]
-    D --> E[ASSAY_TARGET_ROUTER]
-    E --> F[BANK_STAGE2_CONTRACT]
-    F --> G[ASSEMBLE_STAGE2_BANKED_MANIFEST]
+  A["Stage 1 banked manifest input"] --> B["VALIDATE_STAGE1_PRECONDITION"]
+  B --> C["VALIDATE_CHROMOSOMAL_SEX"]
+  C --> D["SPECIMEN_PARADIGM_PURITY_RESOLVER"]
+  D --> E["ASSAY_TARGET_ROUTER"]
+  E --> F["BANK_STAGE2_CONTRACT"]
+  F --> G["ASSEMBLE_STAGE2_BANKED_MANIFEST"]
 
-    B --> B1[stage2_precondition_audit.json]
-    C --> C1[purity_and_sex_validation_audit.json]
+  B --> B1["stage2_precondition_audit.json"]
+  C --> C1["purity_and_sex_validation_audit.json"]
     D --> C1
-    E --> E1[assay_target_router_audit.json]
-    F --> G1[samples_hg002_banked_stage2.yaml]
+  E --> E1["assay_target_router_audit.json"]
+  F --> G1["samples_hg002_banked_stage2.yaml"]
 ```
 
 ## Module Inventory

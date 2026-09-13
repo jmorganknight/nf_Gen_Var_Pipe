@@ -20,28 +20,28 @@ Stage 5 consumes Stage 4 phased outputs and executes five parallel interpretatio
 
 ```mermaid
 flowchart TD
-    A[Stage 4 banked manifest] --> B[STAGE5_PRECONDITION_GUARD]
-    B -->|invalid token or missing phased assets| Z[STAGE5_PRECONDITION_FAILURE\nstage5_rejection_audit.json]
-    B -->|validated| R[STAGE5_ASSAY_AWARE_ROUTER]
+  A["Stage 4 banked manifest"] --> B["STAGE5_PRECONDITION_GUARD"]
+  B -->|invalid token or missing phased assets| Z["STAGE5_PRECONDITION_FAILURE\nstage5_rejection_audit.json"]
+  B -->|validated| R["STAGE5_ASSAY_AWARE_ROUTER"]
 
-    R --> V1[VEP_CORE_ENGINE]
-    R --> V2[CLINVAR_SYNC_ENGINE]
-    R --> V3[GNOMAD_AGGREGATOR_SIEVE]
-    V1 --> C[ACMG_BAYESIAN_CLASSIFIER_STAGE5]
+  R --> V1["VEP_CORE_ENGINE"]
+  R --> V2["CLINVAR_SYNC_ENGINE"]
+  R --> V3["GNOMAD_AGGREGATOR_SIEVE"]
+  V1 --> C["ACMG_BAYESIAN_CLASSIFIER_STAGE5"]
     V2 --> C
     V3 --> C
-    C -->|Tier III only| H[VUS_TRIAGE_HGMD_SEARCH]
-    C -->|Tier I, II, IV retained| M[ASSEMBLE_STAGE5_BANKED_MANIFEST]
+  C -->|Tier III only| H["VUS_TRIAGE_HGMD_SEARCH"]
+  C -->|Tier I, II, IV retained| M["ASSEMBLE_STAGE5_BANKED_MANIFEST"]
     H -->|PS4 or PP1 upgrades| M
 
-    R -->|sf_consent valid| S[ACMG_SF_GATED_EVALUATOR]
-    R -->|sf_consent withheld| S2[acmg_sf_bypassed_audit.json]
+  R -->|sf_consent valid| S["ACMG_SF_GATED_EVALUATOR"]
+  R -->|sf_consent withheld| S2["acmg_sf_bypassed_audit.json"]
 
-    R -->|prs_consent valid and coverage >= 80%| P1[PRS_SCORE_CALCULATOR]
-    R -->|prs_consent withheld| P2[prs_bypassed_audit.json]
-    R -->|coverage < 80%| P3[prs_insufficient_coverage_audit.json]
+  R -->|prs_consent valid and coverage >= 80%| P1["PRS_SCORE_CALCULATOR"]
+  R -->|prs_consent withheld| P2["prs_bypassed_audit.json"]
+  R -->|coverage < 80%| P3["prs_insufficient_coverage_audit.json"]
 
-    B --> G[PYPGX_PHARMCAT_CALLER]
+  B --> G["PYPGX_PHARMCAT_CALLER"]
 
     R --> M
     S --> M
@@ -50,7 +50,7 @@ flowchart TD
     P2 --> M
     P3 --> M
     G --> M
-    M --> O[tests/fixtures/banked_stage5/samples_hg002_banked_stage5.yaml]
+  M --> O["tests/fixtures/banked_stage5/samples_hg002_banked_stage5.yaml"]
 ```
 
 ## Cryptographic Integrity

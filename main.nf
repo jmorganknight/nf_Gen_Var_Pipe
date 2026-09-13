@@ -197,34 +197,72 @@ def resolveStage5Artifact(File stage5Root, String artifactName, String fallbackN
     return artifactName ? resolvePathWithBases(artifactName, [stage5Root.toString(), projectDir.toString()]) : (fallbackName ? new File(stage5Root, fallbackName) : null)
 }
 
-workflow MASTER_WES_ONCO_ORCHESTRATOR {
-    main:
+def loadAtomicIntakeContract() {
     def ys = new groovy.yaml.YamlSlurper()
-
+    def projectRoot = projectDir.toString()
     def inputManifest = file((params.input ?: params.samples).toString())
-    def referencesFile = file(params.references)
-    def thresholdsFile = file(params.thresholds)
-    def infrastructureFile = file(params.infrastructure)
+    def referencesFile = file(params.references.toString())
+    def thresholdsFile = file(params.thresholds.toString())
+    def infrastructureFile = file(params.infrastructure.toString())
 
-    def samplesParsed = ys.parse(inputManifest).samples
-    def refsParsed = ys.parse(referencesFile).references
-    def thresholdsParsed = ys.parse(thresholdsFile)
-    def infrastructureParsed = ys.parse(infrastructureFile) ?: [:]
+    def samplesDoc = ys.parse(inputManifest) ?: [:]
+    def referencesDoc = ys.parse(referencesFile) ?: [:]
+    def thresholdsDoc = ys.parse(thresholdsFile) ?: [:]
+    def infrastructureDoc = ys.parse(infrastructureFile) ?: [:]
 
+    def samplesParsed = samplesDoc.samples
+    def refsParsed = referencesDoc.references
     if (!(samplesParsed instanceof List) || samplesParsed.isEmpty()) {
         throw new IllegalArgumentException('FATAL: orchestrator input manifest contains no samples')
     }
+    if (!(refsParsed instanceof Map) || refsParsed.isEmpty()) {
+        throw new IllegalArgumentException('FATAL: references manifest contains no references block')
+    }
 
-    def projectRoot = projectDir.toString()
-    def inputRoot = inputManifest.parent ? inputManifest.parent.toString() : projectRoot
-    def infrastructureRoot = infrastructureFile.parent ? infrastructureFile.parent.toString() : projectRoot
+    [
+        projectRoot       : projectRoot,
+        inputManifest     : inputManifest,
+        referencesFile    : referencesFile,
+        thresholdsFile    : thresholdsFile,
+        infrastructureFile: infrastructureFile,
+        samplesParsed     : samplesParsed,
+        refsParsed        : refsParsed,
+        thresholdsParsed  : thresholdsDoc,
+        infrastructureParsed: infrastructureDoc,
+        inputRoot         : inputManifest.parent ? inputManifest.parent.toString() : projectRoot,
+        thresholdRoot     : thresholdsFile.parent ? thresholdsFile.parent.toString() : projectRoot,
+        infrastructureRoot: infrastructureFile.parent ? infrastructureFile.parent.toString() : projectRoot,
+    ]
+}
+
+workflow MASTER_WES_ONCO_ORCHESTRATOR {
+    main:
+    def ys = new groovy.yaml.YamlSlurper()
+    def intake = loadAtomicIntakeContract()
+
+    def inputManifest = intake.inputManifest
+    def referencesFile = intake.referencesFile
+    def thresholdsFile = intake.thresholdsFile
+    def infrastructureFile = intake.infrastructureFile
+    def samplesParsed = intake.samplesParsed as List
+    def refsParsed = intake.refsParsed as Map
+    def thresholdsParsed = intake.thresholdsParsed as Map
+    def infrastructureParsed = intake.infrastructureParsed as Map
+    def projectRoot = intake.projectRoot.toString()
+    def inputRoot = intake.inputRoot.toString()
+    def infrastructureRoot = intake.infrastructureRoot.toString()
     def configuredRefRoot = (params.ref_data_root ?: params.ref_dir ?: infrastructureParsed?.storage?.reference_host_root ?: 'assets/references').toString()
     def refDir = resolvePathWithBases(configuredRefRoot, [projectRoot, infrastructureRoot]).toString()
 
     def reportingCfg = thresholdsParsed.reporting ?: thresholdsParsed.clinical?.reporting ?: [:]
-    def thresholdRoot = thresholdsFile.parent ? thresholdsFile.parent.toString() : projectRoot
+    def thresholdRoot = intake.thresholdRoot.toString()
     def checksumManifest = resolvePathWithBases('../assets/reference_checksums.sha256', [thresholdRoot, projectRoot])
-    def checksumMap = checksumManifest.exists() ? validateChecksumManifest(checksumManifest, refDir, projectRoot) : [:]
+    def checksumMap = checksumManifest.exists()
+        ? loadChecksumManifest(checksumManifest, refDir, projectRoot).collectEntries { pathText, payload -> [(pathText): payload.digest] }
+        : [:]
+    def preflightLockPublishedPath = "${params.outdir}/audit_and_qc/preflight_lock/preflight_lock.json"
+    def referenceSnapshotPublishedPath = "${params.outdir}/audit_and_qc/preflight_lock/reference_snapshot.tokens"
+    def yamlSnapshotBundlePublishedPath = "${params.outdir}/audit_and_qc/preflight_lock/yaml_snapshot_bundle.tar.gz"
 
     def pkiPair = resolvePkiPair(reportingCfg, thresholdRoot, projectRoot)
     def signerKeyResolved = pkiPair.key as File
@@ -300,6 +338,10 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         onco_target_bed: (refsParsed.onco_target_bed ?: refsParsed.capture_wes_bed),
         sf_bed: refsParsed.sf_bed,
         clinvar_db: refsParsed.clinvar_db,
+        preflight_lock: preflightLockPublishedPath,
+        preflight_lock_status: 'STAGE0_PREFLIGHT_LOCK_PASS',
+        reference_snapshot_tokens: referenceSnapshotPublishedPath,
+        yaml_snapshot_bundle: yamlSnapshotBundlePublishedPath,
         reference_checksum_manifest: checksumManifest.toString(),
         reference_asset_checksums: checksumMap
     ]
@@ -378,6 +420,10 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         phasing_panel_bed: phasingPanel,
         clinvar_db: refsParsed.clinvar_db,
         thresholds_reference: thresholdsParsed,
+        preflight_lock: preflightLockPublishedPath,
+        preflight_lock_status: 'STAGE0_PREFLIGHT_LOCK_PASS',
+        reference_snapshot_tokens: referenceSnapshotPublishedPath,
+        yaml_snapshot_bundle: yamlSnapshotBundlePublishedPath,
         reference_checksum_manifest: checksumManifest.toString(),
         reference_asset_checksums: checksumMap
     ]
@@ -506,6 +552,10 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         hotspot_registry : refsParsed.hotspot_registry,
         hgmd_db          : refsParsed.hgmd_db ?: refsParsed.hgmd_pro_db,
         prs_weights      : refsParsed.prs_weights ?: refsParsed.models?.prs_weights,
+        preflight_lock   : preflightLockPublishedPath,
+        preflight_lock_status: 'STAGE0_PREFLIGHT_LOCK_PASS',
+        reference_snapshot_tokens: referenceSnapshotPublishedPath,
+        yaml_snapshot_bundle: yamlSnapshotBundlePublishedPath,
         reference_checksum_manifest: checksumManifest.toString(),
         reference_asset_checksums: checksumMap
     ]
@@ -528,6 +578,10 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         sf_bed           : refsParsed.sf_bed,
         prs_weights      : refsParsed.prs_weights ?: refsParsed.models?.prs_weights,
         cyp2d6_mask      : refsParsed.stage3?.cyp2d6_paralog_mask_bed,
+        preflight_lock   : preflightLockPublishedPath,
+        preflight_lock_status: 'STAGE0_PREFLIGHT_LOCK_PASS',
+        reference_snapshot_tokens: referenceSnapshotPublishedPath,
+        yaml_snapshot_bundle: yamlSnapshotBundlePublishedPath,
         reference_checksum_manifest: checksumManifest.toString(),
         reference_asset_checksums: checksumMap
     ]

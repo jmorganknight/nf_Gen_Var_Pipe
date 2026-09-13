@@ -17,6 +17,7 @@ process BANK_STAGE0_SUCCESS {
           path(intake_token_file),
           path(intake_report),
           path(route_audit)
+        path preflight_lock
     path snapshot_tokens
     path yaml_bundle
     path infrastructure_yaml
@@ -53,6 +54,7 @@ process BANK_STAGE0_SUCCESS {
     tar -czf "${sid}.stage0.audit_bundle.tar.gz" \
         "${intake_report}" \
         "${route_audit}" \
+        "${preflight_lock}" \
         "${snapshot_tokens}" \
         "${yaml_bundle}" \
         "${infrastructure_yaml}"
@@ -83,6 +85,9 @@ fragment = {
     'fastq_forward': '${params.outdir}/validated_fastqs/${sid}_R1.validated.fastq.gz',
     'fastq_reverse': '${params.outdir}/validated_fastqs/${sid}_R2.validated.fastq.gz',
     'intake_validation_token': '${params.outdir}/intake_token/${sid}.intake_validation_token',
+    'preflight_lock': '${params.outdir}/audit_and_qc/preflight_lock/preflight_lock.json',
+    'preflight_lock_status': 'STAGE0_PREFLIGHT_LOCK_PASS',
+    'reference_snapshot_tokens': '${params.outdir}/audit_and_qc/preflight_lock/reference_snapshot.tokens',
     'stage0_audit_bundle': '${params.outdir}/audit_bundle/${sid}.stage0.audit_bundle.tar.gz',
     'intake_validation_report': '${params.outdir}/${sid}/audit_and_qc/${sid}.intake_validation_report.json',
     'intake_route_decision': '${params.outdir}/${sid}/audit_and_qc/${sid}.intake_route_decision.json',

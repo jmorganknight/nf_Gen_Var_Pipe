@@ -364,15 +364,18 @@ PYEOF
     """
 
     stub:
+    def stubReferenceMetaJson = groovy.json.JsonOutput.toJson(reference_meta).replace('\n', ' ').replace('\r', '')
     """
     python3 - <<'PYEOF'
 import json
 from pathlib import Path
+
 sid = '${meta.sample_id}'
+reference_meta = json.loads('''${stubReferenceMetaJson}''')
 Path('fhir_genomics_v3.json').write_text(json.dumps({'resourceType': 'Bundle', 'type': 'collection', 'entry': []}, indent=2) + '\\n', encoding='utf-8')
 Path('clinical_report.html').write_text('<html><body><h1>Stage 6 Clinical Reporting Workbench Gateway</h1></body></html>\\n', encoding='utf-8')
 Path('clinical_report.pdf').write_bytes(b'%PDF-1.4\\n%%EOF\\n')
-Path(f'{sid}.provenance_audit.json').write_text(json.dumps({'sample_id': sid, 'component': 'provenance', 'digital_signatures': [{'signature_algorithm': 'RS256', 'signature_value': 'STUB', 'signer_id': 'clinical_signer', 'public_key_fingerprint': 'STUB'}], 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
+Path(f'{sid}.provenance_audit.json').write_text(json.dumps({'sample_id': sid, 'component': 'provenance', 'reference_assets': reference_meta, 'preflight_lock': reference_meta.get('preflight_lock', ''), 'preflight_lock_status': reference_meta.get('preflight_lock_status', ''), 'digital_signatures': [{'signature_algorithm': 'RS256', 'signature_value': 'STUB', 'signer_id': 'clinical_signer', 'public_key_fingerprint': 'STUB'}], 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
 Path(f'{sid}.stage6_report.fragment.json').write_text(json.dumps({'sample_id': sid, 'component': 'fhir_report', 'fhir_json': 'fhir_genomics_v3.json', 'html_report': 'clinical_report.html', 'pdf_report': 'clinical_report.pdf', 'provenance_audit_json': f'{sid}.provenance_audit.json', 'report_status': 'PRELIMINARY', 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
 PYEOF
     """

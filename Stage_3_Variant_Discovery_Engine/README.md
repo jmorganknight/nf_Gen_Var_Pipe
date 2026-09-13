@@ -10,21 +10,21 @@ Stage 3 is the production discovery and harmonization gate that converts Stage 2
 
 ```mermaid
 flowchart TD
-    A[Stage 2 banked manifest] --> B[Load contract]
-    B --> C{variant_branches}
-    C -->|snv_indel| D[SNV/indel branch]
-    C -->|structural_variants| E[Structural variant branch]
-    C -->|copy_number_cnv| F[CNV branch]
-    C -->|str_expansions| G[STR expansion branch]
-    C -->|trisomy_aneuploidy| H[Trisomy/aneuploidy branch]
-    C -->|homologous_pseudogenes| I[Homologous/pseudogene branch]
-    D --> J[VCF harmonization]
+    A["Stage 2 banked manifest"] --> B["Load contract"]
+    B --> C{"variant_branches"}
+    C -->|snv_indel| D["SNV/indel branch"]
+    C -->|structural_variants| E["Structural variant branch"]
+    C -->|copy_number_cnv| F["CNV branch"]
+    C -->|str_expansions| G["STR expansion branch"]
+    C -->|trisomy_aneuploidy| H["Trisomy/aneuploidy branch"]
+    C -->|homologous_pseudogenes| I["Homologous/pseudogene branch"]
+    D --> J["VCF harmonization"]
     E --> J
     F --> J
     G --> J
     H --> J
     I --> J
-    J --> K[Stage 3 banked manifest]
+    J --> K["Stage 3 banked manifest"]
 ```
 
 ## Branch Toggles

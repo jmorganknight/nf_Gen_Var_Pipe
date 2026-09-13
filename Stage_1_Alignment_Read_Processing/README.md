@@ -14,37 +14,37 @@ Stage 1 enforces the first clinical handoff gate after Stage 0 intake.
 
 ```mermaid
 flowchart TD
-    A[Stage 0 banked manifest] --> B{Precondition Guard}
-    B -->|token != VALID_PASS| R[STAGE1_PRECONDITION_FAILURE\nstage1_rejection_audit.json]
-    B -->|token valid| C[PLATFORM_INIT_ROUTER]
+    A["Stage 0 banked manifest"] --> B{"Precondition Guard"}
+    B -->|token != VALID_PASS| R["STAGE1_PRECONDITION_FAILURE\nstage1_rejection_audit.json"]
+    B -->|token valid| C["PLATFORM_INIT_ROUTER"]
 
-    C --> D[Illumina/Element/Complete\nFASTP_TRIM]
-    D --> E[ELPREP_ALIGN_MARKDUP\n(single-pass align/sort/markdup)]
+    C --> D["Illumina/Element/Complete\nFASTP_TRIM"]
+    D --> E["ELPREP_ALIGN_MARKDUP\n(single-pass align/sort/markdup)"]
 
-    C --> F[Ultima\nBWA_MEM2_ALIGN single-end fallback]
-    F --> G[STAGE1_BWA_FINALIZE]
+    C --> F["Ultima\nBWA_MEM2_ALIGN single-end fallback"]
+    F --> G["STAGE1_BWA_FINALIZE"]
 
-    C --> H[Mapped BAM path (optional)]
-    H --> I[VALIDATE_MAPPED_BAM_RG]
+    C --> H["Mapped BAM path (optional)"]
+    H --> I["VALIDATE_MAPPED_BAM_RG"]
     I -->|invalid| R
 
-    E --> J[FORCE_CRAM_GRCh38_TAGS]
+    E --> J["FORCE_CRAM_GRCh38_TAGS"]
     G --> J
     I -->|valid| J
 
-    J --> K[COORDINATE_STANDARDIZED_CRAM_JUNCTION_HUB]
-    K --> L[CROSS_SAMPLE_IDENTITY_GATE]
-    L --> M[STAGE1_FLAGSTAT]
+    J --> K["COORDINATE_STANDARDIZED_CRAM_JUNCTION_HUB"]
+    K --> L["CROSS_SAMPLE_IDENTITY_GATE"]
+    L --> M["STAGE1_FLAGSTAT"]
 
-    C --> N[route audits]
-    D --> O[fastp.json]
-    E --> P[elprep_metrics.json]
-    G --> Q[bwa_metrics.json]
-    K --> S[junction_audit.json]
-    L --> T[identity_audit.json]
-    M --> U[samtools flagstat]
+    C --> N["route audits"]
+    D --> O["fastp.json"]
+    E --> P["elprep_metrics.json"]
+    G --> Q["bwa_metrics.json"]
+    K --> S["junction_audit.json"]
+    L --> T["identity_audit.json"]
+    M --> U["samtools flagstat"]
 
-    N --> V[STAGE1_AUDIT_SINK]
+    N --> V["STAGE1_AUDIT_SINK"]
     O --> V
     P --> V
     Q --> V
@@ -52,8 +52,8 @@ flowchart TD
     T --> V
     U --> V
 
-    L --> W[BANK_STAGE1_CONTRACT]
-    W --> X[ASSEMBLE_STAGE1_BANKED_MANIFEST]
+    L --> W["BANK_STAGE1_CONTRACT"]
+    W --> X["ASSEMBLE_STAGE1_BANKED_MANIFEST"]
 ```
 
 ### ASCII Alternative

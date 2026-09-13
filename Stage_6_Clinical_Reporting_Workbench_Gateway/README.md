@@ -15,23 +15,23 @@ Stage 6 consumes Stage 5 banked artifacts and enforces final fail-closed report 
 
 ```mermaid
 flowchart TD
-    A[Stage 5 banked manifest] --> B[STAGE6_PRECONDITION_GUARD]
-    B -->|invalid token or missing assets| R[STAGE6_PRECONDITION_FAILURE]
-    B --> C[STAGE6_VARIANT_INTEGRITY_AUDITOR]
-    B --> D[DOWNGRADED_VARIANT_SINK]
-    B --> E[STAGE6_WETLAB_CONFIRMATION_GATE]
-    B --> F[MEDICAL_DIRECTOR_WORKBENCH_GATEWAY]
-    B --> G[FHIR_REPORT_BUILDER]
-    B --> H[AUDIT_SINK]
-    B --> I[LAB_METRICS_SINK]
+  A["Stage 5 banked manifest"] --> B["STAGE6_PRECONDITION_GUARD"]
+  B -->|invalid token or missing assets| R["STAGE6_PRECONDITION_FAILURE"]
+  B --> C["STAGE6_VARIANT_INTEGRITY_AUDITOR"]
+  B --> D["DOWNGRADED_VARIANT_SINK"]
+  B --> E["STAGE6_WETLAB_CONFIRMATION_GATE"]
+  B --> F["MEDICAL_DIRECTOR_WORKBENCH_GATEWAY"]
+  B --> G["FHIR_REPORT_BUILDER"]
+  B --> H["AUDIT_SINK"]
+  B --> I["LAB_METRICS_SINK"]
 
-    C --> J[variant ledger + integrity audit]
-    F --> K[signed workbench payload]
-    G --> L[FHIR JSON + HTML + PDF + provenance]
-    H --> M[provenance sink]
-    I --> N[lab metrics sink]
+  C --> J["variant ledger + integrity audit"]
+  F --> K["signed workbench payload"]
+  G --> L["FHIR JSON + HTML + PDF + provenance"]
+  H --> M["provenance sink"]
+  I --> N["lab metrics sink"]
 
-    J --> O[ASSEMBLE_STAGE6_BANKED_MANIFEST]
+  J --> O["ASSEMBLE_STAGE6_BANKED_MANIFEST"]
     K --> O
     L --> O
     M --> O

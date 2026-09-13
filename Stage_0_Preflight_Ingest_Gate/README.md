@@ -6,14 +6,14 @@ Standalone Stage 0 micro-pipeline for preflight intake validation, reference sna
 
 ```mermaid
 flowchart TD
-    A[Raw FASTQ R1/R2 + samplesheet.yaml] --> B[AUTOMATED_INGEST_GATE]
-    C[references.yaml + thresholds.yaml + infrastructure.yaml] --> D[REF_MANIFEST_SNAPSHOT_LOCK]
-    B --> E{intake token}
-    E -->|VALID_PASS| F[BANK_STAGE0_SUCCESS]
-    E -->|INVALID_REJECT| G[INGEST_FAIL_REJECT]
+    A["Raw FASTQ R1/R2 + samplesheet.yaml"] --> B["AUTOMATED_INGEST_GATE"]
+    C["references.yaml + thresholds.yaml + infrastructure.yaml"] --> D["REF_MANIFEST_SNAPSHOT_LOCK"]
+    B --> E{"intake token"}
+    E -->|VALID_PASS| F["BANK_STAGE0_SUCCESS"]
+    E -->|INVALID_REJECT| G["INGEST_FAIL_REJECT"]
     D --> F
-    F --> H[tests/fixtures/banked_stage0/]
-    G --> I[sample audit_and_qc ingest_rejection_audit.json]
+    F --> H["tests/fixtures/banked_stage0/"]
+    G --> I["sample audit_and_qc ingest_rejection_audit.json"]
 ```
 
 ### ASCII Alternative
