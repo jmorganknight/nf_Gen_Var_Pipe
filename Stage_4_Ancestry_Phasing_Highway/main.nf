@@ -44,6 +44,37 @@ def resolvePath(String rawPath, String rootDir) {
     return primary
 }
 
+def resolveStageConfigPath(Object overridePath, Object configuredPath, String fileName) {
+    def overrideText = overridePath?.toString()?.trim()
+    if (overrideText) {
+        return file(overrideText)
+    }
+
+    def configuredText = configuredPath?.toString()?.trim()
+    if (configuredText) {
+        def configuredFile = file(configuredText)
+        if (configuredFile.exists()) {
+            return configuredFile
+        }
+    }
+
+    def primary = new File(projectDir.toString(), "conf/${fileName}")
+    if (primary.exists()) {
+        return file(primary.path)
+    }
+
+    def fallback = new File(projectDir.toString(), "../conf/${fileName}")
+    if (fallback.exists()) {
+        return file(fallback.path)
+    }
+
+    return configuredText ? file(configuredText) : file(fallback.path)
+}
+
+def readOptionalParam(String paramName) {
+    params.containsKey(paramName) ? params[paramName] : null
+}
+
 
 def hostPathForReference(String pathText, String refDir) {
     if (!pathText?.startsWith('/opt/reference')) {
@@ -114,8 +145,9 @@ workflow {
     def ys = new groovy.yaml.YamlSlurper()
 
     def stage3ManifestFile = file((params.input ?: params.samples).toString())
-    def referencesFile = file(params.references)
-    def thresholdsFile = file(params.thresholds)
+    def referencesFile = resolveStageConfigPath(readOptionalParam('ref_config'), params.references, 'references.yaml')
+    def thresholdsFile = resolveStageConfigPath(readOptionalParam('thresh_config'), params.thresholds, 'thresholds.yaml')
+    def infrastructureFile = resolveStageConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
 
     if (!stage3ManifestFile.exists()) {
         throw new IllegalArgumentException('STAGE4_PRECONDITION_FAILURE: missing Stage 3 banked manifest')
@@ -124,6 +156,7 @@ workflow {
     def stage3Parsed = ys.parse(stage3ManifestFile)
     def refsParsed = ys.parse(referencesFile).references
     def thresholdsParsed = ys.parse(thresholdsFile)
+    def infrastructureParsed = ys.parse(infrastructureFile) ?: [:]
     def samples = stage3Parsed.samples
 
     if (!(samples instanceof List) || samples.isEmpty()) {
@@ -131,6 +164,8 @@ workflow {
     }
 
     def samplesRoot = stage3ManifestFile.parent ? stage3ManifestFile.parent.toString() : projectDir.toString()
+    def infrastructureRoot = infrastructureFile.parent ? infrastructureFile.parent.toString() : projectDir.toString()
+    def refDir = resolvePath((params.ref_data_root ?: params.ref_dir ?: infrastructureParsed?.storage?.reference_host_root ?: '../assets/references').toString(), infrastructureRoot).toString()
     def refGenome = refsParsed.reference_genome ?: refsParsed.grch38_fasta
     def refFai = refsParsed.reference_fai ?: refsParsed.grch38_fai ?: (refGenome ? "${refGenome}.fai" : null)
     def refDict = refsParsed.reference_dict ?: refsParsed.grch38_dict
@@ -153,20 +188,20 @@ workflow {
 
     ['reference_genome', 'reference_fai', 'reference_dict'].each { key ->
         def p = requiredRefMap[key].toString()
-        def hostFile = hostPathForReference(p, params.ref_dir?.toString())
+        def hostFile = hostPathForReference(p, refDir)
         if (hostFile == null || !hostFile.exists()) {
             writeStage4Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', "${key}=${p}")
             throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}=${p}'")
         }
     }
 
-    def hostPopPcaModels = hostPathForReference(poppcaModels.toString(), params.ref_dir?.toString())
+    def hostPopPcaModels = hostPathForReference(poppcaModels.toString(), refDir)
     if (hostPopPcaModels == null || !hostPopPcaModels.exists()) {
         writeStage4Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', poppcaModels.toString())
         throw new IllegalStateException('STAGE4_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET poppca_models')
     }
 
-    def hostPhasingPanel = hostPathForReference(phasingPanel.toString(), params.ref_dir?.toString())
+    def hostPhasingPanel = hostPathForReference(phasingPanel.toString(), refDir)
     if (hostPhasingPanel == null || !hostPhasingPanel.exists()) {
         writeStage4Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', phasingPanel.toString())
         throw new IllegalStateException('STAGE4_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET phasing_panel')

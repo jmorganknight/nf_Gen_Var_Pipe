@@ -44,6 +44,8 @@ audit = {
     'sample_id': sid,
     'component': 'precondition',
     'validation_token': '${token}',
+    'preflight_lock': reference_meta.get('preflight_lock', '') if isinstance(reference_meta, dict) else '',
+    'preflight_lock_status': reference_meta.get('preflight_lock_status', '') if isinstance(reference_meta, dict) else '',
     'stage5_manifest': '${stage5_manifest}',
     'clinical_bundle_tar_gz': normalize_optional('${clinical_bundle_tar_gz}'),
     'stage5_provenance_json': normalize_optional('${stage5_provenance_json}'),
@@ -58,6 +60,10 @@ audit = {
     'reference_assets_checked': sorted(reference_meta.keys()) if isinstance(reference_meta, dict) else [],
     'status': 'PASS',
 }
+if not audit['preflight_lock']:
+    raise SystemExit(f"STAGE6_PRECONDITION_FAILURE: missing preflight_lock reference for {sid}")
+if audit['preflight_lock_status'] != 'STAGE0_PREFLIGHT_LOCK_PASS':
+    raise SystemExit(f"STAGE6_PRECONDITION_FAILURE: invalid preflight_lock_status for {sid}: {audit['preflight_lock_status']}")
 Path(f'{sid}.stage6_precondition_guard.json').write_text(json.dumps(audit, indent=2) + "\\n", encoding='utf-8')
 fragment = {
     'sample_id': sid,
@@ -71,7 +77,7 @@ PYEOF
 
     stub:
     """
-    printf '{"node":"STAGE6_PRECONDITION_GUARD","sample_id":"%s","status":"PASS","stub":true}' "${meta.sample_id}" > "${meta.sample_id}.stage6_precondition_guard.json"
+    printf '{"node":"STAGE6_PRECONDITION_GUARD","sample_id":"%s","preflight_lock":"%s","preflight_lock_status":"%s","status":"PASS","stub":true}' "${meta.sample_id}" "${reference_meta.preflight_lock ?: ''}" "${reference_meta.preflight_lock_status ?: ''}" > "${meta.sample_id}.stage6_precondition_guard.json"
     printf '{"sample_id":"%s","component":"precondition","guard_audit":"%s.stage6_precondition_guard.json","status":"PASS"}' "${meta.sample_id}" "${meta.sample_id}" > "${meta.sample_id}.stage6_precondition.fragment.json"
     """
 }

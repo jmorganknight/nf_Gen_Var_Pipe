@@ -53,6 +53,8 @@ remaining_count = len(remaining_vus)
 ledger = {
     'node': 'STAGE6_VARIANT_INTEGRITY_AUDITOR',
     'sample_id': sid,
+    'preflight_lock': reference_meta.get('preflight_lock', '') if isinstance(reference_meta, dict) else '',
+    'preflight_lock_status': reference_meta.get('preflight_lock_status', '') if isinstance(reference_meta, dict) else '',
     'reported_variant_count': reported_count,
     'candidate_vus_count': candidate_count,
     'upgraded_vus_count': upgraded_count,
@@ -63,6 +65,8 @@ ledger = {
     'remaining_vus': remaining_vus,
     'accounted_variant_count': reported_count + remaining_count + upgraded_count,
 }
+if ledger['preflight_lock_status'] and ledger['preflight_lock_status'] != 'STAGE0_PREFLIGHT_LOCK_PASS':
+    raise SystemExit(f"STAGE6_PRECONDITION_FAILURE: invalid preflight_lock_status for {sid}: {ledger['preflight_lock_status']}")
 Path(f'{sid}.stage6_variant_ledger.json').write_text(json.dumps(ledger, indent=2) + "\\n", encoding='utf-8')
 
 loss = candidate_count - (upgraded_count + remaining_count)
@@ -84,6 +88,8 @@ if loss != 0:
 confidence = {
     'node': 'STAGE6_VARIANT_INTEGRITY_AUDITOR',
     'sample_id': sid,
+    'preflight_lock': ledger['preflight_lock'],
+    'preflight_lock_status': ledger['preflight_lock_status'],
     'failure_code': None,
     'reported_variant_count': reported_count,
     'candidate_vus_count': candidate_count,
@@ -108,8 +114,8 @@ PYEOF
 
     stub:
     """
-    printf '{"node":"STAGE6_VARIANT_INTEGRITY_AUDITOR","sample_id":"%s","reported_variant_count":0,"candidate_vus_count":0,"upgraded_vus_count":0,"remaining_vus_count":0,"variant_loss_delta":0,"status":"PASS","stub":true}' "${meta.sample_id}" > "${meta.sample_id}.stage6_variant_integrity_audit.json"
-    printf '{"node":"STAGE6_VARIANT_INTEGRITY_AUDITOR","sample_id":"%s","reported_variant_count":0,"candidate_vus_count":0,"upgraded_vus_count":0,"remaining_vus_count":0,"accounted_variant_count":0}' "${meta.sample_id}" > "${meta.sample_id}.stage6_variant_ledger.json"
+    printf '{"node":"STAGE6_VARIANT_INTEGRITY_AUDITOR","sample_id":"%s","preflight_lock":"%s","preflight_lock_status":"%s","reported_variant_count":0,"candidate_vus_count":0,"upgraded_vus_count":0,"remaining_vus_count":0,"variant_loss_delta":0,"status":"PASS","stub":true}' "${meta.sample_id}" "${reference_meta.preflight_lock ?: ''}" "${reference_meta.preflight_lock_status ?: ''}" > "${meta.sample_id}.stage6_variant_integrity_audit.json"
+    printf '{"node":"STAGE6_VARIANT_INTEGRITY_AUDITOR","sample_id":"%s","preflight_lock":"%s","preflight_lock_status":"%s","reported_variant_count":0,"candidate_vus_count":0,"upgraded_vus_count":0,"remaining_vus_count":0,"accounted_variant_count":0}' "${meta.sample_id}" "${reference_meta.preflight_lock ?: ''}" "${reference_meta.preflight_lock_status ?: ''}" > "${meta.sample_id}.stage6_variant_ledger.json"
     printf '{"sample_id":"%s","component":"variant_integrity","integrity_audit":"%s.stage6_variant_integrity_audit.json","variant_ledger":"%s.stage6_variant_ledger.json","reported_variant_count":0,"candidate_vus_count":0,"status":"PASS"}' "${meta.sample_id}" "${meta.sample_id}" "${meta.sample_id}" > "${meta.sample_id}.stage6_variant_integrity.fragment.json"
     """
 }

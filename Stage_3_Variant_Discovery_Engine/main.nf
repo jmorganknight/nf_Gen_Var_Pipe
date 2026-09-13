@@ -20,7 +20,58 @@ def resolveHostPath(def rawPath, String refDir) {
         }
         return new File(refDir + p.replaceFirst('^/opt/reference', '')).toString()
     }
+    def direct = new File(p)
+    if (direct.exists()) {
+        return direct.toString()
+    }
+    def projectRelative = new File(projectDir.toString(), p)
+    if (projectRelative.exists()) {
+        return projectRelative.toString()
+    }
+    def baseName = new File(p).name
+    def stageLocalCandidates = [
+        new File(projectDir.toString(), "tests/schemas/${baseName}"),
+        new File(projectDir.toString(), "tests/fixtures/${baseName}"),
+        new File(projectDir.toString(), "tests/${baseName}"),
+        new File(projectDir.toString(), "../Stage_3_Variant_Discovery_Engine/tests/schemas/${baseName}"),
+        new File(projectDir.toString(), "../Stage_3_Variant_Discovery_Engine/tests/${baseName}"),
+    ]
+    def recovered = stageLocalCandidates.find { candidate -> candidate.exists() }
+    if (recovered != null) {
+        return recovered.toString()
+    }
     return p
+}
+
+def resolveStageConfigPath(Object overridePath, Object configuredPath, String fileName) {
+    def overrideText = overridePath?.toString()?.trim()
+    if (overrideText) {
+        return file(overrideText)
+    }
+
+    def configuredText = configuredPath?.toString()?.trim()
+    if (configuredText) {
+        def configuredFile = file(configuredText)
+        if (configuredFile.exists()) {
+            return configuredFile
+        }
+    }
+
+    def primary = new File(projectDir.toString(), "conf/${fileName}")
+    if (primary.exists()) {
+        return file(primary.path)
+    }
+
+    def fallback = new File(projectDir.toString(), "../conf/${fileName}")
+    if (fallback.exists()) {
+        return file(fallback.path)
+    }
+
+    return configuredText ? file(configuredText) : file(fallback.path)
+}
+
+def readOptionalParam(String paramName) {
+    params.containsKey(paramName) ? params[paramName] : null
 }
 
 workflow STAGE3_VARIANT_DISCOVERY_ENGINE {
@@ -48,12 +99,17 @@ workflow STAGE3_VARIANT_DISCOVERY {
     if (!stage2Manifest.exists()) {
         throw new IllegalArgumentException('STAGE3_PRECONDITION_FAILURE: missing Stage 2 banked manifest')
     }
-    def referencesFile = file(params.references)
+    def referencesFile = resolveStageConfigPath(readOptionalParam('ref_config'), params.references, 'references.yaml')
+    def thresholdsFile = resolveStageConfigPath(readOptionalParam('thresh_config'), params.thresholds, 'thresholds.yaml')
+    def infrastructureFile = resolveStageConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
     def refsRaw = ys.parse(referencesFile)
     def refsParsed = mapOrEmpty(refsRaw?.references ?: refsRaw)
     def refsFromParams = mapOrEmpty(params.refs)
     def refsCombined = refsParsed + refsFromParams
-    def refDir = params.ref_dir?.toString()
+    ys.parse(thresholdsFile)
+    def infrastructureParsed = ys.parse(infrastructureFile) ?: [:]
+    def infrastructureRoot = infrastructureFile.parent ? infrastructureFile.parent.toString() : projectDir.toString()
+    def refDir = resolveHostPath((params.ref_data_root ?: params.ref_dir ?: infrastructureParsed?.storage?.reference_host_root ?: '../assets/references').toString(), infrastructureRoot)
 
     def stage3Refs = [
         reference_genome  : refsCombined.reference_genome ?: refsCombined.grch38_fasta ?: refsCombined.fasta,

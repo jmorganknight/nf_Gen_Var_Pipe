@@ -36,6 +36,37 @@ def resolvePath(String rawPath, String rootDir) {
     return primary
 }
 
+def resolveStageConfigPath(Object overridePath, Object configuredPath, String fileName) {
+    def overrideText = overridePath?.toString()?.trim()
+    if (overrideText) {
+        return file(overrideText)
+    }
+
+    def configuredText = configuredPath?.toString()?.trim()
+    if (configuredText) {
+        def configuredFile = file(configuredText)
+        if (configuredFile.exists()) {
+            return configuredFile
+        }
+    }
+
+    def primary = new File(projectDir.toString(), "conf/${fileName}")
+    if (primary.exists()) {
+        return file(primary.path)
+    }
+
+    def fallback = new File(projectDir.toString(), "../conf/${fileName}")
+    if (fallback.exists()) {
+        return file(fallback.path)
+    }
+
+    return configuredText ? file(configuredText) : file(fallback.path)
+}
+
+def readOptionalParam(String paramName) {
+    params.containsKey(paramName) ? params[paramName] : null
+}
+
 
 def hostPathForReference(String pathText, String refDir) {
     if (!pathText?.startsWith('/opt/reference')) {
@@ -124,10 +155,9 @@ workflow {
         throw new IllegalArgumentException('STAGE6_PRECONDITION_FAILURE: --input is required and must reference Stage 5 banked manifest')
     }
     def stage5ManifestFile = file(stage5InputPath)
-    def referencesArg = params.references?.toString()
-    def thresholdsArg = params.thresholds?.toString()
-    def referencesFile = referencesArg ? file(referencesArg) : null
-    def thresholdsFile = thresholdsArg ? file(thresholdsArg) : null
+    def referencesFile = resolveStageConfigPath(readOptionalParam('ref_config'), params.references, 'references.yaml')
+    def thresholdsFile = resolveStageConfigPath(readOptionalParam('thresh_config'), params.thresholds, 'thresholds.yaml')
+    def infrastructureFile = resolveStageConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
 
     if (!stage5ManifestFile.exists()) {
         throw new IllegalArgumentException('STAGE6_PRECONDITION_FAILURE: missing Stage 5 banked manifest')
@@ -146,8 +176,10 @@ workflow {
     def refsParsed = referencesFile ? mapOrEmpty(ys.parse(referencesFile)?.references) : [:]
     def refsMerged = mapOrEmpty(refsParsed) + mapOrEmpty(params.refs)
     def thresholdsParsed = thresholdsFile ? mapOrEmpty(ys.parse(thresholdsFile)) : [:]
+    def infrastructureParsed = infrastructureFile ? mapOrEmpty(ys.parse(infrastructureFile)) : [:]
     def samples = stage5Parsed.samples
-    def refDir = params.ref_dir?.toString()
+    def infrastructureRoot = infrastructureFile?.parent ? infrastructureFile.parent.toString() : projectDir.toString()
+    def refDir = resolvePath((params.ref_data_root ?: params.ref_dir ?: infrastructureParsed?.storage?.reference_host_root ?: '../assets/references').toString(), infrastructureRoot).toString()
     def stage5Root = new File(stage5ManifestFile.toString()).parentFile ?: new File(projectDir.toString())
 
     if (!(samples instanceof List) || samples.isEmpty()) {

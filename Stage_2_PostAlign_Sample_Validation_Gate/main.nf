@@ -36,6 +36,37 @@ def resolvePath(String rawPath, String rootDir) {
     return rooted
 }
 
+def resolveStageConfigPath(Object overridePath, Object configuredPath, String fileName) {
+    def overrideText = overridePath?.toString()?.trim()
+    if (overrideText) {
+        return file(overrideText)
+    }
+
+    def configuredText = configuredPath?.toString()?.trim()
+    if (configuredText) {
+        def configuredFile = file(configuredText)
+        if (configuredFile.exists()) {
+            return configuredFile
+        }
+    }
+
+    def primary = new File(projectDir.toString(), "conf/${fileName}")
+    if (primary.exists()) {
+        return file(primary.path)
+    }
+
+    def fallback = new File(projectDir.toString(), "../conf/${fileName}")
+    if (fallback.exists()) {
+        return file(fallback.path)
+    }
+
+    return configuredText ? file(configuredText) : file(fallback.path)
+}
+
+def readOptionalParam(String paramName) {
+    params.containsKey(paramName) ? params[paramName] : null
+}
+
 def hostPathForReference(String pathText, String refDir) {
     if (!pathText) {
         return null
@@ -87,13 +118,15 @@ def buildStage2InputChannel() {
         throw new IllegalArgumentException("STAGE2_PRECONDITION_FAILURE: input manifest does not exist: ${samplesFilePath}")
     }
 
-    def referencesFile = file(params.references)
-    def thresholdsFile = file(params.thresholds)
+    def referencesFile = resolveStageConfigPath(readOptionalParam('ref_config'), params.references, 'references.yaml')
+    def thresholdsFile = resolveStageConfigPath(readOptionalParam('thresh_config'), params.thresholds, 'thresholds.yaml')
+    def infrastructureFile = resolveStageConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
 
     def samplesParsed = ys.parse(samplesFile).samples
     def refsPayload = ys.parse(referencesFile)
     def refsParsed = mapOrEmpty(refsPayload?.references ?: refsPayload)
     def thresholdsParsed = ys.parse(thresholdsFile)
+    def infrastructureParsed = ys.parse(infrastructureFile) ?: [:]
 
     if (!(samplesParsed instanceof List) || samplesParsed.isEmpty()) {
         throw new IllegalArgumentException('STAGE2_PRECONDITION_FAILURE: samples manifest contains no samples')
@@ -113,7 +146,8 @@ def buildStage2InputChannel() {
         verifybamid2_bed: refsCombined.verifybamid2_bed
     ]
 
-    def refDir = params.ref_dir?.toString()
+    def infrastructureRoot = infrastructureFile.parent ? infrastructureFile.parent.toString() : projectDir.toString()
+    def refDir = resolvePath((params.ref_data_root ?: params.ref_dir ?: infrastructureParsed?.storage?.reference_host_root ?: '../assets/references').toString(), infrastructureRoot).toString()
     [
         reference_genome: refsNormalized.reference_genome,
         reference_fai   : refsNormalized.reference_fai,

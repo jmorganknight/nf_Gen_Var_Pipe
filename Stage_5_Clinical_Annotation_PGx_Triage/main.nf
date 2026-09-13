@@ -51,6 +51,37 @@ def resolvePath(String rawPath, String rootDir) {
     return primary
 }
 
+def resolveStageConfigPath(Object overridePath, Object configuredPath, String fileName) {
+    def overrideText = overridePath?.toString()?.trim()
+    if (overrideText) {
+        return file(overrideText)
+    }
+
+    def configuredText = configuredPath?.toString()?.trim()
+    if (configuredText) {
+        def configuredFile = file(configuredText)
+        if (configuredFile.exists()) {
+            return configuredFile
+        }
+    }
+
+    def primary = new File(projectDir.toString(), "conf/${fileName}")
+    if (primary.exists()) {
+        return file(primary.path)
+    }
+
+    def fallback = new File(projectDir.toString(), "../conf/${fileName}")
+    if (fallback.exists()) {
+        return file(fallback.path)
+    }
+
+    return configuredText ? file(configuredText) : file(fallback.path)
+}
+
+def readOptionalParam(String paramName) {
+    params.containsKey(paramName) ? params[paramName] : null
+}
+
 
 def resolveStage4Asset(String rawPath, String rootDir) {
     def first = resolvePath(rawPath, rootDir)
@@ -242,6 +273,9 @@ workflow {
     }
 
     def stage4ManifestFile = file(stage4InputPath)
+    def referencesFile = resolveStageConfigPath(readOptionalParam('ref_config'), params.references, 'references.yaml')
+    def thresholdsFile = resolveStageConfigPath(readOptionalParam('thresh_config'), params.thresholds, 'thresholds.yaml')
+    def infrastructureFile = resolveStageConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
 
     if (!stage4ManifestFile.exists()) {
         throw new IllegalArgumentException('STAGE5_PRECONDITION_FAILURE: missing Stage 4 banked manifest')
@@ -251,12 +285,15 @@ workflow {
     }
 
     def stage4Parsed = ys.parse(stage4ManifestFile)
-    def refsParsed = params.refs instanceof Map ? params.refs : [:]
+    def refsPayload = ys.parse(referencesFile)
+    def refsParsed = mapOrEmpty(refsPayload?.references ?: refsPayload) + (params.refs instanceof Map ? params.refs : [:])
     def projectRoot = projectDir.toString()
-    def thresholdPath = params.thresholds?.toString() ?: "${projectRoot}/../conf/thresholds.yaml"
-    def thresholdFile = file(thresholdPath)
+    def thresholdFile = thresholdsFile
     def thresholdRoot = thresholdFile.parent ? thresholdFile.parent.toString() : projectRoot
     def thresholdsParsed = thresholdFile.exists() ? ys.parse(thresholdFile) : [:]
+    def infrastructureParsed = ys.parse(infrastructureFile) ?: [:]
+    def infrastructureRoot = infrastructureFile.parent ? infrastructureFile.parent.toString() : projectRoot
+    def refDir = resolvePath((params.ref_data_root ?: params.ref_dir ?: infrastructureParsed?.storage?.reference_host_root ?: '../assets/references').toString(), infrastructureRoot).toString()
     def reportingCfg = thresholdsParsed.reporting ?: thresholdsParsed.clinical?.reporting ?: [:]
     def pkiPair = resolvePkiPair(reportingCfg as Map, thresholdRoot, projectRoot)
     def signerKeyResolved = pkiPair.key as File
@@ -280,6 +317,16 @@ workflow {
 
     if (!(samples instanceof List) || samples.isEmpty()) {
         throw new IllegalArgumentException('STAGE5_PRECONDITION_FAILURE: Stage 4 manifest contains no samples')
+    }
+
+    ['reference_genome', 'reference_fai', 'reference_dict', 'onco_target_bed', 'capture_wes_bed', 'sf_bed', 'clinvar_db', 'gnomad_db', 'hgmd_db'].each { key ->
+        def value = refsParsed[key] ?: (key == 'reference_genome' ? refsParsed.grch38_fasta : null) ?: (key == 'reference_fai' ? refsParsed.grch38_fai : null) ?: (key == 'reference_dict' ? refsParsed.grch38_dict : null)
+        if (value) {
+            def resolved = hostPathForReference(value.toString(), refDir)
+            if (resolved == null || !resolved.exists()) {
+                throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}=${value}'")
+            }
+        }
     }
 
     def samplesRoot = stage4ManifestFile.parent ? stage4ManifestFile.parent.toString() : projectDir.toString()
