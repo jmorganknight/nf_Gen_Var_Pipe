@@ -1,0 +1,12 @@
+samples:
+  - sample_id: "HG002_ELEMENT"
+    sample_type: "germline"
+    sequencing_platform: "element"
+    gender: "male"
+    intake_validation_token: "fmea/inputs/valid_stage0_token.txt"
+    fastq_forward: "/media/jmk/Extreme Pro/WES_Onco_References/giab_controls/HG002_FULL_R1.fastq.gz"
+    fastq_reverse: "/media/jmk/Extreme Pro/WES_Onco_References/giab_controls/HG002_FULL_R2.fastq.gz"
+    sequencer:
+      platform: "element"
+      model: "Aviti"
+      flowcell_geometry: "native"

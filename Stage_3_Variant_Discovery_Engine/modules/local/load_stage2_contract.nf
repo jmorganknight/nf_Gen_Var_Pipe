@@ -31,6 +31,9 @@ raw_token = str(record.get('validation_token') or record.get('intake_validation_
 if 'VALID_PASS|SAMPLE_VALIDATED' not in raw_token:
     raise SystemExit(f"STAGE3_PRECONDITION_FAILURE: invalid validation_token for sample '{sid}'")
 
+sequencing_type_raw = record.get('sequencing_type') or record.get('seq_type') or 'WES'
+sequencing_type = str(sequencing_type_raw or 'WES').strip().upper() or 'WES'
+
 sorted_bam = Path(str(record.get('sorted_bam') or '')).expanduser()
 sorted_bai = Path(str(record.get('sorted_bai') or '')).expanduser() if record.get('sorted_bai') else Path(str(sorted_bam) + '.bai')
 if not sorted_bam.exists():
@@ -48,6 +51,7 @@ if not isinstance(stage3_faults, dict):
 
 contract_payload = {
     'sample_id': sid,
+    'sequencing_type': sequencing_type,
     'validation_token': raw_token,
     'sorted_bam': str(sorted_bam.resolve()),
     'sorted_bai': str(sorted_bai.resolve()),

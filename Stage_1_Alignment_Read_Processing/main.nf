@@ -1,17 +1,6 @@
 nextflow.enable.dsl = 2
 
-include { PLATFORM_INIT_ROUTER } from './modules/local/platform_init_router.nf'
-include { FASTP_TRIM } from './modules/local/fastp_trim.nf'
-include { ELPREP_ALIGN_MARKDUP } from './modules/local/elprep_align_markdup.nf'
-include { BWA_MEM2_ALIGN } from './modules/local/bwa_mem2_align.nf'
-include { FORCE_CRAM_GRCh38_TAGS } from './modules/local/force_cram_grch38_tags.nf'
-include { COORDINATE_STANDARDIZED_CRAM_JUNCTION_HUB } from './modules/local/coordinate_standardized_cram_junction_hub.nf'
-include { CROSS_SAMPLE_IDENTITY_GATE } from './modules/local/cross_sample_identity_gate.nf'
-include { STAGE1_BWA_FINALIZE } from './modules/local/stage1_bwa_finalize.nf'
-include { STAGE1_FLAGSTAT } from './modules/local/stage1_flagstat.nf'
-include { STAGE1_AUDIT_SINK } from './modules/local/stage1_audit_sink.nf'
-include { BANK_STAGE1_CONTRACT } from './modules/local/bank_stage1_contract.nf'
-include { ASSEMBLE_STAGE1_BANKED_MANIFEST } from './modules/local/assemble_stage1_banked_manifest.nf'
+include { STAGE1_ALIGNMENT as STAGE1_ALIGNMENT_SUBFLOW } from './workflows/stage1_alignment.nf'
 
 def mapOrEmpty(Object value) {
     value instanceof Map ? (value as Map) : [:]
@@ -124,10 +113,22 @@ def normalizePlatform(String platform) {
 }
 
 
+def inferAssayRoute(Map sample) {
+    def sampleType = (sample.sample_type ?: 'germline').toString().toLowerCase()
+    def pairRole = (sample.pair_role ?: sample.tumor_normal_role ?: '').toString().toLowerCase()
+    def hasPairId = (sample.pair_id ?: sample.tumor_normal_pair_id)
+    if (sampleType.contains('somatic') || sampleType.contains('tumor') || pairRole in ['tumor', 'normal'] || hasPairId) {
+        return 'somatic_paired'
+    }
+    return 'germline_single'
+}
+
+
 def buildMetaRow(Map sample, String outdir, String branchTargetCatalogDefault = null) {
-    def platformRaw = sample.sequencer?.platform ?: 'illumina'
+    def platformRaw = sample.sequencing_platform ?: sample.platform ?: sample.sequencer?.platform ?: 'illumina'
     def platform = normalizePlatform(platformRaw.toString())
     def consent = normalizeConsent(sample.consent)
+    def assayRoute = inferAssayRoute(sample)
     [
         sample_id: sample.sample_id,
         patient_id: (sample.patient_id ?: sample.sample_id),
@@ -138,7 +139,9 @@ def buildMetaRow(Map sample, String outdir, String branchTargetCatalogDefault = 
         analysis_batch_id: sample.analysis_batch_id,
         sample_type: (sample.sample_type ?: 'germline'),
         pathologist_tumor_burden: sample.pathologist_tumor_burden ?: 0.0,
+        physician_tumor_purity: sample.physician_tumor_purity,
         gender: (sample.gender ?: 'unknown'),
+        reported_sex: (sample.reported_sex ?: sample.gender ?: 'unknown'),
         consent: consent,
         consent_tokens: mapOrEmpty(sample.consent_tokens) ?: deriveConsentTokens(consent),
         variant_branches: normalizeVariantBranches(sample.variant_branches),
@@ -147,6 +150,10 @@ def buildMetaRow(Map sample, String outdir, String branchTargetCatalogDefault = 
         specimen: mapOrEmpty(sample.specimen),
         clinical_context: mapOrEmpty(sample.clinical_context),
         sequencer: (sample.sequencer ?: [:]) + [platform: platform],
+        sequencing_platform: platform,
+        assay_route: assayRoute,
+        pair_role: (sample.pair_role ?: sample.tumor_normal_role),
+        pair_id: (sample.pair_id ?: sample.tumor_normal_pair_id),
         stage0_audit_bundle: sample.stage0_audit_bundle,
         intake_validation_token: sample.intake_validation_token,
         intake_validation_report: sample.intake_validation_report,
@@ -160,95 +167,6 @@ def buildMetaRow(Map sample, String outdir, String branchTargetCatalogDefault = 
 
 
 workflow STAGE1_ALIGNMENT {
-
-    take:
-    ch_platform_payload
-    ch_ref_genome
-    ch_ref_fai
-    ch_bwa_index
-    ch_ref_dict
-    ch_svd_panel
-    ch_freemix_limit
-    ch_reference_meta
-
-    main:
-    PLATFORM_INIT_ROUTER(ch_platform_payload)
-
-    def ch_routed_reads = PLATFORM_INIT_ROUTER.out.routed_payload.map { meta, fastq1, fastq2, _token, _report ->
-        tuple(meta, fastq1, fastq2)
-    }
-
-    def lanes = ch_routed_reads.branch { meta, _r1, _r2 ->
-        illumina: ['illumina', 'element', 'complete'].contains(normalizePlatform(meta.sequencer?.platform?.toString()))
-        ultima: normalizePlatform(meta.sequencer?.platform?.toString()) == 'ultima'
-        unsupported: true
-    }
-
-    FASTP_TRIM(lanes.illumina)
-    ELPREP_ALIGN_MARKDUP(
-        FASTP_TRIM.out.reads,
-        ch_ref_genome,
-        ch_ref_fai,
-        ch_bwa_index
-    )
-
-    def ch_ultima_reads = lanes.ultima.map { meta, r1, r2 ->
-        tuple(meta + [single_end: true, fastp_disable_poly_g: true], r1, r2)
-    }
-    BWA_MEM2_ALIGN(
-        ch_ultima_reads,
-        ch_ref_genome,
-        ch_ref_fai,
-        ch_bwa_index
-    )
-    STAGE1_BWA_FINALIZE(BWA_MEM2_ALIGN.out.bam)
-
-    def ch_all_bam_bai = ELPREP_ALIGN_MARKDUP.out.bam_bai
-        .mix(STAGE1_BWA_FINALIZE.out.bam_bai)
-
-    def ch_force_input = ch_all_bam_bai
-        .combine(ch_ref_dict)
-        .map { meta, bam, bai, refDict -> tuple(meta, bam, bai, refDict) }
-
-    FORCE_CRAM_GRCh38_TAGS(ch_force_input)
-    COORDINATE_STANDARDIZED_CRAM_JUNCTION_HUB(FORCE_CRAM_GRCh38_TAGS.out.normalized_stream)
-
-    def ch_identity_input = COORDINATE_STANDARDIZED_CRAM_JUNCTION_HUB.out.verified_stream
-        .combine(ch_svd_panel)
-        .combine(ch_freemix_limit)
-        .map { meta, bam, bai, svdPanel, freemixLimit -> tuple(meta, bam, bai, svdPanel, freemixLimit) }
-
-    CROSS_SAMPLE_IDENTITY_GATE(ch_identity_input)
-    STAGE1_FLAGSTAT(CROSS_SAMPLE_IDENTITY_GATE.out.audited_stream)
-
-    def ch_route_audits = PLATFORM_INIT_ROUTER.out.route_audit.collect()
-    def ch_fastp_jsons = FASTP_TRIM.out.json.map { _meta, jsonPath -> jsonPath }.collect()
-    def ch_align_metrics = ELPREP_ALIGN_MARKDUP.out.json_metrics.map { _meta, p -> p }
-        .mix(STAGE1_BWA_FINALIZE.out.json_metrics.map { _meta, p -> p })
-        .collect()
-    def ch_identity_audits = CROSS_SAMPLE_IDENTITY_GATE.out.audited_stream.map { _meta, audit, _bam, _bai -> audit }.collect()
-    def ch_junction_audits = COORDINATE_STANDARDIZED_CRAM_JUNCTION_HUB.out.audit.collect()
-    def ch_flagstats = STAGE1_FLAGSTAT.out.flagstat.collect()
-
-    STAGE1_AUDIT_SINK(
-        ch_route_audits,
-        ch_fastp_jsons,
-        ch_align_metrics,
-        ch_flagstats,
-        ch_identity_audits,
-        ch_junction_audits
-    )
-
-    BANK_STAGE1_CONTRACT(CROSS_SAMPLE_IDENTITY_GATE.out.audited_stream, ch_reference_meta)
-    ASSEMBLE_STAGE1_BANKED_MANIFEST(BANK_STAGE1_CONTRACT.out.manifest_fragment.collect())
-
-    emit:
-    aligned_contract = ASSEMBLE_STAGE1_BANKED_MANIFEST.out.banked_manifest
-    stage1_audit_payload = STAGE1_AUDIT_SINK.out.payload
-}
-
-
-workflow {
     def ys = new groovy.yaml.YamlSlurper()
 
     def samplesFilePath = (params.input ?: params.samples).toString()
@@ -264,7 +182,7 @@ workflow {
         throw new IllegalArgumentException('STAGE1_PRECONDITION_FAILURE: samples manifest contains no samples')
     }
 
-    def allowedPlatforms = ['illumina', 'element', 'complete', 'complete_genomics', 'ultima'] as Set
+    def allowedPlatforms = ['illumina', 'element', 'complete', 'complete_genomics', 'ultima', 'ont'] as Set
     def samplesRoot = samplesFile.parent ? samplesFile.parent.toString() : projectDir.toString()
 
     samplesParsed.each { sample ->
@@ -286,7 +204,7 @@ workflow {
             throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: sample '${sid}' token was '${token}'")
         }
 
-        def platform = (sample.sequencer?.platform ?: 'illumina').toString().toLowerCase()
+        def platform = normalizePlatform((sample.sequencing_platform ?: sample.platform ?: sample.sequencer?.platform ?: 'illumina').toString())
         if (!allowedPlatforms.contains(platform)) {
             writeStage1Rejection(params.outdir.toString(), sid, 'UNSUPPORTED_PLATFORM', platform)
             throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: unsupported platform '${platform}' for sample '${sid}'")
@@ -343,8 +261,14 @@ workflow {
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: BAM @RG tags missing for sample '${sid}'")
             }
         } else {
-            def fq1 = resolvePath(sample.fastq_forward.toString(), samplesRoot)
-            def fq2 = resolvePath(sample.fastq_reverse.toString(), samplesRoot)
+            def fq1Raw = sample.fastq_forward?.toString() ?: sample.read_file_paths?.read1?.toString()
+            def fq2Raw = sample.fastq_reverse?.toString() ?: sample.read_file_paths?.read2?.toString()
+            if (!fq1Raw) {
+                writeStage1Rejection(params.outdir.toString(), sid, 'FASTQ_INPUT_MISSING', 'r1 path missing')
+                throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: FASTQ R1 input missing for sample '${sid}'")
+            }
+            def fq1 = resolvePath(fq1Raw, samplesRoot)
+            def fq2 = fq2Raw ? resolvePath(fq2Raw, samplesRoot) : fq1
             if (!fq1.exists() || !fq2.exists()) {
                 writeStage1Rejection(params.outdir.toString(), sid, 'FASTQ_INPUT_MISSING', "r1=${fq1}; r2=${fq2}")
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: FASTQ inputs missing for sample '${sid}'")
@@ -352,10 +276,11 @@ workflow {
         }
     }
 
-    def refGenome = refsParsed.reference_genome ?: refsParsed.grch38_fasta
-    def refFai = refsParsed.reference_fai ?: refsParsed.grch38_fai ?: (refGenome ? "${refGenome}.fai" : null)
-    def refDict = refsParsed.reference_dict ?: refsParsed.grch38_dict
-    def bwaBase = refsParsed.bwa_index_base ?: refsParsed.bwa_index
+    def refsDynamic = (params.refs instanceof Map) ? (params.refs as Map) : [:]
+    def refGenome = refsDynamic.reference_genome ?: refsDynamic.fasta ?: refsParsed.reference_genome ?: refsParsed.grch38_fasta
+    def refFai = refsDynamic.reference_fai ?: refsDynamic.fai ?: refsParsed.reference_fai ?: refsParsed.grch38_fai ?: (refGenome ? "${refGenome}.fai" : null)
+    def refDict = refsDynamic.reference_dict ?: refsDynamic.dict ?: refsParsed.reference_dict ?: refsParsed.grch38_dict
+    def bwaBase = refsDynamic.bwa_index_base ?: refsDynamic.bwa_index ?: refsParsed.bwa_index_base ?: refsParsed.bwa_index
     def branchTargetCatalogDefault = (refsParsed.capture_wes_bed ?: refsParsed.onco_target_bed)?.toString()
     def elprepIntervals = refsParsed.elprep_intervals ?: refsParsed.onco_target_intervals ?: branchTargetCatalogDefault
 
@@ -401,16 +326,18 @@ workflow {
 
     def chPlatformPayload = channel.fromList(samplesParsed.findAll { s -> !s.mapped_bam }).map { sample ->
         def meta = buildMetaRow(sample as Map, params.outdir.toString(), branchTargetCatalogDefault)
-        def fq1 = resolvePath(sample.fastq_forward.toString(), samplesRoot)
-        def fq2 = resolvePath(sample.fastq_reverse.toString(), samplesRoot)
+        def fq1Raw = sample.fastq_forward?.toString() ?: sample.read_file_paths?.read1?.toString()
+        def fq2Raw = sample.fastq_reverse?.toString() ?: sample.read_file_paths?.read2?.toString()
+        def fq1 = resolvePath(fq1Raw, samplesRoot)
+        def fq2 = fq2Raw ? resolvePath(fq2Raw, samplesRoot) : fq1
         def tokenPath = resolvePath(sample.intake_validation_token.toString(), samplesRoot)
-        def intakeReport = sample.intake_validation_report ? resolvePath(sample.intake_validation_report.toString(), samplesRoot) : null
+        def intakeReport = sample.intake_validation_report ? resolvePath(sample.intake_validation_report.toString(), samplesRoot) : tokenPath
         tuple(
             meta,
             file(fq1, checkIfExists: true),
             file(fq2, checkIfExists: true),
             file(tokenPath, checkIfExists: true),
-            file(intakeReport, checkIfExists: intakeReport != null)
+            file(intakeReport, checkIfExists: true)
         )
     }
 
@@ -432,7 +359,7 @@ workflow {
     ]
     def chReferenceMeta = channel.value(referenceMeta)
 
-    STAGE1_ALIGNMENT(
+    STAGE1_ALIGNMENT_SUBFLOW(
         chPlatformPayload,
         chRefGenome,
         chRefFai,
@@ -442,4 +369,8 @@ workflow {
         chFreemix,
         chReferenceMeta
     )
+}
+
+workflow {
+    STAGE1_ALIGNMENT()
 }

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Stage3 VCF 4.2 Production Schema",
+  "description": "Minimal governance contract used by MASTER_HARMONIZED_VCF_PAYLOAD to fail closed on malformed VCF payloads.",
+  "type": "object",
+  "required_header_prefix": "##fileformat=VCFv4.2",
+  "required_columns": [
+    "#CHROM",
+    "POS",
+    "ID",
+    "REF",
+    "ALT",
+    "QUAL",
+    "FILTER",
+    "INFO"
+  ]
+}

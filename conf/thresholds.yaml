@@ -72,8 +72,8 @@ clinical:
     publish_dir_mode: "copy"  # File publication mode expected for reportable clinical artifacts.
     lis_endpoint_url: "https://fhir.clinical-lab.internal/v1/Observation"  # Internal LIS/FHIR endpoint for report payload exchange.
     lis_max_retries: 3  # Maximum retry count for LIS publication attempts.
-    pki_key_path: "/media/drive_c/nf_pipes/nf_WES_Onco_Risk/conf/keys/clinical_signer.pem"  # Absolute signer private-key path used for RS256 clinical payload signatures.
-    pki_pub_key_path: "/media/drive_c/nf_pipes/nf_WES_Onco_Risk/conf/keys/clinical_signer.pub.pem"  # Absolute signer public-key path used for audit fingerprinting.
+    pki_key_path: "keys/clinical_signer.pem"  # Repo-governed signer private-key path used for RS256 clinical payload signatures.
+    pki_pub_key_path: "keys/clinical_signer.pub.pem"  # Repo-governed signer public-key path used for audit fingerprinting.
     consent_token_namespace: "CONSENT_V1"  # Namespace label applied to derived consent-routing tokens.
 
 platform_specific_overrides:

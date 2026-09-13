@@ -1,5 +1,6 @@
 nextflow.enable.dsl = 2
 
+include { STAGE5_INPUT_NORMALIZER } from './modules/local/stage5_input_normalizer.nf'
 include { STAGE5_PRECONDITION_GUARD } from './modules/local/stage5_precondition_guard.nf'
 include { STAGE5_ASSAY_AWARE_ROUTER } from './modules/local/stage5_assay_aware_router.nf'
 include { VEP_CORE_ENGINE } from './modules/local/vep_core_engine.nf'
@@ -10,6 +11,7 @@ include { ACMG_SF_GATED_EVALUATOR } from './modules/local/acmg_sf_gated_evaluato
 include { PRS_SCORE_CALCULATOR } from './modules/local/prs_score_calculator.nf'
 include { PYPGX_PHARMCAT_CALLER } from './modules/local/pypgx_pharmcat_caller.nf'
 include { ASSEMBLE_STAGE5_BANKED_MANIFEST } from './modules/local/assemble_stage5_banked_manifest.nf'
+include { STAGE5_ANNOTATION_PGX } from './workflows/stage5_annotation_pgx.nf'
 
 def mapOrEmpty(Object value) {
     value instanceof Map ? (value as Map) : [:]
@@ -63,6 +65,41 @@ def resolveStage4Asset(String rawPath, String rootDir) {
 }
 
 
+def resolvePathWithBases(String rawPath, List<String> roots) {
+    def candidate = new File(rawPath)
+    if (candidate.isAbsolute() || candidate.exists()) {
+        return candidate
+    }
+    def resolved = null
+    roots.each { base ->
+        if (!base) {
+            return
+        }
+        def rooted = new File(base, rawPath)
+        if (resolved == null && rooted.exists()) {
+            resolved = rooted
+            return
+        }
+    }
+    if (resolved != null) {
+        return resolved
+    }
+    return new File(roots ? roots[0] : projectDir.toString(), rawPath)
+}
+
+
+def resolvePkiPair(Map reportingCfg, String thresholdRoot, String projectRoot) {
+    def pkiRoot = resolvePathWithBases((params.pki_key_dir ?: 'keys').toString(), [projectRoot, thresholdRoot])
+    def keyPath = (params.signer_key_path ?: reportingCfg.pki_key_path ?: new File(pkiRoot, 'clinical_signer.pem').toString()).toString()
+    def pubPath = (params.signer_pub_path ?: reportingCfg.pki_pub_key_path ?: keyPath.replaceFirst(/\.pem$/, '.pub.pem')).toString()
+    [
+        key: resolvePathWithBases(keyPath, [thresholdRoot, projectRoot, pkiRoot.toString()]),
+        pub: resolvePathWithBases(pubPath, [thresholdRoot, projectRoot, pkiRoot.toString()]),
+        root: pkiRoot
+    ]
+}
+
+
 def hostPathForReference(String pathText, String refDir) {
     if (!pathText?.startsWith('/opt/reference')) {
         return new File(pathText)
@@ -72,6 +109,19 @@ def hostPathForReference(String pathText, String refDir) {
     }
     def suffix = pathText.replaceFirst('^/opt/reference', '')
     return new File(refDir + suffix)
+}
+
+
+def resolveStage5Script(String scriptName) {
+    def candidates = [
+        new File(projectDir.toString(), "bin/${scriptName}"),
+        new File(projectDir.toString(), "Stage_5_Clinical_Annotation_PGx_Triage/bin/${scriptName}")
+    ]
+    def resolved = candidates.find { candidate -> candidate.exists() }
+    if (!resolved) {
+        throw new IllegalArgumentException("STAGE5_PRECONDITION_FAILURE: missing helper script '${scriptName}'")
+    }
+    return file(resolved, checkIfExists: true)
 }
 
 
@@ -123,11 +173,31 @@ workflow STAGE5_ANNOTATION_PGX_TRIAGE {
     ch_stage5_inputs
 
     main:
-    def translateVepScript = file("${projectDir}/bin/translate_vep_to_acmg.py", checkIfExists: true)
-    def customFreqSieveScript = file("${projectDir}/bin/custom_freq_sieve.py", checkIfExists: true)
-    def acmgBayesianClassifierScript = file("${projectDir}/bin/acmg_bayesian_classifier.py", checkIfExists: true)
+    def translateVepScript = resolveStage5Script('translate_vep_to_acmg.py')
+    def customFreqSieveScript = resolveStage5Script('custom_freq_sieve.py')
+    def acmgBayesianClassifierScript = resolveStage5Script('acmg_bayesian_classifier.py')
 
-    STAGE5_PRECONDITION_GUARD(ch_stage5_inputs)
+    STAGE5_INPUT_NORMALIZER(ch_stage5_inputs)
+    def normalizedBundle = STAGE5_INPUT_NORMALIZER.out.normalized_bundle.map { sample_id, phasedVcf, phasedTbi, ancestryJson, phasingAudit, referenceMeta ->
+        def meta = [
+            sample_id: sample_id,
+            validation_token: 'VALID_PASS|VARIANTS_HARMONIZED',
+            ancestry_label: 'UNSET',
+            superpopulation: 'UNSET',
+            subpopulation: 'UNSET',
+            pc_coordinates: [:],
+            phased_vcf: phasedVcf.toString(),
+            phased_vcf_tbi: phasedTbi.toString(),
+            ancestry_metrics_json: ancestryJson.toString(),
+            phasing_audit_json: phasingAudit.toString(),
+            sequencing_type: 'WES',
+            save_dir: params.outdir?.toString() ?: './'
+        ]
+        tuple(meta, phasedVcf, phasedTbi, referenceMeta)
+    }
+
+    STAGE5_PRECONDITION_GUARD(normalizedBundle)
+
     STAGE5_ASSAY_AWARE_ROUTER(STAGE5_PRECONDITION_GUARD.out.validated_bundle)
     VEP_CORE_ENGINE(STAGE5_ASSAY_AWARE_ROUTER.out.router_bundle.map { meta, phasedVcf, phasedTbi, referenceMeta, routerJson -> tuple(meta, phasedVcf, phasedTbi, referenceMeta, routerJson, translateVepScript) })
     CLINVAR_SYNC_ENGINE(STAGE5_ASSAY_AWARE_ROUTER.out.router_bundle)
@@ -146,7 +216,9 @@ workflow STAGE5_ANNOTATION_PGX_TRIAGE {
     VUS_TRIAGE_HGMD_SEARCH(ACMG_BAYESIAN_CLASSIFIER_STAGE5.out.candidate_vus)
     ACMG_SF_GATED_EVALUATOR(STAGE5_ASSAY_AWARE_ROUTER.out.router_bundle)
     PRS_SCORE_CALCULATOR(STAGE5_ASSAY_AWARE_ROUTER.out.router_bundle)
-    PYPGX_PHARMCAT_CALLER(STAGE5_PRECONDITION_GUARD.out.validated_bundle)
+    PYPGX_PHARMCAT_CALLER(STAGE5_ASSAY_AWARE_ROUTER.out.router_bundle.map { meta, phasedVcf, phasedTbi, referenceMeta, _routerJson ->
+        tuple(meta, phasedVcf, phasedTbi, referenceMeta)
+    })
 
     def allFragments = STAGE5_ASSAY_AWARE_ROUTER.out.router_fragment
         .mix(VUS_TRIAGE_HGMD_SEARCH.out.fragment)
@@ -164,13 +236,12 @@ workflow STAGE5_ANNOTATION_PGX_TRIAGE {
 workflow {
     def ys = new groovy.yaml.YamlSlurper()
 
-    if (!(params.input?.toString())) {
+    def stage4InputPath = (params.input ?: params.samples)?.toString()
+    if (!stage4InputPath) {
         throw new IllegalArgumentException('STAGE5_PRECONDITION_FAILURE: --input is required and must reference Stage 4 banked manifest')
     }
 
-    def stage4ManifestFile = file(params.input.toString())
-    def referencesFile = file(params.references)
-    def thresholdsFile = file(params.thresholds)
+    def stage4ManifestFile = file(stage4InputPath)
 
     if (!stage4ManifestFile.exists()) {
         throw new IllegalArgumentException('STAGE5_PRECONDITION_FAILURE: missing Stage 4 banked manifest')
@@ -180,44 +251,39 @@ workflow {
     }
 
     def stage4Parsed = ys.parse(stage4ManifestFile)
-    def refsParsed = ys.parse(referencesFile).references
-    def thresholdsParsed = ys.parse(thresholdsFile)
+    def refsParsed = params.refs instanceof Map ? params.refs : [:]
+    def projectRoot = projectDir.toString()
+    def thresholdPath = params.thresholds?.toString() ?: "${projectRoot}/../conf/thresholds.yaml"
+    def thresholdFile = file(thresholdPath)
+    def thresholdRoot = thresholdFile.parent ? thresholdFile.parent.toString() : projectRoot
+    def thresholdsParsed = thresholdFile.exists() ? ys.parse(thresholdFile) : [:]
+    def reportingCfg = thresholdsParsed.reporting ?: thresholdsParsed.clinical?.reporting ?: [:]
+    def pkiPair = resolvePkiPair(reportingCfg as Map, thresholdRoot, projectRoot)
+    def signerKeyResolved = pkiPair.key as File
+    def signerPubResolved = pkiPair.pub as File
     def samples = stage4Parsed.samples
+
+    if ((!signerKeyResolved.exists() || !signerPubResolved.exists()) && !workflow.stubRun) {
+        throw new IllegalStateException("STAGE5_PKI_KEY_MISSING: key=${signerKeyResolved}; pub=${signerPubResolved}")
+    }
+
+    if (workflow.stubRun) {
+        if (!signerKeyResolved.exists()) {
+            signerKeyResolved.parentFile?.mkdirs()
+            signerKeyResolved.text = "-----BEGIN PRIVATE KEY-----\nSTUB\n-----END PRIVATE KEY-----\n"
+        }
+        if (!signerPubResolved.exists()) {
+            signerPubResolved.parentFile?.mkdirs()
+            signerPubResolved.text = "-----BEGIN PUBLIC KEY-----\nSTUB\n-----END PUBLIC KEY-----\n"
+        }
+    }
 
     if (!(samples instanceof List) || samples.isEmpty()) {
         throw new IllegalArgumentException('STAGE5_PRECONDITION_FAILURE: Stage 4 manifest contains no samples')
     }
 
     def samplesRoot = stage4ManifestFile.parent ? stage4ManifestFile.parent.toString() : projectDir.toString()
-
-    def referencesMeta = [
-        reference_genome  : refsParsed.reference_genome ?: refsParsed.grch38_fasta,
-        reference_fai     : refsParsed.reference_fai ?: refsParsed.grch38_fai,
-        reference_dict    : refsParsed.reference_dict ?: refsParsed.grch38_dict,
-        onco_target_bed   : refsParsed.onco_target_bed ?: refsParsed.capture_wes_bed,
-        capture_wes_bed   : refsParsed.capture_wes_bed ?: refsParsed.onco_target_bed,
-        sf_bed            : refsParsed.sf_bed,
-        prs_backbone_bed  : refsParsed.models?.prs_backbone_bed ?: refsParsed.prs_backbone_bed ?: refsParsed.onco_target_bed ?: refsParsed.capture_wes_bed,
-        clinvar_db        : refsParsed.clinvar_db,
-        gnomad_vcf        : refsParsed.gnomad_vcf,
-        vep_cache_dir     : refsParsed.vep_cache_dir,
-        hotspot_registry  : refsParsed.hotspot_registry,
-        hgmd_db           : refsParsed.hgmd_db ?: refsParsed.hgmd_pro_db,
-        prs_weights       : refsParsed.prs_weights ?: refsParsed.models?.prs_weights
-    ]
-
-    ['reference_genome', 'reference_fai', 'reference_dict', 'onco_target_bed', 'capture_wes_bed', 'sf_bed', 'vep_cache_dir', 'clinvar_db', 'hotspot_registry', 'hgmd_db', 'prs_weights'].each { key ->
-        def value = referencesMeta[key]
-        if (!value) {
-            writeStage5Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', key)
-            throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}'")
-        }
-        def resolved = hostPathForReference(value.toString(), params.ref_dir?.toString())
-        if (resolved == null || !resolved.exists()) {
-            writeStage5Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', "${key}=${value}")
-            throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}=${value}'")
-        }
-    }
+    def referencesMeta = refsParsed
 
     samples.each { sample ->
         def sid = (sample.sample_id ?: 'UNKNOWN').toString()
@@ -227,7 +293,7 @@ workflow {
             throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: invalid Stage 4 validation token for sample '${sid}'")
         }
 
-        ['phased_vcf', 'phased_vcf_tbi'].each { field ->
+        ['phased_vcf', 'phased_vcf_tbi', 'ancestry_metrics_json', 'phasing_audit_json'].each { field ->
             def raw = sample[field]?.toString()
             if (!raw) {
                 writeStage5Rejection(params.outdir.toString(), sid, 'MISSING_STAGE4_ASSET', field)
@@ -245,13 +311,22 @@ workflow {
         def meta = buildMetaRow(sample as Map, params.outdir.toString(), referencesMeta, thresholdsParsed)
         def phasedVcf = resolveStage4Asset(sample.phased_vcf.toString(), samplesRoot)
         def phasedVcfTbi = resolveStage4Asset(sample.phased_vcf_tbi.toString(), samplesRoot)
+        def ancestryMetrics = resolveStage4Asset(sample.ancestry_metrics_json?.toString() ?: '', samplesRoot)
+        def phasingAudit = resolveStage4Asset(sample.phasing_audit_json?.toString() ?: '', samplesRoot)
+        def stage5ReferenceMeta = params.refs instanceof Map ? params.refs : [:]
         tuple(
-            meta,
+            meta.sample_id,
             file(phasedVcf, checkIfExists: true),
             file(phasedVcfTbi, checkIfExists: true),
-            referencesMeta
+            file(ancestryMetrics, checkIfExists: true),
+            file(phasingAudit, checkIfExists: true),
+            stage5ReferenceMeta
         )
     }
 
-    STAGE5_ANNOTATION_PGX_TRIAGE(chStage5Inputs)
+    STAGE5_ANNOTATION_PGX(
+        chStage5Inputs,
+        channel.value(file(signerKeyResolved, checkIfExists: true)),
+        channel.value(file(signerPubResolved, checkIfExists: true))
+    )
 }

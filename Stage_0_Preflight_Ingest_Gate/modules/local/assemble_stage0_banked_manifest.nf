@@ -3,7 +3,7 @@ process ASSEMBLE_STAGE0_BANKED_MANIFEST {
     label 'process_low'
     container 'wes-onco-core:1.0.0'
 
-    publishDir { new File(params.outdir.toString()).parentFile.parentFile.toString() }, mode: 'copy', overwrite: true, saveAs: { _name -> params.banked_samplesheet_name.toString() }
+    publishDir "${params.outdir}", mode: 'copy', overwrite: true, saveAs: { _name -> params.banked_samplesheet_name.toString() }
 
     input:
     path fragment_jsons

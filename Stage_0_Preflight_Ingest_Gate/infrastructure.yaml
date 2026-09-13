@@ -9,21 +9,21 @@
 storage:
   work_root: "/scratch/nextflow_work"  # Scratch work directory for ephemeral Nextflow task state.
   tmp_root: "/scratch/tmp"  # Shared temporary directory mounted into containers as /tmp.
-  reference_host_root: "/media/jmk/Extreme Pro/WES_Onco_References"  # Host path mounted read-only to /opt/reference for governed reference assets.
+  reference_host_root: "../assets/references"  # Host reference root resolved from `params.ref_data_root` and mounted read-only to /opt/reference.
 
 containers:
   core:
-    image: "wes-onco-core:1.0.0"  # Primary runtime image used for Stage 0 validation and banking tasks.
+    image: "wes-onco-core@sha256:d630bd5dd78ba4f469b80d7b0dbd09a5a1bd8841415ed1bbe91d8559a1ff8906"  # Primary runtime image used for Stage 0 validation and banking tasks.
     sif: "file://containers/wes-onco-core.sif"  # Apptainer/Singularity image URI for offline or HPC execution.
-    # digest: "sha256:..."  # Populate before clinical release; REF_MANIFEST_SNAPSHOT_LOCK records this value.
+    digest: "sha256:d630bd5dd78ba4f469b80d7b0dbd09a5a1bd8841415ed1bbe91d8559a1ff8906"  # Local immutable image ID captured for governed runs.
   annotation:
-    image: "wes-onco-annotation:latest"  # Downstream annotation image tracked here so snapshot audits capture the whole governed stack.
+    image: "wes-onco-annotation@sha256:84ebaaaaf5512dc8398dc98a61215a5d419caf1a32bd1ef68369dbcb19d1b69c"  # Downstream annotation image tracked here so snapshot audits capture the whole governed stack.
     sif: "file://containers/wes-onco-annotation.sif"  # Apptainer/SIF URI for the annotation container.
-    # digest: "sha256:..."  # Populate with immutable registry digest before production sign-off.
+    digest: "sha256:84ebaaaaf5512dc8398dc98a61215a5d419caf1a32bd1ef68369dbcb19d1b69c"  # Local immutable image ID captured for governed runs.
   multiomics:
-    image: "wes-onco-multiomics:1.0.0"  # Downstream multiomics image tracked for cross-stage governance.
+    image: "wes-onco-multiomics@sha256:42315555d3fef25d9369af6d8b3bd34f465f94661ca161d49bb70f8d3c394b35"  # Downstream multiomics image tracked for cross-stage governance.
     sif: "file://containers/wes-onco-multiomics.sif"  # Apptainer/SIF URI for the multiomics container.
-    # digest: "sha256:..."  # Populate with immutable registry digest before production sign-off.
+    digest: "sha256:42315555d3fef25d9369af6d8b3bd34f465f94661ca161d49bb70f8d3c394b35"  # Local immutable image ID captured for governed runs.
 
 process_resources:
   process_low:

@@ -1,0 +1,14 @@
+samples:
+  - sample_id: "HG002_FULL_CONTROL_WES"
+    meta:
+      sample_id: "HG002_FULL_CONTROL_WES"
+      sequencing_type: "CONTROL_DEV"
+      assay_type: "CONTROL_DEV"
+      sex: "XY"
+    sequencing_type: "CONTROL_DEV"
+    assay_type: "CONTROL_DEV"
+    gender: "XY"
+    validation_token: "VALID_PASS|ALIGNMENT_COMPLETED"
+    intake_validation_token: "VALID_PASS|INTAKE_VALIDATED"
+    mapped_bam: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_1_Alignment_Read_Processing/tests/fixtures/banked_stage1_fresh/HG002_FULL_CONTROL_WES/aligned/HG002_FULL_CONTROL_WES.markdup.bam"
+    mapped_bai: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_1_Alignment_Read_Processing/tests/fixtures/banked_stage1_fresh/HG002_FULL_CONTROL_WES/aligned/HG002_FULL_CONTROL_WES.markdup.bam.bai"

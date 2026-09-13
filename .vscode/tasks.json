@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "workspace:preview-purge-stale-artifacts",
+      "type": "shell",
+      "command": "set -euo pipefail; repo='${workspaceFolder}'; echo '[preview] repo='\"$repo\"; echo '[preview] .nextflow cache:'; find \"$repo\" -maxdepth 1 -type d -name '.nextflow' -print; echo '[preview] nextflow logs:'; find \"$repo\" -maxdepth 1 -type f -name '.nextflow.log*' -print | sort; echo '[preview] work dirs:'; find \"$repo\" -type d -name 'work' -print | sort; echo '[preview] deprecated test sample sheets:'; find \"$repo\" -type f \( -path '*/tests/samples_*banked_stage*.yaml' -o -name 'samples_*deprecated*.yaml' \) -print | sort"
+    },
+    {
+      "label": "workspace:purge-stale-artifacts",
+      "type": "shell",
+      "command": "set -euo pipefail; repo='${workspaceFolder}'; rm -rf \"$repo/.nextflow\"; find \"$repo\" -maxdepth 1 -type f -name '.nextflow.log*' -delete; find \"$repo\" -type d -name 'work' -prune -exec rm -rf {} +; find \"$repo\" -type f \( -path '*/tests/samples_*banked_stage*.yaml' -o -name 'samples_*deprecated*.yaml' \) -delete; echo '[purge] completed for' \"$repo\""
+    }
+  ]
+}

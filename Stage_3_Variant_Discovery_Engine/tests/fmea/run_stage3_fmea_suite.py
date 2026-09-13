@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import shutil
 import subprocess
 import textwrap
@@ -13,7 +15,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MAIN_NF = ROOT / "main.nf"
-BASE_STAGE2 = Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_2_PostAlign_Sample_Validation_Gate/tests/fixtures/banked_stage2/samples_hg002_banked_stage2.yaml")
+PIPELINE_ROOT = ROOT.parent
+BASE_STAGE2 = PIPELINE_ROOT / "Stage_2_PostAlign_Sample_Validation_Gate" / "tests" / "fixtures" / "banked_stage2" / "samples_hg002_banked_stage2.yaml"
+SAFE_BAM = Path(__file__).resolve().parent / "stage3_safe.bam"
+SAFE_BAI = Path(__file__).resolve().parent / "stage3_safe.bam.bai"
+REF_ROOT = Path(os.environ.get("NXF_REF_DATA_ROOT", str((PIPELINE_ROOT / "assets" / "references").resolve())))
+BAM_CANDIDATES = [
+    PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing" / "tests" / "fixtures" / "banked_stage1_fresh" / "HG002_FULL_CONTROL_WES" / "audit_and_qc" / "identity" / "HG002_FULL_CONTROL_WES.identity_verified.bam",
+    PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing" / "tests" / "fixtures" / "banked_stage1_rerun2" / "HG002_FULL_CONTROL_WES" / "audit_and_qc" / "identity" / "HG002_FULL_CONTROL_WES.identity_verified.bam",
+    PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing" / "tests" / "fixtures" / "banked_stage1_fresh" / "HG002_FULL_CONTROL_WES" / "aligned" / "HG002_FULL_CONTROL_WES.markdup.bam",
+    SAFE_BAM,
+]
 
 
 def run_nf(input_yaml: Path, outdir: Path, work_dir: Path) -> tuple[int, float, str]:
@@ -41,6 +53,31 @@ def run_nf(input_yaml: Path, outdir: Path, work_dir: Path) -> tuple[int, float, 
 
 def write_text(path: Path, text: str) -> None:
     path.write_text(textwrap.dedent(text).lstrip(), encoding="utf-8")
+
+
+def resolve_bam_pair() -> tuple[Path, Path] | tuple[None, None]:
+    for bam in BAM_CANDIDATES:
+        bai = Path(str(bam) + ".bai")
+        if bam.exists() and bai.exists():
+            return bam, bai
+    return None, None
+
+
+def stage_file(src: Path, dst: Path) -> None:
+    """Stage test fixtures quickly: hardlink/symlink first, copy as fallback."""
+    if dst.exists() or dst.is_symlink():
+        dst.unlink()
+    try:
+        os.link(src, dst)
+        return
+    except OSError:
+        pass
+    try:
+        dst.symlink_to(src)
+        return
+    except OSError:
+        pass
+    shutil.copy2(src, dst)
 
 
 def stage2_manifest_mutation(base_text: str, *, validation_token: str, bam: Path, bai: Path, branch_block: str, faults_block: str = "") -> str:
@@ -72,17 +109,18 @@ def stage2_manifest_mutation(base_text: str, *, validation_token: str, bam: Path
         'sorted_bam': str(bam),
         'sorted_bai': str(bai),
         'stage2_router_token': 'WES|TARGET_VALIDATED',
+        'sequencing_type': 'WGS',
         'variant_branches': variant_branches,
         'reference_build': {
-            'reference_genome': '/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa',
-            'reference_dict': '/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.dict',
-            'reference_fai': '/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai',
-            'capture_wes_bed': '/opt/reference/beds/OncoPanel_v4.2_Master_hs38DH.bed',
-            'onco_target_bed': '/opt/reference/beds/OncoPanel_v4.2_Master_hs38DH.bed',
-            'sf_bed': '/opt/reference/beds/ACMG_SF_v3.2_hs38DH.bed',
-            'clinvar_db': '/opt/reference/clinvar/clinvar_20260601.vcf.gz',
+            'reference_genome': str(REF_ROOT / 'reference' / 'GRCh38_full_analysis_set_plus_decoy_hla.fa'),
+            'reference_dict': str(REF_ROOT / 'reference' / 'GRCh38_full_analysis_set_plus_decoy_hla.dict'),
+            'reference_fai': str(REF_ROOT / 'reference' / 'GRCh38_full_analysis_set_plus_decoy_hla.fa.fai'),
+            'capture_wes_bed': str(REF_ROOT / 'beds' / 'OncoPanel_v4.2_Master_hs38DH.bed'),
+            'onco_target_bed': str(REF_ROOT / 'beds' / 'OncoPanel_v4.2_Master_hs38DH.bed'),
+            'sf_bed': str(REF_ROOT / 'beds' / 'ACMG_SF_v3.2_hs38DH.bed'),
+            'clinvar_db': str(REF_ROOT / 'clinvar' / 'clinvar_20260601.vcf.gz'),
         },
-        'save_dir': '/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/fmea/stage3_fmea_out',
+        'save_dir': str((ROOT / 'tests' / 'fmea' / 'stage3_fmea_out').resolve()),
     }
     if 'corrupt_vcf_header: true' in faults_block:
         sample['stage3_faults'] = {'corrupt_vcf_header': True}
@@ -95,8 +133,13 @@ def scenario_manifest(base_text: str, scenario_dir: Path, *, validation_token: s
     bam = input_dir / "sorted.bam"
     bai = input_dir / "sorted.bam.bai"
     if bam_exists:
-        bam.write_text("BAM_PLACEHOLDER\n", encoding="utf-8")
-        bai.write_text("BAI_PLACEHOLDER\n", encoding="utf-8")
+        src_bam, src_bai = resolve_bam_pair()
+        if src_bam is not None and src_bai is not None:
+            stage_file(src_bam, bam)
+            stage_file(src_bai, bai)
+        else:
+            bam.write_text("BAM_PLACEHOLDER\n", encoding="utf-8")
+            bai.write_text("BAI_PLACEHOLDER\n", encoding="utf-8")
     input_yaml = scenario_dir / "input.yaml"
     write_text(
         input_yaml,
@@ -135,7 +178,7 @@ def main() -> int:
             "expect_token": "STAGE3_PRECONDITION_FAILURE",
         },
         {
-            "name": "all_branches_disabled_graceful_skip",
+            "name": "all_branches_disabled_fail_closed",
             "manifest": lambda d: scenario_manifest(
                 base_text,
                 d,
@@ -143,8 +186,8 @@ def main() -> int:
                 bam_exists=True,
                 branch_block='    variant_branches:\n      snv_indel: false\n      structural_variants: false\n      copy_number_cnv: false\n      str_expansions: false\n      trisomy_aneuploidy: false\n      homologous_pseudogenes: false\n',
             ),
-            "expect_code": "zero",
-            "expect_token": None,
+            "expect_code": "nonzero",
+            "expect_token": "STAGE3_BRANCH_DISABLED",
         },
         {
             "name": "corrupt_vcf_header_fail_closed",
@@ -157,7 +200,7 @@ def main() -> int:
                 faults_block='    stage3_faults:\n      corrupt_vcf_header: true\n',
             ),
             "expect_code": "nonzero",
-            "expect_token": "STAGE3_HARMONIZATION_FAILURE",
+            "expect_token": "STAGE3_SCHEMA_VALIDATION_FAILURE",
         },
     ]
 
@@ -187,7 +230,8 @@ def main() -> int:
         else:
             checks.append((code != 0, f"expected non-zero exit_code observed={code}"))
             if sc["expect_token"]:
-                checks.append((sc["expect_token"] in output, f"missing {sc['expect_token']} signal in output"))
+                observed = sorted(set(re.findall(r"(STAGE\d+_[A-Z0-9_]+|REJECT_[A-Z0-9_]+)", output)))
+                checks.append((sc["expect_token"] in output, f"missing {sc['expect_token']} signal in output; observed_tokens={observed[:8]}"))
 
         errors = [msg for ok, msg in checks if not ok]
         ok = not errors

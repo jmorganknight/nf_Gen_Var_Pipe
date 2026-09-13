@@ -1,0 +1,6 @@
+samples:
+  - sample_id: "HG002_FMEA_LOW_PURITY"
+    validation_token: "VALID_PASS|SAMPLE_VALIDATED"
+    sequencing_type: "WGS"
+    physician_tumor_purity: 0.05
+    expectation: "LOW_PURITY_THRESHOLD_ROUTING"

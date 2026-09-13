@@ -2,13 +2,11 @@
 
 ## Status
 
-This repository is **Under Construction and Being Refactored**.
-
-The pipeline is being actively expanded and restructured into stage-scoped Nextflow DSL2 modules to dynamically support multi-platform sequencing data and multi-modal variant discovery with clinical-grade auditability.
+This repository contains a production-grade, stage-scoped Nextflow DSL2 clinical WES pipeline with fail-closed governance, externalized control planes, and signed downstream reporting artifacts.
 
 ## What This Repository Contains
 
-`nf_Gen_Var_Pipe` is a staged WES processing framework organized into independent gates from sample intake through clinical reporting.
+`nf_Gen_Var_Pipe` is a staged WES processing framework organized into independent gates from intake through reporting.
 
 Current top-level stages:
 
@@ -20,98 +18,165 @@ Current top-level stages:
 - `Stage_5_Clinical_Annotation_PGx_Triage`
 - `Stage_6_Clinical_Reporting_Workbench_Gateway`
 
-## Stage Overview (0 to 6)
+## Stage Overview (Clinical Path 1 to 6)
 
-### Stage 0: Preflight Ingest Gate
+The production clinical execution path is:
 
-Purpose:
-- Intake schema checks and route determination.
-- Hard precondition validation for references and sample fields.
-- Emit Stage 0 banked manifest and intake validation token artifacts.
+| Stage | Clinical Function | Primary Governance Token |
+|---|---|---|
+| Stage 1 | Alignment + coordinate normalization + identity verification | `VALID_PASS|ALIGNMENT_COMPLETED` |
+| Stage 2 | Identity/contamination/sex/purity gate | `VALID_PASS|SAMPLE_VALIDATED` |
+| Stage 3 | Variant discovery + normalization + schema validation | `VALID_PASS|VARIANTS_HARMONIZED` |
+| Stage 4 | Phasing + ancestry projection | `VALID_PASS|VARIANTS_HARMONIZED` passthrough |
+| Stage 5 | Clinical triage and signed bundle creation | Stage 5 signed bundle + provenance |
+| Stage 6 | Zero-loss integrity + workbench + FHIR + telemetry sinks | Stage 6 banked manifest |
 
-Outputs (representative):
-- Stage 0 banked samples manifest
-- Intake validation token(s)
-- Intake/route audit JSON artifacts
+Stage 0 remains the intake/preflight control gate that validates incoming manifests and route decisions before Stage 1.
+
+## System Architecture and Scope
+
+```mermaid
+flowchart LR
+		S1[Stage 1 Alignment] --> S2[Stage 2 Identity and QC Gate]
+		S2 --> S3[Stage 3 Variant Discovery]
+		S3 --> S4[Stage 4 Phasing and PopPCA]
+		S4 --> S5[Stage 5 Clinical Triage]
+		S5 --> S6[Stage 6 Telemetry and FHIR]
+```
 
 ### Stage 1: Alignment Read Processing
 
 Purpose:
-- Execute alignment and post-processing.
-- Produce mapped/sorted BAM + BAI and identity audits.
-- Bank immutable Stage 1 handoff contract.
-
-Outputs (representative):
-- `mapped_bam`, `mapped_bai`
-- Stage 1 banked samples manifest
-- Stage 1 audit sink artifacts
+- Platform-aware intake routing and alignment/markdup processing.
+- Coordinate normalization and cross-sample identity checks.
+- Stage 1 banked contract generation for Stage 2.
 
 ### Stage 2: Post-Align Sample Validation Gate
 
 Purpose:
-- Validate Stage 1 contract integrity.
-- Perform chromosomal sex and purity checks.
-- Route assay/branch targets for variant discovery.
-
-Outputs (representative):
-- Stage 2 banked samples manifest
-- precondition/purity/router audits
+- Verify contamination, chromosomal sex concordance, and purity coherence.
+- Enforce fail-closed sample-level acceptance before discovery.
+- Emit `sample_qc_meta` and Stage 2 banked contract.
 
 ### Stage 3: Variant Discovery Engine
 
 Purpose:
-- Branch-aware variant discovery on Stage 2 validated samples.
-- Emit discovery artifacts aligned to downstream annotation/reporting.
-
-Outputs (representative):
-- Stage 3 banked samples manifest
-- branch-specific call artifacts and audits
+- Compute branch-aware variant artifacts.
+- Calibrate filtering using Stage 2 purity/contamination metrics.
+- Normalize and validate VCF against GA4GH/VCF 4.2 production schema.
 
 ### Stage 4: Ancestry Phasing Highway
 
 Purpose:
-- Execute ancestry and phasing related computations.
-- Provide phasing-informed assets for Stage 5 interpretation.
-
-Outputs (representative):
-- Stage 4 banked samples manifest
-- ancestry/phasing artifacts and audit summaries
+- Run ancestry projection and read-backed phasing handoff.
+- Produce phased assets and Stage 4 banked contract for clinical triage.
 
 ### Stage 5: Clinical Annotation + PGx Triage
 
 Purpose:
-- Clinical annotation and interpretation routing.
-- Candidate VUS triage, SF/PRS/PGx branch materialization.
-- Build Stage 5 contract consumed by reporting gateway.
-
-Outputs (representative):
-- Stage 5 banked samples manifest
-- annotation payloads, VUS queues, SF/PRS/PGx artifacts
+- Execute parallel clinical triage channels.
+- Create signed `clinical_bundle.tar.gz` and provenance payload.
+- Bank Stage 5 outputs for reporting gateway.
 
 ### Stage 6: Clinical Reporting Workbench Gateway
 
 Purpose:
-- Final integrity reconciliation and fail-closed gate checks.
-- FHIR/report generation and medical director workflow integration.
-- Assemble Stage 6 manifest + reporting provenance artifacts.
+- Enforce zero-loss ledger checks and fail-closed reporting preconditions.
+- Build Medical Director workbench payloads and FHIR/HTML/PDF outputs.
+- Emit dual telemetry sinks (`provenance` and lab metrics) and Stage 6 banked manifest.
 
-Outputs (representative):
-- Stage 6 banked samples manifest
-- FHIR JSON, HTML/PDF report artifacts
-- provenance and audit sink outputs
+## Externalized Control Planes
 
-## Local FMEA Testing
+Pipeline control is intentionally externalized and environment-driven.
 
-Each stage includes local FMEA-style negative and nominal scenario runners under `tests/fmea`.
+| Control Plane | Source | Notes |
+|---|---|---|
+| Reference root | `params.ref_data_root` / `params.ref_dir` | Defaults to `NXF_REF_DATA_ROOT` then local assets fallback. |
+| PKI key directory | `params.pki_key_dir` | Defaults to `NXF_PKI_KEY_DIR` then `${projectDir}/keys`. |
+| Resources and retry policy | `nextflow.config` `process {}` | Label-based CPU/memory scaling with bounded retries on OOM-like exits. |
+| Parameter contracts | `conf/` and `assets/` | References, thresholds, schema paths, and sample manifests are declarative artifacts. |
+| Work/temp roots | `params.work_root`, `params.tmp_dir` | Defaulted to scratch paths for high-throughput execution. |
 
-Typical pattern:
-- run a stage-specific suite (for example `run_stage0_fmea_suite.py`, `run_stage1_fmea_suite.py`, etc.)
-- verify that nominal scenarios pass
-- verify fail-closed behavior for corrupted/missing token, reference, or contract cases
+Key runtime conventions:
+- Reference data is mounted through Docker/Apptainer profile mount options.
+- Resource tiers are label-driven (`process_low`, `process_medium`, `process_high`, `process_high_memory`).
+- Fail-closed process policy defaults to retry only for selected infrastructure exits.
 
-Notes:
-- FMEA run directories under `tests/fmea/runs/` are treated as transient local outputs.
-- They are intentionally ignored by `.gitignore` and should not be committed.
+## Cryptographic Integrity and Telemetry
+
+Stage 5 and Stage 6 implement signed artifact lineage and telemetry sinks.
+
+### RS256 Signing and Bundle Provenance
+
+- Stage 5 packages a `clinical_bundle.tar.gz` and computes SHA-256 digests.
+- A digital signature block is written in Stage 5 provenance (`RS256`, signer metadata, signed digest).
+- Signing path uses configured signer key paths (`params.signer_key_path`, `params.signer_pub_path`) resolved from PKI control plane.
+
+### Reference Hash Manifest
+
+- Reference immutability is anchored via `assets/reference_checksums.sha256`.
+- Stage contracts and precondition checks propagate reference manifest context into downstream reporting/audit payloads.
+
+### Dual-Sink Telemetry in Stage 6
+
+- `provenance.json` / provenance audit payloads for reporting lineage and signature propagation.
+- `lab_metrics.json` for lab-facing operational metrics and downstream telemetry.
+
+## Execution Modes
+
+### Development Run (fast profile)
+
+```bash
+NXF_REF_DATA_ROOT="/path/to/reference_root" \
+nextflow run main.nf \
+	-profile dev_fast,docker \
+	--input assets/samples_hg002_mini.yaml \
+	--outdir results/master_orchestrator \
+	-ansi-log false
+```
+
+### Stub Validation Run
+
+```bash
+NXF_REF_DATA_ROOT="/path/to/reference_root" \
+nextflow run main.nf \
+	-profile dev_fast,docker \
+	-stub \
+	--input assets/samples_hg002_mini.yaml \
+	-ansi-log false
+```
+
+### Full Docker Profile Run
+
+```bash
+NXF_REF_DATA_ROOT="/path/to/reference_root" \
+nextflow run main.nf \
+	-profile docker \
+	--input assets/samples_hg002_mini.yaml \
+	--outdir results/master_orchestrator \
+	-resume
+```
+
+## FMEA Edge-Case Suites
+
+Root convenience runners:
+
+```bash
+python3 scripts/run_stage2_fmea_suite.py
+python3 scripts/run_stage3_fmea_suite.py
+python3 scripts/run_stage6_fmea_suite.py
+```
+
+Stage-local runners:
+
+```bash
+python3 Stage_1_Alignment_Read_Processing/tests/fmea/run_stage1_fmea_suite.py
+python3 Stage_2_PostAlign_Sample_Validation_Gate/tests/fmea/run_stage2_fmea_suite.py
+python3 Stage_3_Variant_Discovery_Engine/tests/fmea/run_stage3_fmea_suite.py
+python3 Stage_4_Ancestry_Phasing_Highway/tests/fmea/run_stage4_fmea_suite.py
+python3 Stage_5_Clinical_Annotation_PGx_Triage/tests/fmea/run_stage5_fmea_suite.py
+python3 Stage_6_Clinical_Reporting_Workbench_Gateway/tests/fmea/run_stage6_fmea_suite.py
+```
 
 ## Development Notes
 
@@ -125,7 +190,3 @@ Recommended workflow during refactor:
 - Keep changes scoped by stage.
 - Commit module/config changes with short, explicit messages.
 - Validate with stage-local FMEA before promoting changes downstream.
-
-## Disclaimer
-
-This codebase is in active refactor and should be treated as a moving target until a formal release tag and validation baseline are published.

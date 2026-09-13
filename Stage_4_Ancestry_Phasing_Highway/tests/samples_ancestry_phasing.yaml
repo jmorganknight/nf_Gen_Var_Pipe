@@ -1,0 +1,5 @@
+samples:
+  - sample_id: "HG002_ANCESTRY_PHASING"
+    validation_token: "VALID_PASS|VARIANTS_HARMONIZED"
+    phased_vcf: "../Stage_3_Variant_Discovery_Engine/tests/fixtures/banked_stage3/snv_indel.vcf"
+    phased_vcf_tbi: "../Stage_3_Variant_Discovery_Engine/tests/fixtures/banked_stage3/snv_indel.vcf.tbi"

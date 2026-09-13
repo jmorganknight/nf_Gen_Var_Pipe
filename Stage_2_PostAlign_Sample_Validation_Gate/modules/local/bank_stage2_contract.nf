@@ -6,7 +6,7 @@ process BANK_STAGE2_CONTRACT {
     publishDir "${params.outdir}/contracts/stage2", mode: 'copy', overwrite: true, pattern: '*.stage2.contract.fragment.json'
 
     input:
-    tuple val(meta), path(bam), path(bai), val(refs), val(thresholds), path(precondition_audit), path(purity_sex_audit), path(router_audit)
+    tuple val(meta), path(bam), path(bai), val(refs), val(thresholds), path(precondition_audit), path(contamination_audit), path(purity_sex_audit), path(router_audit)
 
     output:
     path "${meta.sample_id}.stage2.contract.fragment.json", emit: manifest_fragment
@@ -25,6 +25,19 @@ from pathlib import Path
 meta = json.loads('${metaJson}')
 refs = json.loads('${refsJson}')
 sid = meta['sample_id']
+contamination_payload = json.loads(Path('${contamination_audit}').read_text(encoding='utf-8'))
+purity_sex_payload = json.loads(Path('${purity_sex_audit}').read_text(encoding='utf-8'))
+
+purity_block = purity_sex_payload.get('purity_validation', {})
+sex_block = purity_sex_payload.get('sex_concordance', {})
+
+sample_qc_meta = {
+    'estimated_in_silico_purity': purity_block.get('estimated_in_silico_purity'),
+    'contamination_rate': contamination_payload.get('contamination_rate'),
+    'computed_sex': sex_block.get('computed_sex', 'UNKNOWN'),
+    'sex_concordance_pass': bool(sex_block.get('sex_concordance_pass', False)),
+    'purity_concordance_pass': bool(purity_block.get('purity_concordance_pass', False)),
+}
 
 payload = {
     'sample_id': sid,
@@ -56,8 +69,15 @@ payload = {
     'sv_calling_enabled': meta.get('sv_calling_enabled'),
     'stage2_router_token': meta.get('stage2_router_token'),
     'stage2_precondition_audit': str(Path('${precondition_audit}').resolve()),
+    'contamination_audit': str(Path('${contamination_audit}').resolve()),
     'purity_and_sex_validation_audit': str(Path('${purity_sex_audit}').resolve()),
     'assay_target_router_audit': str(Path('${router_audit}').resolve()),
+    'estimated_in_silico_purity': sample_qc_meta['estimated_in_silico_purity'],
+    'contamination_rate': sample_qc_meta['contamination_rate'],
+    'computed_sex': sample_qc_meta['computed_sex'],
+    'sex_concordance_pass': sample_qc_meta['sex_concordance_pass'],
+    'purity_concordance_pass': sample_qc_meta['purity_concordance_pass'],
+    'sample_qc_meta': sample_qc_meta,
     'reference_build': {
         'reference_genome': refs.get('reference_genome'),
         'reference_fai': refs.get('reference_fai'),

@@ -1,0 +1,7 @@
+samples:
+  - sample_id: "HG002_FMEA_SEX_DISCORDANT"
+    sequencing_type: "WGS"
+    reported_sex: "XX"
+    inferred_sex: "XY"
+    physician_tumor_purity: 0.00
+    expectation: "FAIL_SEX_DISCORDANCE"

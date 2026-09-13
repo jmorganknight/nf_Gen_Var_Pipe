@@ -5,7 +5,7 @@
 process CROSS_SAMPLE_IDENTITY_GATE {
 
     label 'process_high'
-    container 'wes-onco-core:latest'
+    container 'wes-onco-core:1.0.0'
 
     tag "${meta.sample_id}"
 

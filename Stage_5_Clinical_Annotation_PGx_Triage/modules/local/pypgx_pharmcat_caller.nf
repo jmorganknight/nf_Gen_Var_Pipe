@@ -20,6 +20,15 @@ process PYPGX_PHARMCAT_CALLER {
     """
     set -euo pipefail
 
+    if ! command -v pharmcat >/dev/null 2>&1; then
+        echo "STAGE5_PRECONDITION_FAILURE: pharmcat binary is not available in container PATH" >&2
+        exit 127
+    fi
+    if pharmcat --help 2>&1 | grep -qi "not installed in this image"; then
+        echo "STAGE5_PRECONDITION_FAILURE: pharmcat placeholder wrapper detected; install PharmCAT CLI/JAR for non-stub execution" >&2
+        exit 127
+    fi
+
     python3 - <<'PYEOF'
 import gzip
 import json

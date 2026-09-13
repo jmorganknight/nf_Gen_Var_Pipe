@@ -36,13 +36,15 @@ if not token_value:
 if token_field and Path(token_field).exists():
     token_value = Path(token_field).read_text(encoding='utf-8', errors='replace').strip()
 
+valid_token = ('VALID_PASS|INTAKE_VALIDATED' in token_value) or ('VALID_PASS|ALIGNMENT_COMPLETED' in token_value)
+
 audit = {
     'node': 'STAGE2_PRECONDITION_GUARD',
     'sample_id': sid,
     'timestamp_utc': datetime.now(timezone.utc).isoformat(),
     'checks': {
         'stage1_token_present': bool(token_field),
-        'stage1_token_valid': 'VALID_PASS|INTAKE_VALIDATED' in token_value,
+        'stage1_token_valid': valid_token,
         'sorted_bam_exists': bam_path.exists(),
         'sorted_bai_exists': bai_path.exists(),
         'sorted_bam_size_bytes': bam_path.stat().st_size if bam_path.exists() else 0,

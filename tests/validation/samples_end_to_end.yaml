@@ -1,0 +1,5 @@
+samples:
+  - sample_id: "HG002_E2E"
+    input_manifest: "assets/samplesheet_production.yaml"
+    mode: "full_pipeline"
+    notes: "Root-level end-to-end validation entrypoint."

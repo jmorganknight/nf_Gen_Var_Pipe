@@ -1,0 +1,11 @@
+##fileformat=VCFv4.2
+##INFO=<ID=REVEL,Number=1,Type=Float,Description="REVEL score">
+##INFO=<ID=AlphaMissense,Number=1,Type=Float,Description="AlphaMissense score">
+##INFO=<ID=CADD,Number=1,Type=Float,Description="CADD score">
+##INFO=<ID=SpliceAI,Number=1,Type=Float,Description="SpliceAI score">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=PS,Number=1,Type=String,Description="Phase set">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	HG002_STUB
+10	96541616	rs4244285	G	A	100	PASS	REVEL=0.91;AlphaMissense=0.88;CADD=28.4;SpliceAI=0.01	GT:PS	1|0:PS1
+22	42128945	rs3892097	C	T	100	PASS	REVEL=0.95;AlphaMissense=0.94;CADD=30.1;SpliceAI=0.02	GT:PS	0|1:PS2
+1	114716160	rs1801133	C	T	100	PASS	REVEL=0.31;AlphaMissense=0.22;CADD=14.3;SpliceAI=0.00	GT:PS	0|1:PS3

@@ -9,10 +9,10 @@ process STAGE6_PRECONDITION_GUARD {
     publishDir "${params.outdir}/audit_and_qc/stage6", mode: 'rellink', overwrite: true, pattern: '*.json'
 
     input:
-    tuple val(meta), path(stage5_manifest), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta)
+    tuple val(meta), path(stage5_manifest), path(clinical_bundle_tar_gz), path(stage5_provenance_json), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta)
 
     output:
-    tuple val(meta), path(stage5_manifest), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta), emit: validated_bundle
+    tuple val(meta), path(stage5_manifest), path(clinical_bundle_tar_gz), path(stage5_provenance_json), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta), emit: validated_bundle
     path "${meta.sample_id}.stage6_precondition_guard.json", emit: guard_audit
     tuple val(meta), path("${meta.sample_id}.stage6_precondition.fragment.json"), emit: fragment
 
@@ -25,15 +25,30 @@ process STAGE6_PRECONDITION_GUARD {
     python3 - <<'PYEOF'
 import json
 from pathlib import Path
+import os
 
 sid = '${sid}'
 reference_meta = json.loads('''${groovy.json.JsonOutput.toJson(reference_meta)}''')
+
+def normalize_optional(path_text: str):
+    text = (path_text or '').strip()
+    if not text:
+        return None
+    base = os.path.basename(text)
+    if base == 'NO_FILE' or base.startswith('NO_FILE.'):
+        return None
+    return text
+
 audit = {
     'node': 'STAGE6_PRECONDITION_GUARD',
     'sample_id': sid,
     'component': 'precondition',
     'validation_token': '${token}',
     'stage5_manifest': '${stage5_manifest}',
+    'clinical_bundle_tar_gz': normalize_optional('${clinical_bundle_tar_gz}'),
+    'stage5_provenance_json': normalize_optional('${stage5_provenance_json}'),
+    'stage5_bundle_present': ('${meta.stage5_bundle_present ? 'true' : 'false'}' == 'true'),
+    'stage5_provenance_present': ('${meta.stage5_provenance_present ? 'true' : 'false'}' == 'true'),
     'acmg_tiered_variants_json': '${acmg_tiered_variants_json}',
     'candidate_vus_json': '${candidate_vus_json}',
     'vus_queue_json': '${vus_queue_json}',

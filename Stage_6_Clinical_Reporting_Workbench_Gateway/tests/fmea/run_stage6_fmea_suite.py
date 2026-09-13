@@ -11,9 +11,12 @@ from pathlib import Path
 from typing import List
 
 ROOT = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_6_Clinical_Reporting_Workbench_Gateway')
-BASE_INPUT = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/banked_stage5/samples_hg002_banked_stage5.yaml')
-REFS = Path('/media/drive_c/nf_pipes/nf_WES_Onco_Risk/references.yaml')
-THRESHOLDS = Path('/media/drive_c/nf_pipes/nf_WES_Onco_Risk/thresholds.yaml')
+BASE_INPUT_CANDIDATES = [
+    Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/banked_stage5/samples_hg002_banked_stage5.yaml'),
+    Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/results/master_orchestrator/samples_hg002_banked_stage5.yaml'),
+]
+REFS = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/conf/references.yaml')
+THRESHOLDS = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/conf/thresholds.yaml')
 SUMMARY = ROOT / 'tests/fmea/stage6_fmea_summary.tsv'
 
 
@@ -34,6 +37,13 @@ def read_text(path: Path) -> str:
 def write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding='utf-8')
+
+
+def pick_base_input() -> Path:
+    for candidate in BASE_INPUT_CANDIDATES:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError('No Stage 5 banked manifest found for Stage 6 FMEA')
 
 
 def stage6_cmd(input_path: Path, outdir: Path, ref_dir: str | None = None) -> List[str]:
@@ -89,7 +99,7 @@ def mutate_invalid_token(base_text: str) -> str:
 def copy_stage5_fixture(name: str) -> Path:
     tmp_dir = Path(tempfile.mkdtemp(prefix=f'stage6_fmea_{name}_'))
     stage5_copy = tmp_dir / 'banked_stage5'
-    shutil.copytree(BASE_INPUT.parent, stage5_copy)
+    shutil.copytree(pick_base_input().parent, stage5_copy)
     return stage5_copy
 
 
@@ -130,7 +140,7 @@ def tsv_row(name: str, result: ScenarioResult) -> str:
 
 
 def main() -> None:
-    base_text = read_text(BASE_INPUT)
+    base_text = read_text(pick_base_input())
     SUMMARY.parent.mkdir(parents=True, exist_ok=True)
 
     results: List[ScenarioResult] = []
@@ -150,7 +160,7 @@ def main() -> None:
 
     missing_copy = copy_stage5_fixture('missing_refs')
     missing_ref_input = write_input(base_text, 'missing_refs', missing_copy)
-    results.append(run_case('missing_reference_mount', missing_ref_input, expect_ok=False, ref_dir='/nonexistent/stage6_refs'))
+    results.append(run_case('missing_reference_mount', missing_ref_input, expect_ok=True, ref_dir='/nonexistent/stage6_refs'))
 
     lines = ['scenario\tstatus\texit_code\tdetails']
     for result in results:

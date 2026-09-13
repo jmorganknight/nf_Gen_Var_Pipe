@@ -1,0 +1,4 @@
+gene	annotation	confidence
+CYP2C19	active_site_region	0.92
+CYP2D6	heme_binding_region	0.95
+DPYD	substrate_binding_region	0.90

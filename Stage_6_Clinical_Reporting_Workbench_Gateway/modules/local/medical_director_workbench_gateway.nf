@@ -9,7 +9,7 @@ process MEDICAL_DIRECTOR_WORKBENCH_GATEWAY {
     publishDir "${params.outdir}/audit_and_qc/stage6", mode: 'rellink', overwrite: true, pattern: '*.json'
 
     input:
-    tuple val(meta), path(stage5_manifest), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta)
+    tuple val(meta), path(stage5_manifest), path(clinical_bundle_tar_gz), path(stage5_provenance_json), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta)
 
     output:
     path 'medical_director_workbench_signoff.json', emit: signoff
@@ -25,6 +25,15 @@ import hashlib
 import json
 from pathlib import Path
 
+
+def sha256_file(path_text):
+    path = Path(path_text)
+    digest = hashlib.sha256()
+    with path.open('rb') as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
 sid = '${sid}'
 queue = json.loads(Path('${vus_queue_json}').read_text(encoding='utf-8'))
 acmg = json.loads(Path('${acmg_tiered_variants_json}').read_text(encoding='utf-8'))
@@ -37,7 +46,16 @@ upgraded_count = len(queue.get('upgraded_variants', [])) if isinstance(queue, di
 
 manual_overrides = []
 sanger_inputs = []
+stage5_provenance = json.loads(Path('${stage5_provenance_json}').read_text(encoding='utf-8'))
+stage5_signature = stage5_provenance.get('digital_signature', {}) if isinstance(stage5_provenance, dict) else {}
 digital_signatures = []
+if stage5_signature.get('signature_value'):
+    digital_signatures.append({
+        'signature_algorithm': stage5_signature.get('signature_algorithm', 'RS256'),
+        'signature_value': stage5_signature.get('signature_value', ''),
+        'signer_id': stage5_signature.get('signer_id', ''),
+        'public_key_fingerprint': stage5_signature.get('public_key_fingerprint', ''),
+    })
 
 summary_seed = json.dumps({
     'sample_id': sid,
@@ -45,9 +63,10 @@ summary_seed = json.dumps({
     'upgraded_vus_count': upgraded_count,
     'remaining_vus_count': remaining_count,
     'reported_variant_count': reported_count,
+    'bundle_digest': stage5_signature.get('signed_digest_sha256') or sha256_file('${clinical_bundle_tar_gz}'),
 }, sort_keys=True)
 
-digest = hashlib.sha256(summary_seed.encode('utf-8')).hexdigest()
+digest = stage5_signature.get('signed_digest_sha256') or hashlib.sha256(summary_seed.encode('utf-8')).hexdigest()
 
 payload = {
     'node': 'MEDICAL_DIRECTOR_WORKBENCH_GATEWAY',
@@ -57,6 +76,7 @@ payload = {
     'sanger_confirmation_inputs': sanger_inputs,
     'digital_signatures': digital_signatures,
     'approval_digest': digest,
+    'signed_bundle': '${clinical_bundle_tar_gz}',
     'workflow_gate': 'STAGE6_CLINICAL_WORKBENCH',
 }
 Path('medical_director_workbench_signoff.json').write_text(json.dumps(payload, indent=2) + "\\n", encoding='utf-8')
@@ -85,8 +105,13 @@ payload = {
     'signoff_status': 'PENDING_DIRECTOR_REVIEW',
     'manual_variant_overrides': [],
     'sanger_confirmation_inputs': [],
-    'digital_signatures': [],
-    'approval_digest': hashlib.sha256(sid.encode('utf-8')).hexdigest(),
+    'digital_signatures': [{
+        'signature_algorithm': 'RS256',
+        'signature_value': 'STUB',
+        'signer_id': 'clinical_signer',
+        'public_key_fingerprint': 'STUB',
+    }],
+    'approval_digest': 'stub',
     'workflow_gate': 'STAGE6_CLINICAL_WORKBENCH',
 }
 Path('medical_director_workbench_signoff.json').write_text(json.dumps(payload, indent=2) + '\\n', encoding='utf-8')

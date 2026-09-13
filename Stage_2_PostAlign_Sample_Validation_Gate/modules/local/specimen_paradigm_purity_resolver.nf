@@ -6,10 +6,10 @@ process SPECIMEN_PARADIGM_PURITY_RESOLVER {
     publishDir "${params.outdir}/audit_and_qc/stage2", mode: 'copy', overwrite: true, pattern: '*.purity_and_sex_validation_audit.json'
 
     input:
-    tuple val(meta), path(bam), path(bai), val(refs), val(thresholds), path(precondition_audit), path(sex_purity_audit)
+    tuple val(meta), path(bam), path(bai), val(refs), val(thresholds), path(precondition_audit), path(contamination_audit), path(sex_purity_audit)
 
     output:
-    tuple val(meta), path(bam), path(bai), val(refs), val(thresholds), path(precondition_audit), path("${meta.sample_id}.purity_and_sex_validation_audit.json"), emit: validated
+    tuple val(meta), path(bam), path(bai), val(refs), val(thresholds), path(precondition_audit), path(contamination_audit), path("${meta.sample_id}.purity_and_sex_validation_audit.json"), emit: validated
 
     script:
     def metaJson = groovy.json.JsonOutput.toJson(meta).replace('\\', '\\\\').replace("'", "\\'")
@@ -101,6 +101,7 @@ purity_section = {
     'physician_tumor_purity': physician_purity,
     'estimated_in_silico_purity': None,
     'absolute_delta': None,
+    'purity_concordance_pass': True,
     'heterozygous_site_count': 0,
     'min_depth_threshold': min_depth,
     'min_site_threshold': min_sites,
@@ -109,9 +110,18 @@ purity_section = {
     'timestamp_utc': datetime.now(timezone.utc).isoformat(),
 }
 
+chip_section = {
+    'status': 'SKIPPED',
+    'sample_type': paradigm,
+    'vaf_window_low': 0.05,
+    'vaf_window_high': 0.15,
+    'candidate_site_count': 0,
+    'flag_chip_or_mosaicism': False,
+}
+
 failure = None
 
-if paradigm in {'somatic', 'liquid_biopsy'}:
+if paradigm in {'somatic', 'liquid_biopsy', 'germline', 'normal'}:
     if not bed_path or not Path(bed_path).exists():
         failure = f"Reference target BED missing for purity resolver: {bed_path}"
     else:
@@ -161,21 +171,37 @@ if paradigm in {'somatic', 'liquid_biopsy'}:
                     vafs.append(vaf)
 
         purity_section['heterozygous_site_count'] = len(vafs)
-        if vafs:
-            estimate = max(0.0, min(1.0, 2.0 * statistics.median(vafs)))
-            delta = abs(estimate - physician_purity)
-            purity_section['estimated_in_silico_purity'] = round(estimate, 6)
-            purity_section['absolute_delta'] = round(delta, 6)
-            if len(vafs) < min_sites:
-                purity_section['status'] = 'LOW_SUPPORT'
-                purity_section['note'] = 'Insufficient heterozygous SNP support; compare cautiously.'
-            elif delta > max_delta:
-                purity_section['status'] = 'DISCORDANT'
+        if paradigm in {'somatic', 'liquid_biopsy'}:
+            if vafs:
+                estimate = max(0.0, min(1.0, 2.0 * statistics.median(vafs)))
+                delta = abs(estimate - physician_purity)
+                purity_section['estimated_in_silico_purity'] = round(estimate, 6)
+                purity_section['absolute_delta'] = round(delta, 6)
+                if len(vafs) < min_sites:
+                    purity_section['status'] = 'LOW_SUPPORT'
+                    purity_section['purity_concordance_pass'] = True
+                    purity_section['note'] = 'Insufficient heterozygous SNP support; compare cautiously.'
+                elif delta > max_delta:
+                    purity_section['status'] = 'DISCORDANT'
+                    purity_section['purity_concordance_pass'] = False
+                else:
+                    purity_section['status'] = 'PASS'
+                    purity_section['purity_concordance_pass'] = True
             else:
-                purity_section['status'] = 'PASS'
-        else:
-            purity_section['status'] = 'LOW_SUPPORT'
-            purity_section['note'] = 'No heterozygous SNP-like sites recovered from selected regions.'
+                purity_section['status'] = 'LOW_SUPPORT'
+                purity_section['purity_concordance_pass'] = True
+                purity_section['note'] = 'No heterozygous SNP-like sites recovered from selected regions.'
+
+        # Germline-only subclonal detector: flag persistent low-VAF spectrum (5-15%) consistent with CHIP/mosaicism.
+        if paradigm in {'germline', 'normal'}:
+            chip_candidates = [v for v in vafs if 0.05 <= v <= 0.15]
+            chip_section['status'] = 'EVALUATED'
+            chip_section['candidate_site_count'] = len(chip_candidates)
+            if len(chip_candidates) >= 10:
+                chip_section['flag_chip_or_mosaicism'] = True
+                chip_section['note'] = 'Subclonal low-VAF burden in 5-15% window suggests CHIP/mosaicism review.'
+            else:
+                chip_section['flag_chip_or_mosaicism'] = False
 
         if purity_section['status'] == 'DISCORDANT' and fail_closed:
             failure = (
@@ -184,6 +210,8 @@ if paradigm in {'somatic', 'liquid_biopsy'}:
             )
 
 base_audit['purity_validation'] = purity_section
+base_audit['subclonal_mosaicism_chip'] = chip_section
+base_audit['contamination_audit'] = '${contamination_audit}'
 if failure:
     base_audit['status'] = 'FAIL'
     base_audit['failure_code'] = 'STAGE2_PURITY_VALIDATION_FAILURE'
@@ -198,4 +226,33 @@ if failure:
     sys.exit(1)
 PYEOF
     """
+
+        stub:
+        """
+        cat > "${meta.sample_id}.purity_and_sex_validation_audit.json" <<'JSON'
+{
+    "node": "SPECIMEN_PARADIGM_PURITY_RESOLVER",
+    "sample_id": "${meta.sample_id}",
+    "status": "PASS",
+    "contamination_audit": "${contamination_audit}",
+    "sex_concordance": {
+        "stub": true
+    },
+    "purity_validation": {
+        "status": "PASS",
+        "purity_concordance_pass": true,
+        "estimated_in_silico_purity": 0.0,
+        "absolute_delta": 0.0,
+        "stub": true
+    },
+    "subclonal_mosaicism_chip": {
+        "status": "EVALUATED",
+        "candidate_site_count": 0,
+        "flag_chip_or_mosaicism": false,
+        "stub": true
+    },
+    "precondition_audit": "${precondition_audit}"
+}
+JSON
+        """
 }

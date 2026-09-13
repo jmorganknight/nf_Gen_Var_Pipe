@@ -9,7 +9,7 @@ process FHIR_REPORT_BUILDER {
     publishDir "${params.outdir}/reporting", mode: 'rellink', overwrite: true, pattern: '*.*'
 
     input:
-    tuple val(meta), path(stage5_manifest), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta)
+    tuple val(meta), path(stage5_manifest), path(clinical_bundle_tar_gz), path(stage5_provenance_json), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta)
 
     output:
     path 'fhir_genomics_v3.json', emit: fhir_json
@@ -36,6 +36,8 @@ queue = json.loads(Path('${vus_queue_json}').read_text(encoding='utf-8'))
 sf_payload = json.loads(Path('${sf_artifact}').read_text(encoding='utf-8')) if Path('${sf_artifact}').exists() else {}
 prs_payload = json.loads(Path('${prs_artifact}').read_text(encoding='utf-8')) if Path('${prs_artifact}').exists() else {}
 pgx_payload = json.loads(Path('${pgx_artifact}').read_text(encoding='utf-8')) if Path('${pgx_artifact}').exists() else {}
+stage5_provenance = json.loads(Path('${stage5_provenance_json}').read_text(encoding='utf-8')) if Path('${stage5_provenance_json}').exists() else {}
+stage5_signature = stage5_provenance.get('digital_signature', {}) if isinstance(stage5_provenance, dict) else {}
 
 reported = []
 for tier_name, tier_rows in (acmg.get('tiers', {}) if isinstance(acmg, dict) else {}).items():
@@ -120,8 +122,13 @@ signoff_payload = {
     'signoff_status': 'PENDING_DIRECTOR_REVIEW',
     'manual_variant_overrides': [],
     'sanger_confirmation_inputs': [],
-    'digital_signatures': [],
-    'approval_digest': '',
+    'digital_signatures': [{
+        'signature_algorithm': stage5_signature.get('signature_algorithm', 'RS256'),
+        'signature_value': stage5_signature.get('signature_value', ''),
+        'signer_id': stage5_signature.get('signer_id', ''),
+        'public_key_fingerprint': stage5_signature.get('public_key_fingerprint', ''),
+    }] if stage5_signature.get('signature_value') else [],
+    'approval_digest': stage5_signature.get('signed_digest_sha256', ''),
 }
 
 def sha256sum(path_text):
@@ -143,6 +150,8 @@ provenance_payload = {
         'stage6_validation_token': '${meta.validation_token}',
         'save_dir': '${meta.save_dir}',
         'stage5_manifest': '${stage5_manifest}',
+        'stage5_bundle': '${clinical_bundle_tar_gz}',
+        'stage5_provenance_json': '${stage5_provenance_json}',
     },
     'reference_assets': reference_meta_json,
     'reference_asset_paths': reference_meta_json,
@@ -165,6 +174,7 @@ provenance_payload = {
         'poppca_models': reference_meta_json.get('stage4', {}).get('poppca_refgen_dir', reference_meta_json.get('stage4', {}).get('poppca_models', '')),
         'caller_models': reference_meta_json.get('models', {}),
     },
+    'digital_signatures': signoff_payload.get('digital_signatures', []),
 }
 Path(f'{sid}.provenance_audit.json').write_text(json.dumps(provenance_payload, indent=2) + "\\n", encoding='utf-8')
 
@@ -362,7 +372,7 @@ sid = '${meta.sample_id}'
 Path('fhir_genomics_v3.json').write_text(json.dumps({'resourceType': 'Bundle', 'type': 'collection', 'entry': []}, indent=2) + '\\n', encoding='utf-8')
 Path('clinical_report.html').write_text('<html><body><h1>Stage 6 Clinical Reporting Workbench Gateway</h1></body></html>\\n', encoding='utf-8')
 Path('clinical_report.pdf').write_bytes(b'%PDF-1.4\\n%%EOF\\n')
-Path(f'{sid}.provenance_audit.json').write_text(json.dumps({'sample_id': sid, 'component': 'provenance', 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
+Path(f'{sid}.provenance_audit.json').write_text(json.dumps({'sample_id': sid, 'component': 'provenance', 'digital_signatures': [{'signature_algorithm': 'RS256', 'signature_value': 'STUB', 'signer_id': 'clinical_signer', 'public_key_fingerprint': 'STUB'}], 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
 Path(f'{sid}.stage6_report.fragment.json').write_text(json.dumps({'sample_id': sid, 'component': 'fhir_report', 'fhir_json': 'fhir_genomics_v3.json', 'html_report': 'clinical_report.html', 'pdf_report': 'clinical_report.pdf', 'provenance_audit_json': f'{sid}.provenance_audit.json', 'report_status': 'PRELIMINARY', 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
 PYEOF
     """

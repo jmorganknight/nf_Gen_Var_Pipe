@@ -1,0 +1,6 @@
+{
+  "sample_id": "HG002_STUB",
+  "status": "PASS",
+  "validation_token": "VALID_PASS|VARIANTS_HARMONIZED",
+  "phase_region_targets": ["CYP2D6", "CYP2C19", "DPYD"]
+}

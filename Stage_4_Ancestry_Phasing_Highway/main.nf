@@ -1,5 +1,6 @@
 nextflow.enable.dsl = 2
 
+include { STAGE4_ANCESTRY_PGX } from './workflows/stage4_ancestry_pgx.nf'
 include { POPPCA_REFERENCE_PROJECTION } from './modules/local/poppca_reference_projection.nf'
 include { WHATSHAP_SHAPEIT_PHASER } from './modules/local/whatshap_shapeit_phaser.nf'
 include { BANK_STAGE4_CONTRACT } from './modules/local/bank_stage4_contract.nf'
@@ -106,6 +107,7 @@ workflow STAGE4_ANCESTRY_PHASING {
 
     emit:
     banked_manifest = ASSEMBLE_STAGE4_BANKED_MANIFEST.out.banked_manifest
+    phase_bundle = WHATSHAP_SHAPEIT_PHASER.out.phase_bundle
 }
 
 workflow {
@@ -220,5 +222,5 @@ workflow {
         )
     }
 
-    STAGE4_ANCESTRY_PHASING(chStage4Inputs)
+    STAGE4_ANCESTRY_PGX(chStage4Inputs)
 }

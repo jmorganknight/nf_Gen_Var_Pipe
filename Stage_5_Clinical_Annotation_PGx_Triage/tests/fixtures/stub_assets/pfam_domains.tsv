@@ -1,0 +1,4 @@
+gene	domain	start	end
+CYP2C19	P450	1	490
+CYP2D6	P450	1	497
+DPYD	Pyr_redox	1	1025

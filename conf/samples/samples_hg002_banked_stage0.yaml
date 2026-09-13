@@ -1,0 +1,74 @@
+# ==============================================================================
+# STAGE 0 BANKED MANIFEST
+# Purpose: Immutable Stage 0 handoff after intake validation, consent routing,
+#          reference snapshot locking, and audit bundle creation.
+# ==============================================================================
+samples:
+  # ---------------------------------------------------------------------------
+  # Stage 0 banked record. All paths below are immutable outputs from the run
+  # that validated this sample at intake.
+  # ---------------------------------------------------------------------------
+  - sample_id: "HG002_FULL_CONTROL_WES"  # Stable sample identifier propagated across all stages.
+    patient_id: "HG002"  # Clinical or LIMS patient identifier; may equal sample_id for controls.
+    case_id: "GIAB_CONTROL_CASE"  # Case, family, or accession-group identifier used for multi-sample context.
+    accession_id: "ACC-HG002-WES-0001"  # Laboratory accession identifier assigned at order intake.
+    encounter_id: "ENC-CONTROL-0001"  # Clinical encounter or visit identifier tied to the order.
+    specimen_id: "SPEC-HG002-BLOOD-01"  # Physical specimen identifier from accessioning or biobank custody.
+    analysis_batch_id: "BATCH-STAGE0-DEMO-01"  # Batch or run-set identifier used for operational grouping.
+    sample_type: "germline"  # Primary biological context enum such as germline or somatic.
+    pathologist_tumor_burden: 0.0  # Tumor burden fraction on a 0-1 scale; 0.0 is expected for this control.
+    gender: "male"  # Declared sex/gender field required by the Stage 0 concordance gate.
+    consent:
+      prs_opt_in: true  # True permits downstream polygenic risk scoring branches.
+      sf_opt_in: true  # True permits ACMG secondary findings analysis and reporting.
+      research_opt_in: false  # Optional research-only use permission.
+      data_sharing_opt_in: false  # Optional permission for controlled data sharing.
+      recontact_opt_in: false  # Optional permission allowing future clinically relevant recontact.
+      consent_version: "CLINICAL_WES_V3.2"  # Human-readable consent form or policy revision identifier.
+      consent_signed_utc: "2026-06-01T13:15:00Z"  # ISO 8601 UTC timestamp of signed consent.
+      consent_source: "CLINICAL_INTAKE_FORMS"  # Source system from which consent was transcribed.
+    consent_tokens:
+      prs_reporting: "CONSENTED|PRS_ENABLED"  # Deterministic route token used to gate PRS-producing downstream tasks.
+      secondary_findings: "CONSENTED|SF_ENABLED"  # Deterministic route token used to gate secondary-findings tasks.
+      research_use: "WITHHELD|RESEARCH_DISABLED"  # Deterministic route token for research-only derivative workflows.
+      data_sharing: "WITHHELD|DATA_SHARING_DISABLED"  # Deterministic route token for any controlled federation/export path.
+      recontact: "WITHHELD|RECONTACT_PROHIBITED"  # Deterministic route token indicating future recontact is not permitted.
+    biological_context:
+      declared_sex: "male"  # Declared biological sex used for concordance checks.
+      reported_ancestry: "benchmark_control"  # Self-reported or operational ancestry label.
+      phenotype_terms: "GIAB benchmark control"  # Phenotype or ontology summary relevant to interpretation.
+      affected_status: "unaffected"  # Affected/unaffected status used in germline review context.
+    diagnosis:
+      disease: "reference_control"  # Operational disease label for this benchmark control.
+      primary_site: "blood"  # Specimen/tissue origin relevant to interpretation context.
+      indication: "pipeline_validation"  # Operational reason for the order.
+      icd10: "Z00.00"  # ICD-10 or equivalent coding when available.
+      stage: "NA"  # Disease stage; NA when not clinically relevant.
+    specimen:
+      specimen_type: "blood"  # Material class such as blood, saliva, FFPE, fresh tissue, or plasma.
+      tissue_site: "peripheral_blood"  # Anatomic or collection site.
+      collection_timestamp_utc: "2026-06-01T12:45:00Z"  # ISO 8601 UTC collection timestamp.
+      accessioning_lab: "GIAB_CONTROL_BANK"  # Laboratory or accessioning service responsible for custody.
+      tumor_purity_estimate: 0.0  # Fraction on a 0-1 scale; relevant primarily for somatic specimens.
+    clinical_context:
+      mrn: "CONTROL-NOT-APPLICABLE"  # Medical record number or equivalent hospital identifier.
+      ordering_clinician: "pipeline.validation@lab.internal"  # Ordering clinician or responsible reviewer identifier.
+      report_priority: "validation"  # Operational priority label.
+      family_history: "none"  # Family-history summary or coded term when available.
+    ingest_manifest:
+      strict_pair_count_check: false  # True would force full gzip decode and read-count parity checks.
+      observed_q30_fraction: 0.95  # Precomputed Q30 fraction used by Stage 0 intake QC gating.
+      declared_sex: "male"  # Sex value mirrored from the source intake contract.
+      chromosome_y_depth: 0.92  # Normalized ChrY depth proxy used by the intake concordance check.
+      x_inbreeding_coefficient: 0.99  # X-chromosome inbreeding coefficient used by the intake concordance check.
+    sequencer:
+      platform: "illumina"  # Permitted short-read platform enum: illumina, element, complete_genomics, or ultima.
+      model: "NovaSeqX"  # Instrument or chemistry model string from LIMS.
+      flowcell_geometry: "native"  # Run geometry enum such as native or DNBSEQ_PATTERNED.
+    fastq_forward: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/fixtures/banked_stage0/validated_fastqs/HG002_FULL_CONTROL_WES_R1.validated.fastq.gz"  # Validated Stage 0 forward-read FASTQ path.
+    fastq_reverse: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/fixtures/banked_stage0/validated_fastqs/HG002_FULL_CONTROL_WES_R2.validated.fastq.gz"  # Validated Stage 0 reverse-read FASTQ path.
+    intake_validation_token: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/fixtures/banked_stage0/intake_token/HG002_FULL_CONTROL_WES.intake_validation_token"  # Machine-readable Stage 0 pass token required by Stage 1.
+    stage0_audit_bundle: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/fixtures/banked_stage0/audit_bundle/HG002_FULL_CONTROL_WES.stage0.audit_bundle.tar.gz"  # Compressed audit bundle containing validation and reference-lock evidence.
+    intake_validation_report: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/fixtures/banked_stage0/HG002_FULL_CONTROL_WES/audit_and_qc/HG002_FULL_CONTROL_WES.intake_validation_report.json"  # Detailed JSON audit for Stage 0 intake validation decisions.
+    intake_route_decision: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/fixtures/banked_stage0/HG002_FULL_CONTROL_WES/audit_and_qc/HG002_FULL_CONTROL_WES.intake_route_decision.json"  # JSON record showing deterministic Stage 0 routing after token evaluation.
+    save_dir: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/fixtures/banked_stage0"  # Root banking directory for this Stage 0 sample.

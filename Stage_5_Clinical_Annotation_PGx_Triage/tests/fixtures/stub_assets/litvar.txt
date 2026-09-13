@@ -1,0 +1,2 @@
+Evidence summary: variant 10:96541616:G:A linked to CYP2C19 reduced function in pharmacogenomic literature.
+CYP2D6 variant 22:42128945:C:T has established reduced enzyme activity evidence.

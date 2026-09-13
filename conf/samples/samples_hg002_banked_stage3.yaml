@@ -1,0 +1,25 @@
+{
+  "samples": [
+    {
+      "sample_id": "HG002_FULL_CONTROL_WES",
+      "validation_token": "VALID_PASS|SAMPLE_VALIDATED",
+      "sorted_bam": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_1_Alignment_Read_Processing/tests/fixtures/banked_stage1_fresh/HG002_FULL_CONTROL_WES/aligned/HG002_FULL_CONTROL_WES.markdup.bam",
+      "sorted_bai": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_1_Alignment_Read_Processing/tests/fixtures/banked_stage1_fresh/HG002_FULL_CONTROL_WES/aligned/HG002_FULL_CONTROL_WES.markdup.bam.bai",
+      "variant_branches": {},
+      "active_branches": [],
+      "normalized_vcf": "/scratch/nextflow_work/69/d68c1d81ced8a7148a1429d7b3d56e/normalized.vcf",
+      "normalized_vcf_tbi": "/scratch/nextflow_work/69/d68c1d81ced8a7148a1429d7b3d56e/normalized.vcf.tbi",
+      "harmonization_audit": "/scratch/nextflow_work/69/d68c1d81ced8a7148a1429d7b3d56e/harmonization_audit.json",
+      "reference_build": {
+        "reference_genome": "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa",
+        "reference_fai": "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai",
+        "reference_dict": "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.dict",
+        "capture_wes_bed": "/opt/reference/beds/OncoPanel_v4.2_Master_hs38DH.bed",
+        "onco_target_bed": "/opt/reference/beds/OncoPanel_v4.2_Master_hs38DH.bed",
+        "sf_bed": "/opt/reference/beds/ACMG_SF_v3.2_hs38DH.bed",
+        "clinvar_db": "/opt/reference/clinvar/clinvar_20260601.vcf.gz"
+      },
+      "stage4_handoff_note": "Normalized, atomized, left-aligned VCF ready for annotation."
+    }
+  ]
+}

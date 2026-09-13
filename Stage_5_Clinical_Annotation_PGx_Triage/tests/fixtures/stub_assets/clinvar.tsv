@@ -1,0 +1,4 @@
+gene	variant_tokens	clinical_significance	review_status	star_rating	conflict_flag
+CYP2C19	10:96541616:G:A	Pathogenic	reviewed_by_expert_panel	3	false
+CYP2D6	22:42128945:C:T	Likely pathogenic	criteria_provided	2	false
+MTHFR	1:114716160:C:T	VUS	criteria_provided	1	true

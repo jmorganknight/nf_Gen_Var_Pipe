@@ -1,6 +1,6 @@
 process ASSEMBLE_STAGE3_BANKED_MANIFEST {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.0.0'
 
     publishDir "${params.outdir}", mode: 'copy', overwrite: true
 
@@ -49,7 +49,7 @@ for rec in records:
     lines.append('    normalized_vcf_tbi: ' + json.dumps(rec.get('normalized_vcf_tbi', '')))
     lines.append('    harmonization_audit: ' + json.dumps(rec.get('harmonization_audit', '')))
     lines.append('    stage4_handoff_note: "Normalized, atomized, left-aligned VCF ready for annotation."')
-Path('samples_hg002_banked_stage3.yaml').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+Path('samples_hg002_banked_stage3.yaml').write_text(chr(10).join(lines) + chr(10), encoding='utf-8')
 PYEOF
     """
 }

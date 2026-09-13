@@ -1,0 +1,4 @@
+scenario	status	elapsed_seconds	exit_code	details
+unvalidated_stage2_manifest	PASS	12.78	1	OK
+all_branches_disabled_fail_closed	PASS	2.75	1	OK
+corrupt_vcf_header_fail_closed	PASS	5.02	1	OK

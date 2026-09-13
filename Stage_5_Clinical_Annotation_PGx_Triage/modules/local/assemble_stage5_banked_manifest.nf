@@ -82,7 +82,11 @@ for sid in sorted(by_sample):
     lines.append(f'      prs_calibrated_report_json: "{prs.get("prs_report", "")}"')
     lines.append(f'      prs_bypassed_audit_json: "{prs.get("prs_bypass_audit", "")}"')
     lines.append(f'      prs_insufficient_coverage_audit_json: "{prs.get("prs_coverage_audit", "")}"')
-    lines.append(f'      pgx_report_json: "{pgx.get("pgx_report", "")}"')
+    lines.append(f'      pgx_diplotype_json: "{pgx.get("pgx_diplotype_json", "")}"')
+    lines.append(f'      pgx_actionability_json: "{pgx.get("pgx_actionability_json", "")}"')
+    lines.append(f'      pgx_report_json: "{pgx.get("pgx_actionability_json", pgx.get("pgx_report", ""))}"')
+    lines.append(f'      clinical_bundle_tar_gz: "{pgx.get("clinical_bundle_tar_gz", "")}"')
+    lines.append(f'      provenance_json: "{pgx.get("provenance_json", "")}"')
     lines.append('    save_dir: "tests/fixtures/banked_stage5"')
 
 Path('samples_hg002_banked_stage5.yaml').write_text("\\n".join(lines) + "\\n", encoding='utf-8')

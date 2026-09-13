@@ -66,6 +66,15 @@ export GOGC=${gogc_val}
 mkdir -p "./tmp_elprep_sfm"
 mkdir -p "/tmp/elprep_logs"
 
+if ! command -v elprep >/dev/null 2>&1; then
+    echo "STAGE1_PRECONDITION_FAILURE: elprep binary is not available in container PATH" >&2
+    exit 127
+fi
+if elprep --help 2>&1 | grep -qi "not installed in this image"; then
+    echo "STAGE1_PRECONDITION_FAILURE: elprep placeholder wrapper detected; install licensed elprep binary for non-stub execution" >&2
+    exit 127
+fi
+
 bwa-mem2 mem \
     -t ${threads} \
     -R "@RG\\t${rg_tag}" \

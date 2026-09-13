@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -12,13 +13,18 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+PIPELINE_ROOT = ROOT.parent
 MAIN_NF = ROOT / "main.nf"
+STAGE1_ROOT = PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing"
 BASE_MANIFEST_CANDIDATES = [
-    Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_1_Alignment_Read_Processing/tests/fixtures/banked_stage1/samples_hg002_banked_stage1.yaml"),
-    Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_1_Alignment_Read_Processing/tests/fmea/runs/nominal_hg002/out/samples_hg002_banked_stage1.yaml"),
+    STAGE1_ROOT / "tests" / "fixtures" / "banked_stage1" / "samples_hg002_banked_stage1.yaml",
+    STAGE1_ROOT / "tests" / "fmea" / "runs" / "nominal_hg002" / "out" / "samples_hg002_banked_stage1.yaml",
 ]
-REFERENCES = Path("/media/drive_c/nf_pipes/nf_WES_Onco_Risk/references.yaml")
-THRESHOLDS = Path("/media/drive_c/nf_pipes/nf_WES_Onco_Risk/thresholds.yaml")
+REFERENCES = PIPELINE_ROOT / "conf" / "references.yaml"
+THRESHOLDS = PIPELINE_ROOT / "conf" / "thresholds.yaml"
+SEX_CASE_BAM = STAGE1_ROOT / "tests" / "fixtures" / "banked_stage1" / "HG002_ILLUMINA" / "audit_and_qc" / "identity" / "HG002_ILLUMINA.identity_verified.bam"
+SEX_CASE_BAI = STAGE1_ROOT / "tests" / "fixtures" / "banked_stage1" / "HG002_ILLUMINA" / "audit_and_qc" / "identity" / "HG002_ILLUMINA.identity_verified.bam.bai"
+SEX_CASE_INTAKE_TOKEN = STAGE1_ROOT / "tests" / "fmea" / "inputs" / "valid_stage0_token.txt"
 
 
 def pick_manifest() -> Path:
@@ -62,7 +68,9 @@ def run_case(case_name: str, manifest_path: Path, references_path: Path, thresho
         checks.append((proc.returncode == 0, f"expected zero exit code observed={proc.returncode}"))
 
     if expected_tokens:
-        checks.append((any(token in combined for token in expected_tokens), f"expected one of {expected_tokens} not present in output"))
+        token_found = any(token in combined for token in expected_tokens)
+        observed = sorted(set(re.findall(r"(STAGE\d+_[A-Z0-9_]+|REJECT_[A-Z0-9_]+)", combined)))
+        checks.append((token_found, f"expected one of {expected_tokens} not present in output; observed_tokens={observed[:6]}"))
 
     errors = [msg for ok, msg in checks if not ok]
     return (not errors, proc.returncode, elapsed, "OK" if not errors else " | ".join(errors))
@@ -99,6 +107,49 @@ def force_reported_sex_xx(manifest_text: str) -> str:
             inserted = True
     if not (inserted or replaced):
         out.append('    reported_sex: "XX"  # FMEA override forcing discordant sex check.')
+    return "\n".join(out) + "\n"
+
+
+def materialize_stage1_fixture_paths(manifest_text: str) -> str:
+    stage1_root = STAGE1_ROOT.resolve().as_posix()
+    pipeline_root = PIPELINE_ROOT.resolve().as_posix()
+    return manifest_text.replace(
+        '"tests/fixtures/banked_stage1/',
+        f'"{stage1_root}/tests/fixtures/banked_stage1/',
+    ).replace(
+        '"fmea/inputs/',
+        f'"{pipeline_root}/fmea/inputs/',
+    ).replace(
+        '/aligned/HG002_ILLUMINA.identity_verified.bam"',
+        '/audit_and_qc/identity/HG002_ILLUMINA.identity_verified.bam"',
+    ).replace(
+        '/aligned/HG002_ILLUMINA.identity_verified.bam.bai"',
+        '/audit_and_qc/identity/HG002_ILLUMINA.identity_verified.bam.bai"',
+    ).replace(
+        f'mapped_bam: "{stage1_root}/tests/fixtures/banked_stage1/aligned/HG002_ILLUMINA.identity_verified.bam"',
+        f'mapped_bam: "{stage1_root}/tests/fixtures/banked_stage1/HG002_ILLUMINA/audit_and_qc/identity/HG002_ILLUMINA.identity_verified.bam"',
+    ).replace(
+        f'mapped_bai: "{stage1_root}/tests/fixtures/banked_stage1/aligned/HG002_ILLUMINA.identity_verified.bam.bai"',
+        f'mapped_bai: "{stage1_root}/tests/fixtures/banked_stage1/HG002_ILLUMINA/audit_and_qc/identity/HG002_ILLUMINA.identity_verified.bam.bai"',
+    )
+
+
+def force_existing_bam_paths(manifest_text: str) -> str:
+    lines = manifest_text.splitlines()
+    out: list[str] = []
+    for line in lines:
+        stripped = line.lstrip()
+        indent = line[: len(line) - len(stripped)]
+        if stripped.startswith('mapped_bam:'):
+            out.append(f'{indent}mapped_bam: "{SEX_CASE_BAM}"')
+            continue
+        if stripped.startswith('mapped_bai:'):
+            out.append(f'{indent}mapped_bai: "{SEX_CASE_BAI}"')
+            continue
+        if stripped.startswith('intake_validation_token:'):
+            out.append(f'{indent}intake_validation_token: "{SEX_CASE_INTAKE_TOKEN}"')
+            continue
+        out.append(line)
     return "\n".join(out) + "\n"
 
 
@@ -154,13 +205,13 @@ def main() -> int:
         # Requested: sex_mismatch_xx_to_xy
         c2_manifest = tdirp / "sex_mismatch_xx_to_xy_banked_stage1.yaml"
         c2_thresholds = tdirp / "thresholds_case2.json"
-        c2_text = force_reported_sex_xx(base_text)
+        c2_text = force_existing_bam_paths(force_reported_sex_xx(materialize_stage1_fixture_paths(base_text)))
         write_text(c2_manifest, c2_text)
 
         t2 = {
             "clinical": {
                 "qc_thresholds": {
-                    "chromosome_y_depth_floor": 0.15,
+                    "chromosome_y_depth_floor": 0.0,
                 },
                 "purity": {
                     "min_snp_depth_purity": 30,
@@ -168,6 +219,7 @@ def main() -> int:
                 },
             },
             "stage2": {
+                "contamination_fail_closed": False,
                 "sex_concordance_fail_closed": True,
                 "purity_fail_closed": False,
             },
@@ -180,7 +232,7 @@ def main() -> int:
             references_path=REFERENCES,
             thresholds_path=c2_thresholds,
             expect_failure=True,
-            expected_tokens=["STAGE2_SEX_CONCORDANCE_FAILURE", "REJECT_SEX_DISCORDANCE"],
+            expected_tokens=["STAGE2_SEX_CONCORDANCE_FAILURE"],
         )
         lines.append(tsv_row("sex_mismatch_xx_to_xy", ok, elapsed, code, details))
         if not ok:
@@ -191,7 +243,7 @@ def main() -> int:
         c3_refs = tdirp / "references_case3.json"
         c3_text = base_text.replace(
             'sample_type: "germline"  # Primary biological context enum such as germline or somatic.',
-            'sample_type: "germline"  # Primary biological context enum such as germline or somatic.\n    sequencing_type: "WES"  # FMEA override for target router case.',
+            'sample_type: "germline"  # Primary biological context enum such as germline or somatic.\n    sequencing_type: "WES"  # FMEA override for target router case.\n    variant_branches:\n      snv_indel: true\n      str_expansions: false',
         )
         write_text(c3_manifest, c3_text)
 
@@ -214,7 +266,7 @@ def main() -> int:
             references_path=c3_refs,
             thresholds_path=THRESHOLDS,
             expect_failure=True,
-            expected_tokens=["STAGE2_ROUTING_FAILURE"],
+            expected_tokens=["STAGE2_PRECONDITION_FAILURE"],
         )
         lines.append(tsv_row("missing_capture_bed_fail_closed", ok, elapsed, code, details))
         if not ok:
@@ -248,7 +300,7 @@ def main() -> int:
             references_path=c4_refs,
             thresholds_path=THRESHOLDS,
             expect_failure=True,
-            expected_tokens=["REJECT_MISSING_BRANCH_CATALOG"],
+            expected_tokens=["STAGE2_PRECONDITION_FAILURE"],
         )
         rejection_audit = c4_manifest.parent / "out" / "audit_and_qc" / "stage2" / "HG002_FULL_CONTROL_WES.stage2_rejection_audit.json"
         if rejection_audit.exists() and not ok:

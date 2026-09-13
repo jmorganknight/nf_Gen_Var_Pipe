@@ -1,0 +1,5 @@
+gene	allele	required_variants	activity_score	evidence_level	phenotype	guidance	weight
+CYP2C19	*2	10:96541616:G:A	0.0	A	Poor Metabolizer	Avoid clopidogrel; use alternative antiplatelet.	1.2
+CYP2D6	*4	22:42128945:C:T	0.0	A	Poor Metabolizer	Avoid codeine/tramadol due to reduced activation.	1.1
+DPYD	*2A	1:97000000:G:A	0.0	A	Poor Metabolizer	Substantially reduce fluoropyrimidine dose.	1.3
+MTHFR	C677T	1:114716160:C:T	1.0	B	Intermediate Metabolizer	Monitor homocysteine; folate support per clinician.	0.2

@@ -1,19 +1,14 @@
 # Stage_1_Alignment_Read_Processing
 
-Standalone short-read Stage 1 micro-pipeline for platform-aware trimming, alignment/read processing, coordinate normalization, identity auditing, and Stage 2 contract banking.
+Standalone Stage 1 micro-pipeline for platform-aware intake routing, alignment/read processing, coordinate normalization, identity auditing, and Stage 2 contract banking.
 
-## Local rerun guidance
+## Clinical Scope
 
-- Recommended scratch volume: /scratch
-- Default Stage 1 work directory: /scratch/nextflow_work
-- Default Stage 1 temp directory: /scratch/tmp
-- Heavy-path CPU ceiling: 30 cores
+Stage 1 enforces the first clinical handoff gate after Stage 0 intake.
 
-To run a fresh local Stage 1 rerun with the scratch directories cleared first, use:
-
-`./run_local_stage1.sh`
-
-The wrapper clears the Stage 1 scratch work and temp directories before launching Nextflow, so it is intended for fresh reruns rather than resume-based recovery.
+- Accepts only validated intake contracts from Stage 0.
+- Routes by sequencer platform (`illumina`, `element`, `complete`, `ultima`, `ont`).
+- Produces normalized alignment outputs and identity-verified BAM/BAI artifacts for Stage 2.
 
 ## Architecture Flow
 
@@ -70,6 +65,34 @@ Stage0 manifest --> precondition gate --> platform router --> [fastp + elprep] O
                                                                                                  --> banked_stage1 contract yaml
 ```
 
+## Platform-Aware Routing Matrix
+
+| Platform | Route | Notes |
+|---|---|---|
+| `illumina` | `FASTP_TRIM` -> `ELPREP_ALIGN_MARKDUP` | Standard short-read paired-end lane. |
+| `element` | `FASTP_TRIM` -> `ELPREP_ALIGN_MARKDUP` | AVITI-like paired-end lane with same guardrails. |
+| `complete` | `FASTP_TRIM` -> `ELPREP_ALIGN_MARKDUP` | Patterned-flow metadata retained via `@RG` and `DS`. |
+| `ultima` | `BWA_MEM2_ALIGN` -> `STAGE1_BWA_FINALIZE` | Specialized fallback lane for Ultima reads. |
+| `ont` | Stage 1 ONT lane module(s) | Long-read path remains governed by Stage 1 preconditions and contract outputs. |
+
+## Intake Governance and Checksum/Token Guards
+
+Stage 1 consumes Stage 0-validated intake artifacts and enforces fail-closed conditions:
+
+- Stage 0 token and manifest preconditions are validated before heavy compute.
+- Stage 0 reference snapshot/checksum lock artifacts are carried forward as intake integrity context.
+- Route decisions and intake metadata are captured in `platform_init_route.json` and Stage 1 audit sink payloads.
+- Reference lineage and contract continuity are retained in Stage 1 banked outputs.
+- Missing, malformed, or invalid mapped BAM metadata causes explicit Stage 1 precondition rejection.
+
+## Pre-Execution Binary Validation
+
+Stage 1 now includes explicit runtime guards before alignment execution:
+
+- `ELPREP_ALIGN_MARKDUP` asserts `elprep` exists on `PATH`.
+- It also rejects placeholder wrappers (fail-closed) and emits `STAGE1_PRECONDITION_FAILURE` if detected.
+- This prevents accidental production execution with non-functional placeholder binaries.
+
 ## Module Inventory
 
 | Module | Inputs | Outputs | Platforms | Failure Behavior |
@@ -87,16 +110,14 @@ Stage0 manifest --> precondition gate --> platform router --> [fastp + elprep] O
 | `STAGE1_AUDIT_SINK` | route/fastp/align/identity/junction/flagstat artifacts | `stage1_audit_payload.json` | all short-read | fails on sink assembly/write failure. |
 | `BANK_STAGE1_CONTRACT` + `ASSEMBLE_STAGE1_BANKED_MANIFEST` | final BAM/BAI + ref metadata | banked files and `samples_hg002_banked_stage1.yaml` | all short-read | fails if banking/manifest write fails. |
 
-## Platform Geometry Matrix
+## Inputs
 
-| Platform | Read Mode | Trimming | Alignment/Processing | Geometry Preservation |
-|---|---|---|---|---|
-| Illumina | paired-end | `fastp` with poly-G support | `elprep 5` (`bwa-mem2` stream + sort + markdup) | `@RG` includes `ID,PL,PU,SM,LB,DS` and flow metadata propagated from sample/meta. |
-| Element (AVITI) | paired-end | `fastp` adapter/quality trimming | `elprep 5` pathway | same `@RG` preservation guarantees. |
-| Complete Genomics / DNBseq | paired-end | `fastp` filtering | `elprep 5` pathway | patterned geometry encoded in `DS` and carried through reheader/junction checks. |
-| Ultima | single-end fallback (workflow route) | no mandatory fastp trim in fallback lane | `bwa-mem2` fallback + finalize index/metrics | `@RG` includes full required tag set with flow geometry in `DS`. |
+- Stage 0 banked manifest
+- validated intake token and intake report
+- reference genome, FAI, dictionary, and BWA index assets
+- platform metadata and consent/context fields propagated from Stage 0
 
-## Banked Deliverables Contract
+## Outputs
 
 Published under `tests/fixtures/banked_stage1/`:
 
@@ -107,7 +128,7 @@ Published under `tests/fixtures/banked_stage1/`:
 - `audit_and_qc/stage1/stage1_rejection_audit.json` (failure scenarios)
 - `samples_hg002_banked_stage1.yaml`
 
-`samples_hg002_banked_stage1.yaml` carries Stage 2 handoff fields:
+Stage 2 handoff fields include:
 
 - `mapped_bam`
 - `mapped_bai`
@@ -115,3 +136,51 @@ Published under `tests/fixtures/banked_stage1/`:
 - `reference_build.reference_fai`
 - `reference_build.reference_dict`
 - `reference_build.bwa_index_base`
+
+## Execute
+
+Run Stage 1 standalone:
+
+```bash
+cd Stage_1_Alignment_Read_Processing
+nextflow run main.nf \
+    -profile docker \
+    --input tests/fixtures/banked_stage0/samples_hg002_banked_stage0.yaml \
+    --outdir tests/fixtures/banked_stage1
+```
+
+Dev-fast validation:
+
+```bash
+cd /media/drive_c/nf_pipes/nf_Gen_Var_Pipe
+NXF_REF_DATA_ROOT="/path/to/reference_root" \
+nextflow run main.nf -profile dev_fast,docker -stub --input assets/samples_hg002_mini.yaml -ansi-log false
+```
+
+## Platform Geometry Matrix
+
+| Platform | Read Mode | Trimming | Alignment/Processing | Geometry Preservation |
+|---|---|---|---|---|
+| Illumina | paired-end | `fastp` with poly-G support | `elprep 5` (`bwa-mem2` stream + sort + markdup) | `@RG` includes `ID,PL,PU,SM,LB,DS` and flow metadata propagated from sample/meta. |
+| Element (AVITI) | paired-end | `fastp` adapter/quality trimming | `elprep 5` pathway | same `@RG` preservation guarantees. |
+| Complete Genomics / DNBseq | paired-end | `fastp` filtering | `elprep 5` pathway | patterned geometry encoded in `DS` and carried through reheader/junction checks. |
+| Ultima | single-end fallback (workflow route) | no mandatory fastp trim in fallback lane | `bwa-mem2` fallback + finalize index/metrics | `@RG` includes full required tag set with flow geometry in `DS`. |
+
+## FMEA
+
+```bash
+python3 tests/fmea/run_stage1_fmea_suite.py
+```
+
+## Notes
+
+### Local rerun guidance
+
+- Recommended scratch volume: /scratch
+- Default Stage 1 work directory: /scratch/nextflow_work
+- Default Stage 1 temp directory: /scratch/tmp
+- Heavy-path CPU ceiling: 30 cores
+
+To run a fresh local Stage 1 rerun with the scratch directories cleared first, use `./run_local_stage1.sh`.
+
+The wrapper clears the Stage 1 scratch work and temp directories before launching Nextflow, so it is intended for fresh reruns rather than resume-based recovery.

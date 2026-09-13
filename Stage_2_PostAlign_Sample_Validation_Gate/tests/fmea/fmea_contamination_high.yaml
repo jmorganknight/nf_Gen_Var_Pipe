@@ -1,0 +1,7 @@
+samples:
+  - sample_id: "HG002_FMEA_CONTAM_HIGH"
+    sequencing_type: "WGS"
+    reported_sex: "XY"
+    physician_tumor_purity: 0.00
+    simulated_freemix: 0.02
+    expectation: "FAIL_CONTAMINATION_GT_1_PERCENT"

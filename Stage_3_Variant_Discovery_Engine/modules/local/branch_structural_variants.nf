@@ -1,6 +1,6 @@
 process BRANCH_STRUCTURAL_VARIANTS {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.0.0'
 
     input:
     tuple path(contract_json), path(branch_plan_json)

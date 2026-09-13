@@ -1,0 +1,78 @@
+FROM ubuntu:22.04@sha256:281c5745f657873d78e5531fc5ba8575f46ab7769b94550ac99543f122679986
+
+ARG REQUIRE_FULL_CLINICAL_BINARIES=0
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV MAMBA_ROOT_PREFIX=/opt/micromamba
+ENV PATH=/opt/conda/bin:/usr/local/bin:${PATH}
+ENV PHARMCAT_PLACEHOLDER=1
+
+# 1. Install annotation and report-generation dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    wget \
+    curl \
+    git \
+    bzip2 \
+    ca-certificates \
+    perl \
+    python3 \
+    python3-pip \
+    python3-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    liblzma-dev \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    openjdk-17-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Annotation runtime binaries with direct PATH audit coverage.
+RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest \
+    | tar -xvj -C /usr/local/bin --strip-components=1 bin/micromamba && \
+    micromamba create -y -p /opt/conda -c conda-forge -c bioconda \
+      python=3.11 \
+      bcftools \
+      htslib \
+      tabix \
+      ensembl-vep \
+      pypgx && \
+    micromamba clean -a -y && \
+    /opt/conda/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/conda/bin/pip install --no-cache-dir \
+    numpy \
+    pandas \
+    PyYAML \
+    jinja2 \
+    reportlab \
+    cryptography && \
+    printf '#!/usr/bin/env bash\nif [[ "${PHARMCAT_PLACEHOLDER:-1}" == "1" ]]; then\n  echo "CONTAINER_BINARY_VALIDATION_FAILURE: pharmcat placeholder wrapper detected; install PharmCAT CLI/JAR before production PGx reporting" >&2\n  exit 127\nfi\necho "CONTAINER_BINARY_VALIDATION_FAILURE: pharmcat invocation failed and no validated binary was available" >&2\nexit 127\n' > /usr/local/bin/pharmcat && \
+    chmod +x /usr/local/bin/pharmcat
+
+# 3. Verification check
+RUN command -v bcftools && \
+    command -v vep && \
+    command -v pypgx && \
+    command -v pharmcat && \
+    test "${PHARMCAT_PLACEHOLDER}" = "1" && \
+    /opt/conda/bin/python - <<'PY'
+import json
+from pathlib import Path
+
+audit = {
+    'image': 'wes-onco-annotation:1.0.0',
+    'implemented_binaries': ['bcftools', 'vep', 'pypgx'],
+    'placeholder_binaries': {
+        'pharmcat': 'requires separately supplied PharmCAT CLI or jar',
+    },
+}
+Path('/opt/container_binary_audit.annotation.json').write_text(json.dumps(audit, indent=2) + '\n', encoding='utf-8')
+print('wes-onco-annotation:1.0.0 audit emitted with placeholder exception for pharmcat')
+PY
+
+RUN if [ "${REQUIRE_FULL_CLINICAL_BINARIES}" = "1" ] && [ "${PHARMCAT_PLACEHOLDER}" = "1" ]; then \
+            echo "BUILD_VALIDATION_FAILURE: REQUIRE_FULL_CLINICAL_BINARIES=1 but pharmcat placeholder wrapper is still configured" >&2; \
+            exit 64; \
+        fi
+
+WORKDIR /workspace

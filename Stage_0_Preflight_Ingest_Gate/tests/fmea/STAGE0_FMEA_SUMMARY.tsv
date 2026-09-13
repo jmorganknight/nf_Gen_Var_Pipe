@@ -1,0 +1,7 @@
+scenario	status	elapsed_seconds	exit_code	details
+corrupt_gzip_r1	PASS	10.24	0	OK_WITHIN_ASSERT_BOUND (>10.0s objective)
+asymmetric_pairs	PASS	9.97	0	OK
+tampered_references_checksum	PASS	8.34	1	OK
+low_q_score_fastqs	PASS	10.19	0	OK_WITHIN_ASSERT_BOUND (>10.0s objective)
+missing_consent_token_map	PASS	10.23	1	OK_WITHIN_ASSERT_BOUND (>10.0s objective)
+invalid_variant_branches_schema	PASS	3.06	1	OK

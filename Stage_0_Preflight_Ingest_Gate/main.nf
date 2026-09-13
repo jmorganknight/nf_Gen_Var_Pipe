@@ -11,6 +11,77 @@ def mapOrEmpty(Object value) {
     value instanceof Map ? (value as Map) : [:]
 }
 
+def isStubMode() {
+    def commandLine = workflow.hasProperty('commandLine') ? (workflow.commandLine ?: '') : ''
+    def stubFlag = workflow.hasProperty('stubRun') ? workflow.stubRun : null
+    (stubFlag instanceof Boolean && stubFlag) || commandLine.contains('-stub')
+}
+
+def resolvePathWithBases(String rawPath, List<String> roots) {
+    def candidate = new File(rawPath)
+    if (candidate.isAbsolute() || candidate.exists()) {
+        return candidate
+    }
+    def resolved = null
+    roots.each { base ->
+        if (!base) {
+            return
+        }
+        def rooted = new File(base, rawPath)
+        if (resolved == null && rooted.exists()) {
+            resolved = rooted
+            return
+        }
+    }
+    resolved ?: new File(roots ? roots[0] : projectDir.toString(), rawPath)
+}
+
+def sha256Hex(File fileObj) {
+    def digest = java.security.MessageDigest.getInstance('SHA-256')
+    if (fileObj.isDirectory()) {
+        def children = []
+        fileObj.eachFileRecurse(groovy.io.FileType.FILES) { child ->
+            children << child
+        }
+        children.sort { left, right ->
+            fileObj.toPath().relativize(left.toPath()).toString().replace('\\', '/') <=> fileObj.toPath().relativize(right.toPath()).toString().replace('\\', '/')
+        }.each { child ->
+            def rel = fileObj.toPath().relativize(child.toPath()).toString().replace('\\', '/')
+            digest.update(rel.getBytes('UTF-8'))
+            digest.update('\u0000'.getBytes('UTF-8'))
+            digest.update(sha256Hex(child).getBytes('US-ASCII'))
+            digest.update('\u0000'.getBytes('UTF-8'))
+        }
+    } else {
+        fileObj.withInputStream { stream ->
+            stream.eachByte(1024 * 1024) { buffer, size ->
+                digest.update(buffer, 0, size)
+            }
+        }
+    }
+    digest.digest().collect { value -> String.format('%02x', value) }.join()
+}
+
+def validateChecksumManifest(File manifestFile, String refDir, String projectRoot) {
+    manifestFile.eachLine('UTF-8') { raw ->
+        def line = raw.trim()
+        if (!line || line.startsWith('#')) {
+            return
+        }
+        def parts = line.split(/\s+/, 2)
+        if (parts.size() != 2) {
+            throw new IllegalArgumentException("Invalid checksum manifest line: ${raw}")
+        }
+        def pathText = parts[1].trim()
+        def resolved = pathText.startsWith('/opt/reference')
+            ? hostPathForReference(pathText, refDir)
+            : resolvePathWithBases(pathText, [projectRoot, manifestFile.parent])
+        if (sha256Hex(resolved) != parts[0].trim().toLowerCase()) {
+            throw new IllegalStateException("REFERENCE_CHECKSUM_MISMATCH: ${pathText}")
+        }
+    }
+}
+
 
 def normalizeConsent(Object rawConsent) {
     def source = mapOrEmpty(rawConsent)
@@ -213,15 +284,20 @@ workflow {
         throw new IllegalArgumentException('FATAL: samples manifest contains no samples')
     }
 
-    def referenceMountRoot = infrastructureParsed?.storage?.reference_host_root?.toString()
+    def infrastructureRoot = infrastructureFile.parent ? infrastructureFile.parent.toString() : projectDir.toString()
+    def referenceMountRoot = (params.ref_data_root ?: params.ref_dir ?: infrastructureParsed?.storage?.reference_host_root ?: '../assets/references')?.toString()
     def referencesText = referencesFile.text
-    if (referencesText.contains('/opt/reference') && !referenceMountRoot && !params.ref_dir) {
+    if (referencesText.contains('/opt/reference') && !referenceMountRoot) {
         throw new IllegalArgumentException(
             'FATAL: references manifest uses /opt/reference assets but no host reference mount is configured. Set storage.reference_host_root in infrastructure.yaml or provide --ref_dir.'
         )
     }
 
-    def refDir = referenceMountRoot ?: params.ref_dir?.toString()
+    def refDir = resolvePathWithBases(referenceMountRoot, [infrastructureRoot, projectDir.toString()]).toString()
+    def checksumManifest = resolvePathWithBases('../assets/reference_checksums.sha256', [projectDir.toString(), thresholdsFile.parent?.toString() ?: projectDir.toString()])
+    if (checksumManifest.exists()) {
+        validateChecksumManifest(checksumManifest, refDir, projectDir.toString())
+    }
     [
         reference_genome      : (refsParsed.reference_genome ?: refsParsed.grch38_fasta),
         reference_fai         : (refsParsed.reference_fai ?: refsParsed.grch38_fai),
@@ -237,19 +313,28 @@ workflow {
     def samplesRoot = samplesFile.parent ? samplesFile.parent.toString() : projectDir.toString()
     def thresholdsRoot = thresholdsFile.parent ? thresholdsFile.parent.toString() : projectDir.toString()
 
-    def signerKeyRaw = (params.signer_key_path ?: reportingCfg.pki_key_path)
-    if (!signerKeyRaw) {
-        throw new IllegalArgumentException('FATAL: no signing key path configured. Set clinical.reporting.pki_key_path in thresholds.yaml or provide --signer_key_path.')
-    }
-    def signerKeyCandidate = new File(signerKeyRaw.toString())
-    def signerKeyResolved = signerKeyCandidate.isAbsolute() ? signerKeyCandidate : new File(thresholdsRoot, signerKeyRaw.toString())
+    def pkiRoot = resolvePathWithBases((params.pki_key_dir ?: '../keys').toString(), [projectDir.toString(), thresholdsRoot])
+    def signerKeyRaw = (params.signer_key_path ?: reportingCfg.pki_key_path ?: new File(pkiRoot, 'clinical_signer.pem').toString())
+    def signerKeyResolved = resolvePathWithBases(signerKeyRaw.toString(), [thresholdsRoot, projectDir.toString(), pkiRoot.toString()])
 
     def inferredPubKey = signerKeyRaw.toString().endsWith('.pem')
         ? signerKeyRaw.toString().replaceFirst(/\.pem$/, '.pub.pem')
         : "${signerKeyRaw}.pub.pem"
     def signerPubRaw = params.signer_pub_path ?: reportingCfg.pki_pub_key_path ?: inferredPubKey
-    def signerPubCandidate = new File(signerPubRaw.toString())
-    def signerPubResolved = signerPubCandidate.isAbsolute() ? signerPubCandidate : new File(thresholdsRoot, signerPubRaw.toString())
+    def signerPubResolved = resolvePathWithBases(signerPubRaw.toString(), [thresholdsRoot, projectDir.toString(), pkiRoot.toString()])
+    if ((!signerKeyResolved.exists() || !signerPubResolved.exists()) && !isStubMode()) {
+        throw new IllegalStateException("STAGE5_PKI_KEY_MISSING: key=${signerKeyResolved}; pub=${signerPubResolved}")
+    }
+    if (isStubMode()) {
+        if (!signerKeyResolved.exists()) {
+            signerKeyResolved.parentFile?.mkdirs()
+            signerKeyResolved.text = "-----BEGIN PRIVATE KEY-----\nSTUB\n-----END PRIVATE KEY-----\n"
+        }
+        if (!signerPubResolved.exists()) {
+            signerPubResolved.parentFile?.mkdirs()
+            signerPubResolved.text = "-----BEGIN PUBLIC KEY-----\nSTUB\n-----END PUBLIC KEY-----\n"
+        }
+    }
 
     def chRawReads = channel.fromList(samplesParsed).map { sample ->
         def sid = (sample.sample_id ?: 'UNKNOWN').toString()

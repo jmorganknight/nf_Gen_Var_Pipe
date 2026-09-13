@@ -7,10 +7,10 @@ process ASSAY_TARGET_ROUTER {
         pattern: "*.assay_target_router_audit.json"
 
     input:
-    tuple val(meta), path(bam), path(bai), val(refs), val(thresholds), path(precondition_audit), path(purity_sex_audit)
+    tuple val(meta), path(bam), path(bai), val(refs), val(thresholds), path(precondition_audit), path(contamination_audit), path(purity_sex_audit)
 
     output:
-    tuple val(meta), path(bam), path(bai), val(refs), val(thresholds), path(precondition_audit), path(purity_sex_audit), path("${meta.sample_id}.stage2_routing.json"), path("${meta.sample_id}.assay_target_router_audit.json"), emit: validated
+    tuple val(meta), path(bam), path(bai), val(refs), val(thresholds), path(precondition_audit), path(contamination_audit), path(purity_sex_audit), path("${meta.sample_id}.stage2_routing.json"), path("${meta.sample_id}.assay_target_router_audit.json"), emit: validated
 
     script:
     def metaJson = groovy.json.JsonOutput.toJson(meta).replace('\\', '\\\\').replace("'", "\\'")
@@ -113,6 +113,7 @@ router_audit = {
     'target_bed_validation_note': bed_validation_note,
     'routing': routing,
     'precondition_audit': '${precondition_audit}',
+    'contamination_audit': '${contamination_audit}',
     'purity_and_sex_validation_audit': '${purity_sex_audit}'
 }
 

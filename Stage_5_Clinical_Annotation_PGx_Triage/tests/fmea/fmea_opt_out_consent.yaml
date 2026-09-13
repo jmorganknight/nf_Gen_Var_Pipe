@@ -1,0 +1,7 @@
+samples:
+  - sample_id: "HG002_FMEA_OPT_OUT"
+    validation_token: "VALID_PASS|VARIANTS_HARMONIZED"
+    consent:
+      prs_opt_in: false
+      sf_opt_in: false
+    expectation: "OPT_OUT_BRANCHES_BYPASS"

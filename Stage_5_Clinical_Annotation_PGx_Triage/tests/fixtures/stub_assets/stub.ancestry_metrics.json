@@ -1,0 +1,11 @@
+{
+  "sample_id": "HG002_STUB",
+  "ancestry_label": "EUR",
+  "superpopulation": "EUR",
+  "subpopulation": "CEU",
+  "pc_coordinates": {
+    "PC1": 0.012,
+    "PC2": -0.004,
+    "PC3": 0.008
+  }
+}

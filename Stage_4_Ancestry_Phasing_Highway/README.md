@@ -2,6 +2,10 @@
 
 Standalone Stage 4 micro-pipeline for ancestry projection and haplotype phasing after Stage 3 harmonization.
 
+## Clinical Scope
+
+Stage 4 transforms Stage 3 harmonized variants into ancestry- and phasing-aware handoff artifacts required by Stage 5 clinical interpretation.
+
 ## Architecture Flow
 
 ```mermaid
@@ -18,6 +22,19 @@ flowchart TD
     H --> I[tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml]
 ```
 
+## Population Projection and Phasing Stack
+
+| Layer | Engine | Purpose |
+|---|---|---|
+| Population projection (Layer 1: superpopulation / Layer 2: subpopulation) | `POPPCA_REFERENCE_PROJECTION` (`nf_PopPCA_refgen`) | Produces PC1-PC10 coordinates and hierarchical population labels. |
+| Read-backed phasing | `WHATSHAP_SHAPEIT_PHASER` | Produces phased VCF + index with audit payload. |
+
+Implementation notes:
+
+- Projection metadata records `projection_engine: nf_PopPCA_refgen`.
+- Projection method is tool-aware (`plink2_projection` when available, deterministic guarded fallback otherwise).
+- Runtime toolchain aligns with PLINK 1.9/2.0 compatible reference projection workflows.
+
 ## Module Inventory
 
 | Module | Inputs | Outputs | Purpose |
@@ -27,7 +44,7 @@ flowchart TD
 | `BANK_STAGE4_CONTRACT` | ancestry metrics + phased outputs | contract fragment JSON | Captures Stage 4 handoff data for Stage 5. |
 | `ASSEMBLE_STAGE4_BANKED_MANIFEST` | stage4 fragments | `samples_hg002_banked_stage4.yaml` | Renders the banked Stage 4 manifest. |
 
-## Input Contract
+## Inputs
 
 Expected input:
 
@@ -43,15 +60,33 @@ Required fields:
 - `reference_build`
 - `consent_tokens` / `stage0_consent_tokens`
 
-## Output Contract
+## Outputs
 
 Published to `tests/fixtures/banked_stage4/`:
 
 - `phased/*.phased.vcf.gz`
 - `phased/*.phased.vcf.gz.tbi`
-- `audit_and_qc/stage4/ancestry_metrics.json`
-- `audit_and_qc/stage4/phasing_audit.json`
+- `audit_and_qc/stage4/*.ancestry_metrics.json`
+- `audit_and_qc/stage4/*.phasing_audit.json`
 - `samples_hg002_banked_stage4.yaml`
+
+## Execute
+
+```bash
+cd Stage_4_Ancestry_Phasing_Highway
+nextflow run main.nf \
+    -profile docker \
+    --input ../Stage_3_Variant_Discovery_Engine/tests/fixtures/banked_stage3/samples_hg002_banked_stage3.yaml \
+    --references ../conf/references.yaml \
+    --thresholds ../conf/thresholds.yaml \
+    --outdir tests/fixtures/banked_stage4
+```
+
+## FMEA
+
+```bash
+python3 tests/fmea/run_stage4_fmea_suite.py
+```
 
 ## Notes
 

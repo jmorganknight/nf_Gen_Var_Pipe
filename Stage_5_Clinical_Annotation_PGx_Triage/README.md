@@ -2,6 +2,20 @@
 
 Production-grade standalone Stage 5 micro-pipeline for clinical annotation, Bayesian ACMG/AMP triage, gated secondary findings and PRS reporting, and independent phased PGx interpretation.
 
+## Clinical Scope
+
+Stage 5 consumes Stage 4 phased outputs and executes five parallel interpretation channels before assembling and signing the clinical bundle for Stage 6.
+
+## Parallel Clinical Channels
+
+| Channel | Core Modules | Primary Output |
+|---|---|---|
+| Germline triage | `GERMLINE_TRIAGE_ENGINE` | germline interpretation summary payload |
+| Somatic/VUS triage | `SOMATIC_ONCO_TRIAGE` + VUS upgrade logic | VUS queue + upgraded evidence payload |
+| PGx (PyPGx/PharmCAT lane) | `PGX_DIPLOTYPE_RESOLVER` (+ stage router lane) | `pgx_report.json` |
+| PRS scoring | `PRS_RISK_SCORE_ENGINE` | calibrated PRS report or governed bypass audit |
+| SF-ACMG opt-out/consent lane | `ACMG_SF73_CLASSIFIER` / opt-out branch | SF report or consent bypass audit |
+
 ## Architecture Flow
 
 ```mermaid
@@ -39,19 +53,22 @@ flowchart TD
     M --> O[tests/fixtures/banked_stage5/samples_hg002_banked_stage5.yaml]
 ```
 
-## Input Contract
+## Cryptographic Integrity
 
-Expected input:
+Stage 5 signs and packages the final clinical bundle through `CLINICAL_PROVENANCE_MANIFEST`:
 
-- `--input /media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_4_Ancestry_Phasing_Highway/tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml`
+- bundles branch outputs into `${sample_id}.clinical_bundle.tar.gz`
+- computes SHA-256 digests for inputs/outputs and bundle payload
+- signs bundle digest with RS256 (`cryptography` primary, OpenSSL fallback)
+- emits `${sample_id}.provenance.json` with digital signature block
 
-Required per sample:
+Signature fields include:
 
-- `validation_token` containing `VALID_PASS|VARIANTS_HARMONIZED`
-- `phased_vcf`
-- `phased_vcf_tbi`
-- `consent_tokens` or `stage0_consent_tokens`
-- Stage 4 ancestry fields used to calibrate downstream filters
+- `signature_algorithm: RS256`
+- `signature_value`
+- `signer_id`
+- `public_key_fingerprint`
+- `signed_digest_sha256`
 
 ## Module Inventory
 
@@ -66,15 +83,19 @@ Required per sample:
 - `pypgx_pharmcat_caller.nf`: Independent phased PGx lane for core loci including `CYP2D6`, `CYP2C19`, `CYP2C9`, `SLCO1B1`, `DPYD`, `TPMT`, and `VKORC1`.
 - `assemble_stage5_banked_manifest.nf`: Consolidates branch fragments into the banked Stage 5 handoff contract.
 
-## Python Helpers
+## Inputs
 
-Stage-local helper scripts are provided in `bin/`:
+Expected input:
 
-- `translate_vep_to_acmg.py`
-- `custom_freq_sieve.py`
-- `acmg_bayesian_classifier.py`
+- `--input ../Stage_4_Ancestry_Phasing_Highway/tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml`
 
-These are adapted stage-local implementations because the exact requested helper filenames are not present in the source repository `bin/` directory.
+Required per sample:
+
+- `validation_token` containing `VALID_PASS|VARIANTS_HARMONIZED`
+- `phased_vcf`
+- `phased_vcf_tbi`
+- `consent_tokens` or `stage0_consent_tokens`
+- Stage 4 ancestry fields used to calibrate downstream filters
 
 ## Outputs
 
@@ -99,13 +120,22 @@ Published under `tests/fixtures/banked_stage5/`:
 ## Execute
 
 ```bash
-cd /media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage
+cd Stage_5_Clinical_Annotation_PGx_Triage
 nextflow run main.nf \
   -profile docker \
-  --input /media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_4_Ancestry_Phasing_Highway/tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml \
-  --references /media/drive_c/nf_pipes/nf_WES_Onco_Risk/references.yaml \
-  --thresholds /media/drive_c/nf_pipes/nf_WES_Onco_Risk/thresholds.yaml \
+  --input ../Stage_4_Ancestry_Phasing_Highway/tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml \
+  --references ../conf/references.yaml \
+  --thresholds ../conf/thresholds.yaml \
   --outdir tests/fixtures/banked_stage5/
+```
+
+For signer key overrides:
+
+```bash
+nextflow run main.nf -profile docker \
+  --input ../Stage_4_Ancestry_Phasing_Highway/tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml \
+  --signer_key_path ../keys/clinical_signer.pem \
+  --signer_pub_path ../keys/clinical_signer.pub.pem
 ```
 
 ## FMEA
@@ -122,3 +152,13 @@ Scenarios:
 - `unconsented_sf_access_attempt` -> bypass SF and emit audit payload.
 - `unconsented_prs_access_attempt` -> bypass PRS and emit audit payload.
 - `insufficient_prs_backbone_coverage` -> emit coverage audit without crashing.
+
+## Notes
+
+Stage-local helper scripts are provided in `bin/`:
+
+- `translate_vep_to_acmg.py`
+- `custom_freq_sieve.py`
+- `acmg_bayesian_classifier.py`
+
+These are adapted stage-local implementations because the exact requested helper filenames are not present in the source repository `bin/` directory.

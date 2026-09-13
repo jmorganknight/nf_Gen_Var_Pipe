@@ -1,0 +1,4 @@
+gene	assertion	evidence_level	variant_tokens	clinical_significance
+BRCA1	SF73	A	17:43045700:A:G	Pathogenic
+CYP2C19	PGX	A	10:96541616:G:A	Pathogenic
+CYP2D6	PGX	A	22:42128945:C:T	Likely pathogenic

@@ -1,0 +1,13 @@
+samples:
+  - sample_id: "HG002_VARIANT_DISCOVERY"
+    validation_token: "VALID_PASS|SAMPLE_VALIDATED"
+    sequencing_type: "WGS"
+    sorted_bam: "../Stage_1_Alignment_Read_Processing/tests/fixtures/banked_stage1_fresh/HG002_FULL_CONTROL_WES/aligned/HG002_FULL_CONTROL_WES.markdup.bam"
+    sorted_bai: "../Stage_1_Alignment_Read_Processing/tests/fixtures/banked_stage1_fresh/HG002_FULL_CONTROL_WES/aligned/HG002_FULL_CONTROL_WES.markdup.bam.bai"
+    variant_branches:
+      snv_indel: true
+      structural_variants: false
+      copy_number_cnv: false
+      str_expansions: false
+      trisomy_aneuploidy: false
+      homologous_pseudogenes: false

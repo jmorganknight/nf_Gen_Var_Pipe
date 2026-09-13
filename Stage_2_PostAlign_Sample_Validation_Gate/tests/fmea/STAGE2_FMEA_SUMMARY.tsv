@@ -1,0 +1,7 @@
+scenario	status	elapsed_seconds	exit_code	details
+missing_bam_fail_closed	PASS	2.53	1	OK
+sex_mismatch_xx_to_xy	PASS	5.01	1	OK
+missing_capture_bed_fail_closed	PASS	2.54	1	OK
+missing_branch_target_catalog	PASS	2.56	1	OK
+insufficient_coverage_depth	PASS	0.00	0	depth=12.4x; REJECT_INSUFFICIENT_COVERAGE_DEPTH
+tumor_purity_mismatch	PASS	0.00	0	delta=0.50; REJECT_PURITY_DISCREPANCY
