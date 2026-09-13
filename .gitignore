@@ -1,5 +1,6 @@
 # Nextflow Execution Directories & Local Logs
 .nextflow/
+.nextflow*
 .nextflow.log*
 work/
 /scratch/
