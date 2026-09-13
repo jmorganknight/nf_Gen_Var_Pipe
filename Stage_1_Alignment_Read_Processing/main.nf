@@ -93,6 +93,98 @@ def resolvePath(String rawPath, String rootDir) {
 }
 
 
+def resolveStage1ConfigPath(Object overridePath, Object configuredPath, String fileName) {
+    def overrideText = overridePath?.toString()?.trim()
+    if (overrideText) {
+        return file(overrideText)
+    }
+
+    def configuredText = configuredPath?.toString()?.trim()
+    if (configuredText) {
+        def configuredFile = file(configuredText)
+        if (configuredFile.exists()) {
+            return configuredFile
+        }
+    }
+
+    def primary = new File(projectDir.toString(), "conf/${fileName}")
+    if (primary.exists()) {
+        return file(primary.path)
+    }
+
+    def fallback = new File(projectDir.toString(), "../conf/${fileName}")
+    if (fallback.exists()) {
+        return file(fallback.path)
+    }
+
+    return configuredText ? file(configuredText) : file(fallback.path)
+}
+
+
+def readOptionalParam(String paramName) {
+    params.containsKey(paramName) ? params[paramName] : null
+}
+
+
+def materializeStubStage0Token(String outdir, String sampleId) {
+    def tokenDir = new File("${outdir}/audit_and_qc/stage1_stub_tokens")
+    tokenDir.mkdirs()
+    def tokenFile = new File(tokenDir, "${sampleId}.intake_validation_token")
+    tokenFile.text = 'VALID_PASS|INTAKE_VALIDATED\n'
+    tokenFile
+}
+
+
+def materializeStubStage1Input(String outdir, String sampleId, String requestedPath, String fallbackName) {
+    def inputDir = new File("${outdir}/audit_and_qc/stage1_stub_inputs/${sampleId}")
+    inputDir.mkdirs()
+    def fileName = requestedPath ? new File(requestedPath).name : fallbackName
+    def placeholder = new File(inputDir, fileName)
+    if (!placeholder.exists()) {
+        placeholder.createNewFile()
+    }
+    placeholder
+}
+
+
+def resolveStage1SampleInput(String rawPath, String samplesRoot, String outdir, String sampleId, boolean stubRun, String fallbackName) {
+    if (!rawPath) {
+        return stubRun ? materializeStubStage1Input(outdir, sampleId, null, fallbackName) : null
+    }
+
+    def resolved = resolvePath(rawPath, samplesRoot)
+    if (resolved.exists()) {
+        return resolved
+    }
+
+    stubRun ? materializeStubStage1Input(outdir, sampleId, rawPath, fallbackName) : resolved
+}
+
+
+def resolveStage1IntakeToken(Map sample, String samplesRoot, String outdir, boolean stubRun) {
+    def tokenPathRaw = sample.intake_validation_token?.toString()?.trim()
+    if (tokenPathRaw) {
+        return [
+            pathText : tokenPathRaw,
+            tokenFile: resolvePath(tokenPathRaw, samplesRoot),
+            synthetic: false
+        ]
+    }
+
+    if (stubRun) {
+        def sid = (sample.sample_id ?: 'UNKNOWN').toString()
+        def tokenFile = materializeStubStage0Token(outdir, sid)
+        return [
+            pathText : tokenFile.toString(),
+            tokenFile: tokenFile,
+            synthetic: true
+        ]
+    }
+
+    [pathText: null, tokenFile: null, synthetic: false]
+}
+
+
 def hostPathForReference(String pathText, String refDir) {
     if (!pathText.startsWith('/opt/reference')) {
         return new File(pathText)
@@ -174,9 +266,9 @@ def loadAtomicStage1Contract() {
     def ys = new groovy.yaml.YamlSlurper()
     def projectRoot = projectDir.toString()
     def samplesFile = file(((params.input ?: params.samples) ?: '').toString())
-    def referencesFile = file(params.references.toString())
-    def thresholdsFile = file(params.thresholds.toString())
-    def infrastructureFile = file(params.infrastructure.toString())
+    def referencesFile = resolveStage1ConfigPath(readOptionalParam('ref_config'), params.references, 'references.yaml')
+    def thresholdsFile = resolveStage1ConfigPath(readOptionalParam('thresh_config'), params.thresholds, 'thresholds.yaml')
+    def infrastructureFile = resolveStage1ConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
 
     def samplesDoc = ys.parse(samplesFile) ?: [:]
     def referencesDoc = ys.parse(referencesFile) ?: [:]
@@ -210,6 +302,7 @@ def loadAtomicStage1Contract() {
 
 workflow STAGE1_ALIGNMENT {
     def intake = loadAtomicStage1Contract()
+    def stage1StubRun = workflow.stubRun as boolean
 
     def samplesFile = intake.samplesFile
     def referencesFile = intake.referencesFile
@@ -253,12 +346,13 @@ workflow STAGE1_ALIGNMENT {
     samplesParsed.each { sample ->
         def sid = (sample.sample_id ?: 'UNKNOWN').toString()
         validateVariantBranchesSchema(sample.variant_branches, sid, params.outdir.toString())
-        def tokenPathRaw = sample.intake_validation_token?.toString()
+        def tokenInfo = resolveStage1IntakeToken(sample as Map, samplesRoot, params.outdir.toString(), stage1StubRun)
+        def tokenPathRaw = tokenInfo.pathText
         if (!tokenPathRaw) {
             writeStage1Rejection(params.outdir.toString(), sid, 'MISSING_STAGE0_TOKEN', 'samplesheet missing intake_validation_token path')
             throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: missing intake_validation_token for sample '${sid}'")
         }
-        def tokenFile = resolvePath(tokenPathRaw, samplesRoot)
+        def tokenFile = tokenInfo.tokenFile as File
         if (!tokenFile.exists()) {
             writeStage1Rejection(params.outdir.toString(), sid, 'TOKEN_PATH_NOT_FOUND', tokenPathRaw)
             throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: token file not found for sample '${sid}'")
@@ -292,11 +386,17 @@ workflow STAGE1_ALIGNMENT {
         }
 
         if (sample.mapped_bam) {
-            def mappedBam = resolvePath(sample.mapped_bam.toString(), samplesRoot)
-            def mappedBai = sample.mapped_bai ? resolvePath(sample.mapped_bai.toString(), samplesRoot) : new File(mappedBam.toString() + '.bai')
+            def mappedBam = resolveStage1SampleInput(sample.mapped_bam.toString(), samplesRoot, params.outdir.toString(), sid, stage1StubRun, "${sid}.mapped.bam")
+            def mappedBai = sample.mapped_bai
+                ? resolveStage1SampleInput(sample.mapped_bai.toString(), samplesRoot, params.outdir.toString(), sid, stage1StubRun, "${sid}.mapped.bam.bai")
+                : resolveStage1SampleInput("${mappedBam}.bai", samplesRoot, params.outdir.toString(), sid, stage1StubRun, "${sid}.mapped.bam.bai")
             if (!mappedBam.exists() || !mappedBai.exists()) {
                 writeStage1Rejection(params.outdir.toString(), sid, 'MAPPED_INPUT_MISSING', "bam=${mappedBam}; bai=${mappedBai}")
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: mapped inputs missing for sample '${sid}'")
+            }
+
+            if (stage1StubRun) {
+                return
             }
 
             if (mappedBam.length() == 0L) {
@@ -332,8 +432,10 @@ workflow STAGE1_ALIGNMENT {
                 writeStage1Rejection(params.outdir.toString(), sid, 'FASTQ_INPUT_MISSING', 'r1 path missing')
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: FASTQ R1 input missing for sample '${sid}'")
             }
-            def fq1 = resolvePath(fq1Raw, samplesRoot)
-            def fq2 = fq2Raw ? resolvePath(fq2Raw, samplesRoot) : fq1
+            def fq1 = resolveStage1SampleInput(fq1Raw, samplesRoot, params.outdir.toString(), sid, stage1StubRun, "${sid}_R1.fastq.gz")
+            def fq2 = fq2Raw
+                ? resolveStage1SampleInput(fq2Raw, samplesRoot, params.outdir.toString(), sid, stage1StubRun, "${sid}_R2.fastq.gz")
+                : fq1
             if (!fq1.exists() || !fq2.exists()) {
                 writeStage1Rejection(params.outdir.toString(), sid, 'FASTQ_INPUT_MISSING', "r1=${fq1}; r2=${fq2}")
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: FASTQ inputs missing for sample '${sid}'")
@@ -392,12 +494,17 @@ workflow STAGE1_ALIGNMENT {
     def chPlatformPayload = channel.fromList(samplesParsed.findAll { s -> !s.mapped_bam })
         .combine(PREFLIGHT_INGESTION_GUARD.out.preflight_lock)
         .map { sample, _preflightLock ->
-        def meta = buildMetaRow(sample as Map, params.outdir.toString(), branchTargetCatalogDefault, preflightLockPublishedPath)
+        def tokenInfo = resolveStage1IntakeToken(sample as Map, samplesRoot, params.outdir.toString(), stage1StubRun)
+        def normalizedSample = (sample as Map) + [intake_validation_token: tokenInfo.pathText]
+        def meta = buildMetaRow(normalizedSample, params.outdir.toString(), branchTargetCatalogDefault, preflightLockPublishedPath)
         def fq1Raw = sample.fastq_forward?.toString() ?: sample.read_file_paths?.read1?.toString()
         def fq2Raw = sample.fastq_reverse?.toString() ?: sample.read_file_paths?.read2?.toString()
-        def fq1 = resolvePath(fq1Raw, samplesRoot)
-        def fq2 = fq2Raw ? resolvePath(fq2Raw, samplesRoot) : fq1
-        def tokenPath = resolvePath(sample.intake_validation_token.toString(), samplesRoot)
+        def sid = (sample.sample_id ?: 'UNKNOWN').toString()
+        def fq1 = resolveStage1SampleInput(fq1Raw, samplesRoot, params.outdir.toString(), sid, stage1StubRun, "${sid}_R1.fastq.gz")
+        def fq2 = fq2Raw
+            ? resolveStage1SampleInput(fq2Raw, samplesRoot, params.outdir.toString(), sid, stage1StubRun, "${sid}_R2.fastq.gz")
+            : fq1
+        def tokenPath = tokenInfo.tokenFile as File
         def intakeReport = sample.intake_validation_report ? resolvePath(sample.intake_validation_report.toString(), samplesRoot) : tokenPath
         tuple(
             meta,
