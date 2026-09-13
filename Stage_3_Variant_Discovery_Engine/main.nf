@@ -67,6 +67,15 @@ def resolveStageConfigPath(Object overridePath, Object configuredPath, String fi
         return file(fallback.path)
     }
 
+    def launchRoot = workflow.hasProperty('launchDir') ? workflow.launchDir?.toString() : null
+    if (launchRoot) {
+        def launchFallback = new File(launchRoot, "conf/${fileName}")
+        if (launchFallback.exists()) {
+            return file(launchFallback.path)
+        }
+        return configuredText ? file(configuredText) : file(launchFallback.path)
+    }
+
     return configuredText ? file(configuredText) : file(fallback.path)
 }
 

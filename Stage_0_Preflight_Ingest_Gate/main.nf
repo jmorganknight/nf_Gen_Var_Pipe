@@ -36,6 +36,41 @@ def resolvePathWithBases(String rawPath, List<String> roots) {
     resolved ?: new File(roots ? roots[0] : projectDir.toString(), rawPath)
 }
 
+def resolveStageConfigPath(Object overridePath, Object configuredPath, String fileName) {
+    def overrideText = overridePath?.toString()?.trim()
+    if (overrideText) {
+        return file(overrideText)
+    }
+
+    def configuredText = configuredPath?.toString()?.trim()
+    if (configuredText) {
+        def configuredFile = file(configuredText)
+        if (configuredFile.exists()) {
+            return configuredFile
+        }
+    }
+
+    def launchRoot = workflow.hasProperty('launchDir') ? workflow.launchDir?.toString() : null
+    def candidatePaths = [
+        new File(projectDir.toString(), "conf/${fileName}"),
+        new File(projectDir.toString(), "../conf/${fileName}")
+    ]
+    if (launchRoot) {
+        candidatePaths << new File(launchRoot, "conf/${fileName}")
+    }
+
+    def resolved = candidatePaths.find { candidate -> candidate.exists() }
+    if (resolved != null) {
+        return file(resolved.path)
+    }
+
+    return configuredText ? file(configuredText) : file(candidatePaths[-1].path)
+}
+
+def readOptionalParam(String paramName) {
+    params.containsKey(paramName) ? params[paramName] : null
+}
+
 def sha256Hex(File fileObj) {
     def digest = java.security.MessageDigest.getInstance('SHA-256')
     if (fileObj.isDirectory()) {
@@ -211,6 +246,37 @@ def buildMetaRow(Map sample, String outdir) {
     ]
 }
 
+def canonicalizeStage0Sample(Map sample) {
+    def normalized = [:] + sample
+
+    if (!normalized.fastq_forward && sample.read_file_paths?.read1) {
+        normalized.fastq_forward = sample.read_file_paths.read1
+    }
+    if (!normalized.fastq_reverse && sample.read_file_paths?.read2) {
+        normalized.fastq_reverse = sample.read_file_paths.read2
+    }
+    if (!normalized.mapped_bam && sample.mapped_paths?.bam) {
+        normalized.mapped_bam = sample.mapped_paths.bam
+    }
+    if (!normalized.mapped_bai && sample.mapped_paths?.bai) {
+        normalized.mapped_bai = sample.mapped_paths.bai
+    }
+    if (!normalized.gender && sample.reported_sex) {
+        normalized.gender = sample.reported_sex
+    }
+    if (!normalized.consent && sample.consent_flags instanceof Map) {
+        normalized.consent = [
+            prs_opt_in: sample.consent_flags.prs_consent ?: false,
+            sf_opt_in: sample.consent_flags.sf_acmg_consent ?: false
+        ]
+    }
+    if (!(normalized.sequencer instanceof Map) && sample.sequencing_platform) {
+        normalized.sequencer = [platform: sample.sequencing_platform]
+    }
+
+    normalized
+}
+
 workflow STAGE0_PREFLIGHT_INGEST {
 
     take:
@@ -288,12 +354,14 @@ workflow STAGE0_PREFLIGHT_INGEST {
 
 workflow {
     def ys = new groovy.yaml.YamlSlurper()
+    def launchRoot = workflow.hasProperty('launchDir') ? workflow.launchDir?.toString() : projectDir.toString()
+    def repoRoot = new File(projectDir.toString()).parent ?: projectDir.toString()
 
     def samplesFilePath = (params.input ?: params.samples).toString()
-    def samplesFile = file(samplesFilePath)
-    def referencesFile = file(params.references)
-    def thresholdsFile = file(params.thresholds)
-    def infrastructureFile = file(params.infrastructure)
+    def samplesFile = resolvePathWithBases(samplesFilePath, [launchRoot, projectDir.toString(), repoRoot])
+    def referencesFile = resolveStageConfigPath(readOptionalParam('ref_config'), params.references, 'references.yaml')
+    def thresholdsFile = resolveStageConfigPath(readOptionalParam('thresh_config'), params.thresholds, 'thresholds.yaml')
+    def infrastructureFile = resolveStageConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
 
     def samplesParsed = ys.parse(samplesFile).samples
     def thresholdsParsed = ys.parse(thresholdsFile)
@@ -359,36 +427,37 @@ workflow {
     }
 
     def chRawReads = channel.fromList(samplesParsed).map { sample ->
-        def sid = (sample.sample_id ?: 'UNKNOWN').toString()
-        if (!sample.fastq_forward || !sample.fastq_reverse) {
-            throw new IllegalArgumentException("FATAL: Stage 0 requires fastq_forward and fastq_reverse for sample '${sid}'")
+        def normalizedSample = canonicalizeStage0Sample(sample as Map)
+        def sid = (normalizedSample.sample_id ?: 'UNKNOWN').toString()
+        def fq1Raw = normalizedSample.fastq_forward?.toString()
+        def fq2Raw = normalizedSample.fastq_reverse?.toString()
+        if (!fq1Raw || !fq2Raw) {
+            throw new IllegalArgumentException("FATAL: Stage 0 requires fastq_forward/fastq_reverse or read_file_paths.read1/read2 for sample '${sid}'")
         }
 
-        validateVariantBranchesSchema(sample.variant_branches, sid, effectiveOutdir)
+        validateVariantBranchesSchema(normalizedSample.variant_branches, sid, effectiveOutdir)
 
-        def fastq1Candidate = new File(sample.fastq_forward.toString())
-        def fastq2Candidate = new File(sample.fastq_reverse.toString())
-        def fastq1 = fastq1Candidate.isAbsolute() ? fastq1Candidate : new File(samplesRoot, sample.fastq_forward.toString())
-        def fastq2 = fastq2Candidate.isAbsolute() ? fastq2Candidate : new File(samplesRoot, sample.fastq_reverse.toString())
+        def fastq1 = resolvePathWithBases(fq1Raw, [launchRoot, projectDir.toString(), repoRoot, samplesRoot])
+        def fastq2 = resolvePathWithBases(fq2Raw, [launchRoot, projectDir.toString(), repoRoot, samplesRoot])
 
         if (!fastq1.exists()) {
-            throw new IllegalArgumentException("FATAL: fastq_forward not found for sample '${sid}': ${sample.fastq_forward}")
+            throw new IllegalArgumentException("FATAL: fastq_forward not found for sample '${sid}': ${fq1Raw}")
         }
         if (!fastq2.exists()) {
-            throw new IllegalArgumentException("FATAL: fastq_reverse not found for sample '${sid}': ${sample.fastq_reverse}")
+            throw new IllegalArgumentException("FATAL: fastq_reverse not found for sample '${sid}': ${fq2Raw}")
         }
 
         tuple(
-            buildMetaRow(sample as Map, effectiveOutdir),
+            buildMetaRow(normalizedSample, effectiveOutdir),
             file(fastq1, checkIfExists: true),
             file(fastq2, checkIfExists: true)
         )
     }
 
-    def chThresholdsYaml = channel.value(thresholdsFile)
-    def chReferencesYaml = channel.value(referencesFile)
-    def chSamplesYaml = channel.value(samplesFile)
-    def chInfrastructureYaml = channel.value(infrastructureFile)
+    def chThresholdsYaml = channel.value(file(thresholdsFile, checkIfExists: true))
+    def chReferencesYaml = channel.value(file(referencesFile, checkIfExists: true))
+    def chSamplesYaml = channel.value(file(samplesFile, checkIfExists: true))
+    def chInfrastructureYaml = channel.value(file(infrastructureFile, checkIfExists: true))
     def chSignerKey = channel.value(file(signerKeyResolved, checkIfExists: true))
     def chSignerPub = channel.value(file(signerPubResolved, checkIfExists: true))
 
