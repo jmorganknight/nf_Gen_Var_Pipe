@@ -16,6 +16,10 @@ containers:
     image: "wes-onco-core@sha256:d630bd5dd78ba4f469b80d7b0dbd09a5a1bd8841415ed1bbe91d8559a1ff8906"  # Primary runtime image used for intake, alignment, audit, and banking tasks.
     sif: "file://containers/wes-onco-core.sif"  # Apptainer/Singularity image URI for offline or HPC execution.
     digest: "sha256:d630bd5dd78ba4f469b80d7b0dbd09a5a1bd8841415ed1bbe91d8559a1ff8906"  # Immutable image ID captured for governed runs.
+  stage3_core:
+    image: "genvar-core:2.1.0"  # Stage 3 discovery image for active SV/CNV/STR/trisomy/homology branches.
+    sif: ""  # Optional SIF URI when Stage 3 discovery image is promoted into offline/HPC distribution.
+    digest: "sha256:446eadc13d0322b907224fbccd57914da190407b43772bf8e9753b27f9b41092"  # Local image digest for traceability pending registry push.
   annotation:
     image: "wes-onco-annotation@sha256:84ebaaaaf5512dc8398dc98a61215a5d419caf1a32bd1ef68369dbcb19d1b69c"  # Downstream annotation image tracked so preflight audits capture the whole governed stack.
     sif: "file://containers/wes-onco-annotation.sif"  # Apptainer/SIF URI for the annotation container.

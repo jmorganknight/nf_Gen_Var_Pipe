@@ -1,20 +1,21 @@
 process MASTER_HARMONIZED_VCF_PAYLOAD {
 
     label 'process_low'
-    container 'genvar-core:2.0.0'
+    container 'genvar-core:2.1.0'
 
     publishDir "${params.outdir}", mode: 'copy', overwrite: true
 
     input:
-    tuple val(sample_id), path(mane_selected_vcf), path(mane_audit), val(stage3_refs), val(sample_meta), path(calibration_audit)
+    tuple val(sample_id), path(mane_selected_vcf), path(mane_audit), path(vcf_schema), val(stage3_refs), val(sample_meta), path(calibration_audit)
 
     output:
-    tuple val(sample_id), path('normalized.vcf'), path('harmonization_audit.json'), path("${sample_id}.stage3.contract.fragment.json"), emit: harmonized
-    path 'normalized.vcf.tbi', emit: normalized_tbi
+    tuple val(sample_id), path("${sample_id}.normalized.vcf.gz"), path("${sample_id}.harmonization_audit.json"), path("${sample_id}.stage3.contract.fragment.json"), emit: harmonized
+    path "${sample_id}.normalized.vcf.gz.tbi", emit: normalized_tbi
 
     script:
     def refsJson = groovy.json.JsonOutput.toJson(stage3_refs).replace('\\', '\\\\').replace("'", "\\'")
     def metaJson = groovy.json.JsonOutput.toJson(sample_meta).replace('\\', '\\\\').replace("'", "\\'")
+    def publishedOutDir = new File(params.outdir.toString()).isAbsolute() ? new File(params.outdir.toString()).canonicalPath : new File(workflow.launchDir.toString(), params.outdir.toString()).canonicalPath
     """
     set -euo pipefail
 
@@ -25,11 +26,11 @@ from pathlib import Path
 
 refs = json.loads('${refsJson}')
 meta = json.loads('${metaJson}')
-schema_path = refs.get('stage3_vcf_schema')
-if not schema_path:
+declared_schema_path = refs.get('stage3_vcf_schema')
+if not declared_schema_path:
     raise SystemExit('STAGE3_SCHEMA_VALIDATION_FAILURE: missing params.refs.stage3_vcf_schema')
 
-schema_file = Path(str(schema_path))
+schema_file = Path('${vcf_schema}')
 if not schema_file.exists():
     raise SystemExit(f'STAGE3_SCHEMA_VALIDATION_FAILURE: schema file missing: {schema_file}')
 
@@ -85,9 +86,23 @@ if violations:
     uniq = sorted(set(violations))
     raise SystemExit('STAGE3_SCHEMA_VALIDATION_FAILURE: ' + '; '.join(uniq[:10]))
 
-normalized_vcf = Path('normalized.vcf')
-normalized_vcf.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-Path('normalized.vcf.tbi').write_text('TABIX_INDEX_PLACEHOLDER\\n', encoding='utf-8')
+normalized_vcf = Path('${sample_id}.normalized.vcf')
+normalized_vcf.write_text(chr(10).join(lines) + chr(10), encoding='utf-8')
+normalized_vcf_gz = Path('${sample_id}.normalized.vcf.gz')
+normalized_vcf_tbi = Path('${sample_id}.normalized.vcf.gz.tbi')
+
+import subprocess
+with normalized_vcf.open('rb') as src, normalized_vcf_gz.open('wb') as dst:
+    proc = subprocess.run(['bgzip', '-c'], stdin=src, stdout=dst, stderr=subprocess.PIPE, text=False)
+if proc.returncode != 0:
+    stderr_text = proc.stderr.decode('utf-8', errors='replace') if proc.stderr else ''
+    raise SystemExit(f'STAGE3_HARMONIZATION_FAILURE: bgzip failed: {stderr_text.strip()}')
+subprocess.run(['tabix', '-f', '-p', 'vcf', str(normalized_vcf_gz)], check=True)
+normalized_vcf.unlink()
+
+published_dir = Path('${publishedOutDir}')
+published_vcf = published_dir / '${sample_id}.normalized.vcf.gz'
+published_tbi = published_dir / '${sample_id}.normalized.vcf.gz.tbi'
 
 def sha256(path: Path):
     h = hashlib.sha256()
@@ -100,9 +115,15 @@ schema_validation_audit = {
     'sample_id': '${sample_id}',
     'node': 'MASTER_HARMONIZED_VCF_PAYLOAD',
     'schema_path': str(schema_file.resolve()),
+    'schema_path_declared': str(declared_schema_path),
     'schema_sha256': sha256(schema_file),
     'validated_vcf': str(vcf_path.resolve()),
-    'normalized_vcf': str(normalized_vcf.resolve()),
+    'normalized_vcf': str(normalized_vcf_gz.resolve()),
+    'normalized_vcf_tbi': str(normalized_vcf_tbi.resolve()),
+    'published_normalized_vcf': str(published_vcf),
+    'published_normalized_vcf_tbi': str(published_tbi),
+    'normalized_vcf_sha256': sha256(normalized_vcf_gz),
+    'normalized_vcf_tbi_sha256': sha256(normalized_vcf_tbi),
     'record_count': record_count,
     'ga4gh_vcf_version': '4.2',
     'status': 'PASS',
@@ -115,38 +136,44 @@ harmonization_audit = {
     'sorted_bai': meta.get('sorted_bai', ''),
     'variant_branches': meta.get('variant_branches', {}),
     'active_branches': [k for k, v in (meta.get('variant_branches', {}) or {}).items() if bool(v)],
-    'normalized_vcf': str(normalized_vcf.resolve()),
-    'normalized_vcf_tbi': str(Path('normalized.vcf.tbi').resolve()),
+    'normalized_vcf': str(published_vcf),
+    'normalized_vcf_tbi': str(published_tbi),
+    'workdir_normalized_vcf': str(normalized_vcf_gz.resolve()),
+    'workdir_normalized_vcf_tbi': str(normalized_vcf_tbi.resolve()),
     'mane_selector_audit': str(Path('${mane_audit}').resolve()),
     'dynamic_calibration_audit': str(Path('${calibration_audit}').resolve()),
     'schema_validation': schema_validation_audit,
     'status': 'PASS',
 }
 
-Path('harmonization_audit.json').write_text(json.dumps(harmonization_audit, indent=2) + '\n', encoding='utf-8')
+Path('${sample_id}.harmonization_audit.json').write_text(json.dumps(harmonization_audit, indent=2) + chr(10), encoding='utf-8')
 
 fragment = {
     'sample_id': '${sample_id}',
     'validation_token': meta.get('validation_token', ''),
+    'run_mode': meta.get('run_mode', 'production'),
     'sorted_bam': meta.get('sorted_bam', ''),
     'sorted_bai': meta.get('sorted_bai', ''),
+    'stage2_contamination_status': meta.get('stage2_contamination_status', ''),
+    'stage2_contamination_policy_action': meta.get('stage2_contamination_policy_action', ''),
     'variant_branches': meta.get('variant_branches', {}),
     'active_branches': [k for k, v in (meta.get('variant_branches', {}) or {}).items() if bool(v)],
-    'normalized_vcf': str(normalized_vcf.resolve()),
-    'normalized_vcf_tbi': str(Path('normalized.vcf.tbi').resolve()),
-    'harmonization_audit': str(Path('harmonization_audit.json').resolve()),
+    'normalized_vcf': str(published_vcf),
+    'normalized_vcf_tbi': str(published_tbi),
+    'harmonization_audit': str(published_dir / '${sample_id}.harmonization_audit.json'),
     'reference_build': meta.get('reference_build', {}),
     'stage4_handoff_note': 'Normalized, atomized, schema-validated VCF ready for annotation.',
 }
-Path('${sample_id}.stage3.contract.fragment.json').write_text(json.dumps(fragment, indent=2) + '\n', encoding='utf-8')
+Path('${sample_id}.stage3.contract.fragment.json').write_text(json.dumps(fragment, indent=2) + chr(10), encoding='utf-8')
 PYEOF
     """
 
     stub:
     """
-    cp "${mane_selected_vcf}" normalized.vcf
-    : > normalized.vcf.tbi
-    cat > harmonization_audit.json <<'JSON'
+        cp "${mane_selected_vcf}" "${sample_id}.normalized.vcf"
+        bgzip -f "${sample_id}.normalized.vcf"
+        tabix -f -p vcf "${sample_id}.normalized.vcf.gz"
+        cat > "${sample_id}.harmonization_audit.json" <<'JSON'
 {
   "sample_id": "${sample_id}",
   "node": "MASTER_HARMONIZED_VCF_PAYLOAD",
@@ -158,11 +185,12 @@ JSON
 {
   "sample_id": "${sample_id}",
   "validation_token": "${sample_meta.validation_token ?: ''}",
+    "run_mode": "${sample_meta.run_mode ?: 'production'}",
   "variant_branches": ${groovy.json.JsonOutput.toJson(sample_meta.variant_branches ?: [:])},
   "active_branches": ["snv_indel"],
-  "normalized_vcf": "normalized.vcf",
-  "normalized_vcf_tbi": "normalized.vcf.tbi",
-  "harmonization_audit": "harmonization_audit.json",
+    "normalized_vcf": "${sample_id}.normalized.vcf.gz",
+    "normalized_vcf_tbi": "${sample_id}.normalized.vcf.gz.tbi",
+    "harmonization_audit": "${sample_id}.harmonization_audit.json",
   "stage4_handoff_note": "Normalized, atomized, schema-validated VCF ready for annotation."
 }
 JSON

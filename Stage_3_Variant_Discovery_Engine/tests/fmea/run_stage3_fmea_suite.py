@@ -16,13 +16,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 MAIN_NF = ROOT / "main.nf"
 PIPELINE_ROOT = ROOT.parent
-BASE_STAGE2 = PIPELINE_ROOT / "Stage_2_PostAlign_Sample_Validation_Gate" / "tests" / "fixtures" / "banked_stage2" / "samples_hg002_banked_stage2.yaml"
+BASE_STAGE2 = PIPELINE_ROOT / "Stage_2_PostAlign_Sample_Validation_Gate" / "tests" / "mini_control" / "samples_hg002_banked_stage2.yaml"
 SAFE_BAM = Path(__file__).resolve().parent / "stage3_safe.bam"
 SAFE_BAI = Path(__file__).resolve().parent / "stage3_safe.bam.bai"
 REF_ROOT = Path(os.environ.get("NXF_REF_DATA_ROOT", str((PIPELINE_ROOT / "assets" / "references").resolve())))
 BAM_CANDIDATES = [
+    PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing" / "tests" / "mini_control" / "HG002_FULL_CONTROL_WES" / "audit_and_qc" / "identity" / "HG002_FULL_CONTROL_WES.identity_verified.bam",
     PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing" / "tests" / "fixtures" / "banked_stage1_fresh" / "HG002_FULL_CONTROL_WES" / "audit_and_qc" / "identity" / "HG002_FULL_CONTROL_WES.identity_verified.bam",
     PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing" / "tests" / "fixtures" / "banked_stage1_rerun2" / "HG002_FULL_CONTROL_WES" / "audit_and_qc" / "identity" / "HG002_FULL_CONTROL_WES.identity_verified.bam",
+    PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing" / "tests" / "mini_control" / "HG002_FULL_CONTROL_WES" / "aligned" / "HG002_FULL_CONTROL_WES.markdup.bam",
     PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing" / "tests" / "fixtures" / "banked_stage1_fresh" / "HG002_FULL_CONTROL_WES" / "aligned" / "HG002_FULL_CONTROL_WES.markdup.bam",
     SAFE_BAM,
 ]
@@ -39,6 +41,8 @@ def run_nf(input_yaml: Path, outdir: Path, work_dir: Path) -> tuple[int, float, 
         str(input_yaml),
         "--outdir",
         str(outdir),
+        "--stage3_test_mode",
+        "true",
         "-work-dir",
         str(work_dir),
         "-ansi-log",

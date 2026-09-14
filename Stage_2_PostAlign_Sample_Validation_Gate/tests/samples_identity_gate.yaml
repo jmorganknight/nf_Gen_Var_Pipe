@@ -4,5 +4,5 @@ samples:
     reported_sex: "XY"
     physician_tumor_purity: 0.00
     validation_token: "VALID_PASS|ALIGNMENT_COMPLETED"
-    sorted_bam: "../Stage_1_Alignment_Read_Processing/tests/fixtures/banked_stage1_fresh/HG002_FULL_CONTROL_WES/aligned/HG002_FULL_CONTROL_WES.markdup.bam"
-    sorted_bai: "../Stage_1_Alignment_Read_Processing/tests/fixtures/banked_stage1_fresh/HG002_FULL_CONTROL_WES/aligned/HG002_FULL_CONTROL_WES.markdup.bam.bai"
+    sorted_bam: "../Stage_1_Alignment_Read_Processing/tests/mini_control/HG002_FULL_CONTROL_WES/aligned/HG002_FULL_CONTROL_WES.markdup.bam"
+    sorted_bai: "../Stage_1_Alignment_Read_Processing/tests/mini_control/HG002_FULL_CONTROL_WES/aligned/HG002_FULL_CONTROL_WES.markdup.bam.bai"

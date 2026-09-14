@@ -19,7 +19,7 @@ flowchart TD
     F --> G["BANK_STAGE4_CONTRACT"]
     D --> G
     G --> H["ASSEMBLE_STAGE4_BANKED_MANIFEST"]
-    H --> I["tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml"]
+    H --> I["tests/mini_control/samples_hg002_banked_stage4.yaml"]
 ```
 
 ## Population Projection and Phasing Stack
@@ -48,7 +48,7 @@ Implementation notes:
 
 Expected input:
 
-- [Stage 3 banked manifest](../Stage_3_Variant_Discovery_Engine/tests/fixtures/banked_stage3/samples_hg002_banked_stage3.yaml)
+- [Stage 3 banked manifest](../Stage_3_Variant_Discovery_Engine/tests/mini_control/samples_hg002_banked_stage3.yaml)
 
 Required fields:
 
@@ -62,7 +62,7 @@ Required fields:
 
 ## Outputs
 
-Published to `tests/fixtures/banked_stage4/`:
+Published to `tests/mini_control/`:
 
 - `phased/*.phased.vcf.gz`
 - `phased/*.phased.vcf.gz.tbi`
@@ -76,10 +76,10 @@ Published to `tests/fixtures/banked_stage4/`:
 cd Stage_4_Ancestry_Phasing_Highway
 nextflow run main.nf \
     -profile docker \
-    --input ../Stage_3_Variant_Discovery_Engine/tests/fixtures/banked_stage3/samples_hg002_banked_stage3.yaml \
+    --input ../Stage_3_Variant_Discovery_Engine/tests/mini_control/samples_hg002_banked_stage3.yaml \
     --references ../conf/references.yaml \
     --thresholds ../conf/thresholds.yaml \
-    --outdir tests/fixtures/banked_stage4
+    --outdir tests/mini_control
 ```
 
 ## FMEA

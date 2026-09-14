@@ -77,7 +77,10 @@ payload = {
     'node': 'AUDIT_SINK',
     'sample_id': sid,
     'generated_utc': datetime.now(timezone.utc).isoformat(),
+    'run_mode': '${meta.run_mode ?: 'production'}',
     'validation_token': '${meta.validation_token}',
+    'stage2_contamination_status': '${meta.stage2_contamination_status ?: ''}',
+    'stage2_contamination_policy_action': '${meta.stage2_contamination_policy_action ?: ''}',
     'stage5_manifest': '${stage5_manifest}',
     'stage5_bundle': {
         'path': '${clinical_bundle_tar_gz}',
@@ -100,14 +103,17 @@ payload = {
     'upstream_stage5_provenance': stage5_provenance_payload,
 }
 
-Path(f'{sid}.provenance.json').write_text(json.dumps(payload, indent=2) + '\\n', encoding='utf-8')
+Path(f'{sid}.provenance.json').write_text(json.dumps(payload, indent=2) + '\n', encoding='utf-8')
 fragment = {
     'sample_id': sid,
     'component': 'audit_sink',
+    'run_mode': '${meta.run_mode ?: 'production'}',
+    'stage2_contamination_status': '${meta.stage2_contamination_status ?: ''}',
+    'stage2_contamination_policy_action': '${meta.stage2_contamination_policy_action ?: ''}',
     'provenance_json': f'{sid}.provenance.json',
     'status': 'PASS',
 }
-Path(f'{sid}.stage6_audit_sink.fragment.json').write_text(json.dumps(fragment, indent=2) + '\\n', encoding='utf-8')
+Path(f'{sid}.stage6_audit_sink.fragment.json').write_text(json.dumps(fragment, indent=2) + '\n', encoding='utf-8')
 PYEOF
     """
 
@@ -117,8 +123,8 @@ PYEOF
 import json
 from pathlib import Path
 sid = '${meta.sample_id}'
-Path(f'{sid}.provenance.json').write_text(json.dumps({'node': 'AUDIT_SINK', 'sample_id': sid, 'status': 'PASS', 'stub': True}, indent=2) + '\\n', encoding='utf-8')
-Path(f'{sid}.stage6_audit_sink.fragment.json').write_text(json.dumps({'sample_id': sid, 'component': 'audit_sink', 'provenance_json': f'{sid}.provenance.json', 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
+Path(f'{sid}.provenance.json').write_text(json.dumps({'node': 'AUDIT_SINK', 'sample_id': sid, 'run_mode': '${meta.run_mode ?: 'production'}', 'stage2_contamination_status': '${meta.stage2_contamination_status ?: ''}', 'stage2_contamination_policy_action': '${meta.stage2_contamination_policy_action ?: ''}', 'status': 'PASS', 'stub': True}, indent=2) + '\n', encoding='utf-8')
+Path(f'{sid}.stage6_audit_sink.fragment.json').write_text(json.dumps({'sample_id': sid, 'component': 'audit_sink', 'run_mode': '${meta.run_mode ?: 'production'}', 'stage2_contamination_status': '${meta.stage2_contamination_status ?: ''}', 'stage2_contamination_policy_action': '${meta.stage2_contamination_policy_action ?: ''}', 'provenance_json': f'{sid}.provenance.json', 'status': 'PASS'}, indent=2) + '\n', encoding='utf-8')
 PYEOF
     """
 }

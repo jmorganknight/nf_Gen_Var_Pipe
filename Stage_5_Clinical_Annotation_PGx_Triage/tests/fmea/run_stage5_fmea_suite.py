@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import List
 
 ROOT = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage')
-BASE_INPUT = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_4_Ancestry_Phasing_Highway/tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml')
+BASE_INPUT = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_4_Ancestry_Phasing_Highway/tests/mini_control/samples_hg002_banked_stage4.yaml')
 REFS = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/conf/references.yaml')
 THRESHOLDS = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/conf/thresholds.yaml')
 SUMMARY = ROOT / 'tests/fmea/stage5_fmea_summary.tsv'

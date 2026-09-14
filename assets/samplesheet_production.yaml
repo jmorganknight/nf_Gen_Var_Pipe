@@ -6,8 +6,8 @@ samples:
     reported_sex: "XY"
     physician_tumor_purity: 0.00
     read_file_paths:
-      read1: "/media/jmk/Extreme Pro/WES_Onco_References/giab_controls/HG002_FULL_R1.fastq.gz"
-      read2: "/media/jmk/Extreme Pro/WES_Onco_References/giab_controls/HG002_FULL_R2.fastq.gz"
+      read1: "/media/jmk/Extreme Pro/pipeline_references/giab_controls/HG002_FULL_R1.fastq.gz"
+      read2: "/media/jmk/Extreme Pro/pipeline_references/giab_controls/HG002_FULL_R2.fastq.gz"
     consent_flags:
       prs_consent: true
       sf_acmg_consent: true

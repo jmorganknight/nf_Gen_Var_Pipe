@@ -1,6 +1,6 @@
 # Stage_0_Preflight_Ingest_Gate
 
-Standalone Stage 0 micro-pipeline for preflight intake validation, reference snapshot locking, and banked fixture emission.
+Standalone Stage 0 micro-pipeline for preflight intake validation, reference snapshot locking, and mini-control banking.
 
 ## Architecture Flow
 
@@ -12,7 +12,7 @@ flowchart TD
     E -->|VALID_PASS| F["BANK_STAGE0_SUCCESS"]
     E -->|INVALID_REJECT| G["INGEST_FAIL_REJECT"]
     D --> F
-    F --> H["tests/fixtures/banked_stage0/"]
+    F --> H["tests/mini_control/"]
     G --> I["sample audit_and_qc ingest_rejection_audit.json"]
 ```
 
@@ -37,7 +37,7 @@ references.yaml + thresholds.yaml + infrastructure.yaml --> REF_MANIFEST_SNAPSHO
 | `EVALUATE_INTAKE_STATUS` | intake payload tuple | route decision JSON + payload passthrough | No direct halt; route decision is deterministic from token prefix. |
 | `INGEST_FAIL_REJECT` | invalid intake payload, signer keypair | `*.ingest_rejection_audit.json` | Emits signed RS256 rejection audit; falls back to SHA256 signature payload only if key usage fails. |
 | `BANK_STAGE0_SUCCESS` | valid intake payload + snapshot lock artifacts + infrastructure YAML | banked validated FASTQs, intake token artifact, stage0 audit bundle, manifest fragment | Fails if banking/copy/tar operations fail. |
-| `ASSEMBLE_STAGE0_BANKED_MANIFEST` | all manifest fragments | `tests/samples_hg002_banked_stage0.yaml` | Fails on malformed fragments or write errors. |
+| `ASSEMBLE_STAGE0_BANKED_MANIFEST` | all manifest fragments | `tests/mini_control/samples_hg002_banked_stage0.yaml` | Fails on malformed fragments or write errors. |
 
 ## Wet Lab Fast-Fail Protocol
 
@@ -50,7 +50,7 @@ Stage 0 is configured to fail closed before any downstream analytical stage:
 
 ## Banked Deliverables Contract
 
-Stage 0 publishes to `tests/fixtures/banked_stage0/` with the following contract:
+Stage 0 publishes to `tests/mini_control/` with the following contract:
 
 - `validated_fastqs/`
 - `intake_token/`
@@ -60,7 +60,7 @@ Stage 0 publishes to `tests/fixtures/banked_stage0/` with the following contract
 - `<sample_id>/audit_and_qc/<sample_id>.intake_validation_report.json`
 - `<sample_id>/audit_and_qc/<sample_id>.intake_route_decision.json`
 - `<sample_id>/audit_and_qc/<sample_id>.ingest_rejection_audit.json` (invalid/reject scenarios)
-- `tests/samples_hg002_banked_stage0.yaml`
+- `tests/mini_control/samples_hg002_banked_stage0.yaml`
 
 `reference_snapshot.tokens` includes:
 

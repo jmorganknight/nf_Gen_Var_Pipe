@@ -236,6 +236,7 @@ def buildMetaRow(Map sample, String outdir, Map referencesMeta, Map thresholdsMe
         sample_id            : sample.sample_id,
         patient_id           : (sample.patient_id ?: sample.sample_id),
         case_id              : (sample.case_id ?: sample.patient_id ?: sample.sample_id),
+        run_mode             : (sample.run_mode ?: 'production').toString(),
         validation_token     : sample.validation_token?.toString(),
         consent_tokens       : consentTokens,
         stage0_consent_tokens: stage0Tokens,
@@ -270,6 +271,9 @@ workflow STAGE5_ANNOTATION_PGX_TRIAGE {
     def normalizedBundle = STAGE5_INPUT_NORMALIZER.out.normalized_bundle.map { sample_id, phasedVcf, phasedTbi, ancestryJson, phasingAudit, referenceMeta ->
         def meta = [
             sample_id: sample_id,
+            run_mode: 'production',
+            stage2_contamination_status: '',
+            stage2_contamination_policy_action: '',
             validation_token: 'VALID_PASS|VARIANTS_HARMONIZED',
             ancestry_label: 'UNSET',
             superpopulation: 'UNSET',

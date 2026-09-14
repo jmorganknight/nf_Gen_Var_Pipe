@@ -1,10 +1,10 @@
 process STAGE3_SNV_INDEL {
     label 'variant_heavy'
-    container 'genvar-core:2.0.0'
+    container 'genvar-core:2.1.0'
     cpus { (params.stage3_snv_indel_cpus ?: params.stage3_cpus ?: 1) as int }
 
     input:
-    tuple val(sample_id), path(stage2_manifest), path(sorted_bam), path(sorted_bai), val(is_wgs), val(target_bed), path(fasta), val(sample_qc_meta), val(stage3_refs), val(sample_meta)
+    tuple val(sample_id), path(stage2_manifest), path(sorted_bam), path(sorted_bai), val(is_wgs), val(target_bed), path(fasta), path(fasta_fai), val(sample_qc_meta), val(stage3_refs), val(sample_meta)
 
     output:
     tuple val(sample_id), path('snv_indel.calibrated.vcf'), path('stage3.dynamic_calibration.json'), val(stage3_refs), val(sample_meta), emit: calibrated_vcf
@@ -190,7 +190,6 @@ PYEOF
       -Ou "${sorted_bam}" \
     | bcftools call \
             --threads "\${THREADS}" \
-      --ploidy-file stage3.ploidy.tsv \
       -mv \
       -Ov \
       -o snv_indel.raw.vcf
@@ -212,6 +211,7 @@ def parse_sample(format_keys, sample_values):
 
 
 cfg = json.loads(Path('stage3.dynamic.thresholds.json').read_text(encoding='utf-8'))
+sample_meta = json.loads('${sampleMetaJson}')
 ab_floor = float(cfg['dynamic_ab_floor'])
 min_vaf = float(cfg['dynamic_min_vaf'])
 somatic_mode = bool(cfg['somatic_mode'])
@@ -232,6 +232,8 @@ if '##FILTER=<ID=LOW_AB,Description="Failed dynamic contamination-aware allele-b
     header.insert(len([h for h in header if h.startswith('##')]), '##FILTER=<ID=LOW_AB,Description="Failed dynamic contamination-aware allele-balance floor">')
 if '##FILTER=<ID=LOW_VAF,Description="Failed dynamic purity-aware somatic VAF floor">' not in existing_filter_lines:
     header.insert(len([h for h in header if h.startswith('##')]), '##FILTER=<ID=LOW_VAF,Description="Failed dynamic purity-aware somatic VAF floor">')
+if not any(h.startswith('##INFO=<ID=BRANCH') for h in header):
+    header.insert(len([h for h in header if h.startswith('##')]), '##INFO=<ID=BRANCH,Number=1,Type=String,Description="Stage 3 variant branch origin">')
 
 fmt_dp_present = any(h.startswith('##FORMAT=<ID=DP') for h in header)
 fmt_ad_present = any(h.startswith('##FORMAT=<ID=AD') for h in header)
@@ -294,8 +296,12 @@ with out_path.open('w', encoding='utf-8') as out:
         else:
             cols[6] = 'PASS'
 
+        info = cols[7] if cols[7] and cols[7] != '.' else ''
+        branch_tag = 'BRANCH=snv_indel'
+        cols[7] = branch_tag if not info else f"{info};{branch_tag}"
+
         cols[9] = ':'.join(sample_map.get(k, '') for k in fmt_keys)
-        out.write('\t'.join(cols) + '\n')
+        out.write(chr(9).join(cols) + chr(10))
         records_kept += 1
 
 if bool(sample_meta.get('stage3_faults', {}).get('corrupt_vcf_header')):
@@ -326,7 +332,7 @@ audit = {
     "intervals_applied": use_intervals,
     "threads": threads,
     "dynamic_calibration": cfg,
-    "command": "bcftools mpileup|call -> bcftools norm --atomize -> AD/DP recalibration",
+    "command": "bcftools mpileup|call -> bcftools norm --atomize -> dynamic recalibration (snv_indel)",
     "snv_indel_vcf": str(Path("snv_indel.calibrated.vcf").resolve()),
     "records_emitted": records_kept,
     "records_filtered_low_ab": low_ab,

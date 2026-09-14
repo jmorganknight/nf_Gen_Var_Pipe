@@ -54,7 +54,7 @@ flowchart TD
 
 Expected input:
 
-- `--input ../Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/banked_stage5/samples_hg002_banked_stage5.yaml`
+- `--input ../Stage_5_Clinical_Annotation_PGx_Triage/tests/mini_control/samples_hg002_banked_stage5.yaml`
 
 Required fields and artifacts:
 
@@ -129,10 +129,10 @@ Stage 6 consolidates two telemetry channels:
 cd Stage_6_Clinical_Reporting_Workbench_Gateway
 nextflow run main.nf \
   -profile docker \
-  --input ../Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/banked_stage5/samples_hg002_banked_stage5.yaml \
+  --input ../Stage_5_Clinical_Annotation_PGx_Triage/tests/mini_control/samples_hg002_banked_stage5.yaml \
   --references ../conf/references.yaml \
   --thresholds ../conf/thresholds.yaml \
-  --outdir tests/fixtures/banked_stage6
+  --outdir tests/mini_control
 ```
 
 ## FMEA

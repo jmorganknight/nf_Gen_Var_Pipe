@@ -1,0 +1,241 @@
+
+***** Intermediate results will be written to /tmp/tmph3xf3nsy in docker. ****
+
+
+***** Running the command:*****
+time seq 0 11 | parallel -q --halt 2 --line-buffer /opt/deepvariant/bin/make_examples --mode calling --ref "GRCh38_full_analysis_set_plus_decoy_hla.fa" --reads "hg002_mini.identity_verified.bam" --examples "/tmp/tmph3xf3nsy/make_examples.tfrecord@12.gz" --channels "insert_size" --regions "/media/jmk/Extreme Pro/pipeline_references/beds/OncoPanel_v4.2_Master_hs38DH.bed" --task {}
+
+I0914 04:18:08.725548 137517674329920 genomics_reader.py:222] Reading hg002_mini.identity_verified.bam with NativeSamReader
+I0914 04:18:08.734688 137517674329920 make_examples_core.py:301] Task 1/12: Preparing inputs
+[E::fai_load3_core] Failed to open FASTA index GRCh38_full_analysis_set_plus_decoy_hla.fa.fai: No such file or directory
+Traceback (most recent call last):
+  File "/tmp/Bazel.runfiles_tcw2tv_b/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 234, in <module>
+    app.run(main)
+  File "/tmp/Bazel.runfiles_tcw2tv_b/runfiles/absl_py/absl/app.py", line 312, in run
+    _run_main(main, args)
+  File "/tmp/Bazel.runfiles_tcw2tv_b/runfiles/absl_py/absl/app.py", line 258, in _run_main
+    sys.exit(main(argv))
+  File "/tmp/Bazel.runfiles_tcw2tv_b/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 224, in main
+    make_examples_core.make_examples_runner(options)
+  File "/tmp/Bazel.runfiles_tcw2tv_b/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2739, in make_examples_runner
+    regions, calling_regions = processing_regions_from_options(options)
+  File "/tmp/Bazel.runfiles_tcw2tv_b/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2600, in processing_regions_from_options
+    ref_contigs = fasta.IndexedFastaReader(
+  File "/tmp/Bazel.runfiles_tcw2tv_b/runfiles/com_google_deepvariant/third_party/nucleus/io/fasta.py", line 106, in __init__
+    self._reader = reference.IndexedFastaReader.from_file(
+ValueError: NOT_FOUND: could not load fasta and/or fai for fasta GRCh38_full_analysis_set_plus_decoy_hla.fa
+I0914 04:18:08.877595 139851738806080 genomics_reader.py:222] Reading hg002_mini.identity_verified.bam with NativeSamReader
+I0914 04:18:08.886043 139851738806080 make_examples_core.py:301] Task 5/12: Preparing inputs
+[E::fai_load3_core] Failed to open FASTA index GRCh38_full_analysis_set_plus_decoy_hla.fa.fai: No such file or directory
+Traceback (most recent call last):
+  File "/tmp/Bazel.runfiles__zllo5bt/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 234, in <module>
+    app.run(main)
+  File "/tmp/Bazel.runfiles__zllo5bt/runfiles/absl_py/absl/app.py", line 312, in run
+    _run_main(main, args)
+  File "/tmp/Bazel.runfiles__zllo5bt/runfiles/absl_py/absl/app.py", line 258, in _run_main
+    sys.exit(main(argv))
+  File "/tmp/Bazel.runfiles__zllo5bt/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 224, in main
+    make_examples_core.make_examples_runner(options)
+  File "/tmp/Bazel.runfiles__zllo5bt/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2739, in make_examples_runner
+    regions, calling_regions = processing_regions_from_options(options)
+  File "/tmp/Bazel.runfiles__zllo5bt/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2600, in processing_regions_from_options
+    ref_contigs = fasta.IndexedFastaReader(
+  File "/tmp/Bazel.runfiles__zllo5bt/runfiles/com_google_deepvariant/third_party/nucleus/io/fasta.py", line 106, in __init__
+    self._reader = reference.IndexedFastaReader.from_file(
+ValueError: NOT_FOUND: could not load fasta and/or fai for fasta GRCh38_full_analysis_set_plus_decoy_hla.fa
+I0914 04:18:08.912575 131059248650048 genomics_reader.py:222] Reading hg002_mini.identity_verified.bam with NativeSamReader
+I0914 04:18:08.921172 131059248650048 make_examples_core.py:301] Task 9/12: Preparing inputs
+[E::fai_load3_core] Failed to open FASTA index GRCh38_full_analysis_set_plus_decoy_hla.fa.fai: No such file or directory
+Traceback (most recent call last):
+  File "/tmp/Bazel.runfiles_drpfdmn6/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 234, in <module>
+    app.run(main)
+  File "/tmp/Bazel.runfiles_drpfdmn6/runfiles/absl_py/absl/app.py", line 312, in run
+    _run_main(main, args)
+  File "/tmp/Bazel.runfiles_drpfdmn6/runfiles/absl_py/absl/app.py", line 258, in _run_main
+    sys.exit(main(argv))
+  File "/tmp/Bazel.runfiles_drpfdmn6/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 224, in main
+    make_examples_core.make_examples_runner(options)
+  File "/tmp/Bazel.runfiles_drpfdmn6/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2739, in make_examples_runner
+    regions, calling_regions = processing_regions_from_options(options)
+  File "/tmp/Bazel.runfiles_drpfdmn6/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2600, in processing_regions_from_options
+    ref_contigs = fasta.IndexedFastaReader(
+  File "/tmp/Bazel.runfiles_drpfdmn6/runfiles/com_google_deepvariant/third_party/nucleus/io/fasta.py", line 106, in __init__
+    self._reader = reference.IndexedFastaReader.from_file(
+ValueError: NOT_FOUND: could not load fasta and/or fai for fasta GRCh38_full_analysis_set_plus_decoy_hla.fa
+I0914 04:18:08.918860 130444610537280 genomics_reader.py:222] Reading hg002_mini.identity_verified.bam with NativeSamReader
+I0914 04:18:08.927505 130444610537280 make_examples_core.py:301] Task 3/12: Preparing inputs
+[E::fai_load3_core] Failed to open FASTA index GRCh38_full_analysis_set_plus_decoy_hla.fa.fai: No such file or directory
+Traceback (most recent call last):
+  File "/tmp/Bazel.runfiles_ncna0anp/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 234, in <module>
+    app.run(main)
+  File "/tmp/Bazel.runfiles_ncna0anp/runfiles/absl_py/absl/app.py", line 312, in run
+    _run_main(main, args)
+  File "/tmp/Bazel.runfiles_ncna0anp/runfiles/absl_py/absl/app.py", line 258, in _run_main
+    sys.exit(main(argv))
+  File "/tmp/Bazel.runfiles_ncna0anp/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 224, in main
+    make_examples_core.make_examples_runner(options)
+  File "/tmp/Bazel.runfiles_ncna0anp/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2739, in make_examples_runner
+    regions, calling_regions = processing_regions_from_options(options)
+  File "/tmp/Bazel.runfiles_ncna0anp/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2600, in processing_regions_from_options
+    ref_contigs = fasta.IndexedFastaReader(
+  File "/tmp/Bazel.runfiles_ncna0anp/runfiles/com_google_deepvariant/third_party/nucleus/io/fasta.py", line 106, in __init__
+    self._reader = reference.IndexedFastaReader.from_file(
+ValueError: NOT_FOUND: could not load fasta and/or fai for fasta GRCh38_full_analysis_set_plus_decoy_hla.fa
+I0914 04:18:08.864706 138729437697856 genomics_reader.py:222] Reading hg002_mini.identity_verified.bam with NativeSamReader
+I0914 04:18:08.873875 138729437697856 make_examples_core.py:301] Task 11/12: Preparing inputs
+[E::fai_load3_core] Failed to open FASTA index GRCh38_full_analysis_set_plus_decoy_hla.fa.fai: No such file or directory
+Traceback (most recent call last):
+  File "/tmp/Bazel.runfiles_rvidn6jo/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 234, in <module>
+    app.run(main)
+  File "/tmp/Bazel.runfiles_rvidn6jo/runfiles/absl_py/absl/app.py", line 312, in run
+    _run_main(main, args)
+  File "/tmp/Bazel.runfiles_rvidn6jo/runfiles/absl_py/absl/app.py", line 258, in _run_main
+    sys.exit(main(argv))
+  File "/tmp/Bazel.runfiles_rvidn6jo/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 224, in main
+    make_examples_core.make_examples_runner(options)
+  File "/tmp/Bazel.runfiles_rvidn6jo/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2739, in make_examples_runner
+    regions, calling_regions = processing_regions_from_options(options)
+  File "/tmp/Bazel.runfiles_rvidn6jo/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2600, in processing_regions_from_options
+    ref_contigs = fasta.IndexedFastaReader(
+  File "/tmp/Bazel.runfiles_rvidn6jo/runfiles/com_google_deepvariant/third_party/nucleus/io/fasta.py", line 106, in __init__
+    self._reader = reference.IndexedFastaReader.from_file(
+ValueError: NOT_FOUND: could not load fasta and/or fai for fasta GRCh38_full_analysis_set_plus_decoy_hla.fa
+I0914 04:18:08.887033 124890581829440 genomics_reader.py:222] Reading hg002_mini.identity_verified.bam with NativeSamReader
+I0914 04:18:08.895489 124890581829440 make_examples_core.py:301] Task 6/12: Preparing inputs
+[E::fai_load3_core] Failed to open FASTA index GRCh38_full_analysis_set_plus_decoy_hla.fa.fai: No such file or directory
+Traceback (most recent call last):
+  File "/tmp/Bazel.runfiles_7k_gx8uh/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 234, in <module>
+    app.run(main)
+  File "/tmp/Bazel.runfiles_7k_gx8uh/runfiles/absl_py/absl/app.py", line 312, in run
+    _run_main(main, args)
+  File "/tmp/Bazel.runfiles_7k_gx8uh/runfiles/absl_py/absl/app.py", line 258, in _run_main
+    sys.exit(main(argv))
+  File "/tmp/Bazel.runfiles_7k_gx8uh/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 224, in main
+    make_examples_core.make_examples_runner(options)
+  File "/tmp/Bazel.runfiles_7k_gx8uh/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2739, in make_examples_runner
+    regions, calling_regions = processing_regions_from_options(options)
+  File "/tmp/Bazel.runfiles_7k_gx8uh/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2600, in processing_regions_from_options
+    ref_contigs = fasta.IndexedFastaReader(
+  File "/tmp/Bazel.runfiles_7k_gx8uh/runfiles/com_google_deepvariant/third_party/nucleus/io/fasta.py", line 106, in __init__
+    self._reader = reference.IndexedFastaReader.from_file(
+ValueError: NOT_FOUND: could not load fasta and/or fai for fasta GRCh38_full_analysis_set_plus_decoy_hla.fa
+I0914 04:18:08.850819 134724953761600 genomics_reader.py:222] Reading hg002_mini.identity_verified.bam with NativeSamReader
+I0914 04:18:08.859313 134724953761600 make_examples_core.py:301] Task 7/12: Preparing inputs
+[E::fai_load3_core] Failed to open FASTA index GRCh38_full_analysis_set_plus_decoy_hla.fa.fai: No such file or directory
+Traceback (most recent call last):
+  File "/tmp/Bazel.runfiles_0n5jobzk/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 234, in <module>
+    app.run(main)
+  File "/tmp/Bazel.runfiles_0n5jobzk/runfiles/absl_py/absl/app.py", line 312, in run
+    _run_main(main, args)
+  File "/tmp/Bazel.runfiles_0n5jobzk/runfiles/absl_py/absl/app.py", line 258, in _run_main
+    sys.exit(main(argv))
+  File "/tmp/Bazel.runfiles_0n5jobzk/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 224, in main
+    make_examples_core.make_examples_runner(options)
+  File "/tmp/Bazel.runfiles_0n5jobzk/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2739, in make_examples_runner
+    regions, calling_regions = processing_regions_from_options(options)
+  File "/tmp/Bazel.runfiles_0n5jobzk/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2600, in processing_regions_from_options
+    ref_contigs = fasta.IndexedFastaReader(
+  File "/tmp/Bazel.runfiles_0n5jobzk/runfiles/com_google_deepvariant/third_party/nucleus/io/fasta.py", line 106, in __init__
+    self._reader = reference.IndexedFastaReader.from_file(
+ValueError: NOT_FOUND: could not load fasta and/or fai for fasta GRCh38_full_analysis_set_plus_decoy_hla.fa
+I0914 04:18:08.924667 127709675996992 genomics_reader.py:222] Reading hg002_mini.identity_verified.bam with NativeSamReader
+I0914 04:18:08.933100 127709675996992 make_examples_core.py:301] Task 0/12: Preparing inputs
+[E::fai_load3_core] Failed to open FASTA index GRCh38_full_analysis_set_plus_decoy_hla.fa.fai: No such file or directory
+Traceback (most recent call last):
+  File "/tmp/Bazel.runfiles_bmibbhke/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 234, in <module>
+    app.run(main)
+  File "/tmp/Bazel.runfiles_bmibbhke/runfiles/absl_py/absl/app.py", line 312, in run
+    _run_main(main, args)
+  File "/tmp/Bazel.runfiles_bmibbhke/runfiles/absl_py/absl/app.py", line 258, in _run_main
+    sys.exit(main(argv))
+  File "/tmp/Bazel.runfiles_bmibbhke/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 224, in main
+    make_examples_core.make_examples_runner(options)
+  File "/tmp/Bazel.runfiles_bmibbhke/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2739, in make_examples_runner
+    regions, calling_regions = processing_regions_from_options(options)
+  File "/tmp/Bazel.runfiles_bmibbhke/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2600, in processing_regions_from_options
+    ref_contigs = fasta.IndexedFastaReader(
+  File "/tmp/Bazel.runfiles_bmibbhke/runfiles/com_google_deepvariant/third_party/nucleus/io/fasta.py", line 106, in __init__
+    self._reader = reference.IndexedFastaReader.from_file(
+ValueError: NOT_FOUND: could not load fasta and/or fai for fasta GRCh38_full_analysis_set_plus_decoy_hla.fa
+I0914 04:18:08.853707 127636083779392 genomics_reader.py:222] Reading hg002_mini.identity_verified.bam with NativeSamReader
+I0914 04:18:08.862043 127636083779392 make_examples_core.py:301] Task 8/12: Preparing inputs
+[E::fai_load3_core] Failed to open FASTA index GRCh38_full_analysis_set_plus_decoy_hla.fa.fai: No such file or directory
+Traceback (most recent call last):
+  File "/tmp/Bazel.runfiles_gmn0rl1k/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 234, in <module>
+    app.run(main)
+  File "/tmp/Bazel.runfiles_gmn0rl1k/runfiles/absl_py/absl/app.py", line 312, in run
+    _run_main(main, args)
+  File "/tmp/Bazel.runfiles_gmn0rl1k/runfiles/absl_py/absl/app.py", line 258, in _run_main
+    sys.exit(main(argv))
+  File "/tmp/Bazel.runfiles_gmn0rl1k/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 224, in main
+    make_examples_core.make_examples_runner(options)
+  File "/tmp/Bazel.runfiles_gmn0rl1k/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2739, in make_examples_runner
+    regions, calling_regions = processing_regions_from_options(options)
+  File "/tmp/Bazel.runfiles_gmn0rl1k/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2600, in processing_regions_from_options
+    ref_contigs = fasta.IndexedFastaReader(
+  File "/tmp/Bazel.runfiles_gmn0rl1k/runfiles/com_google_deepvariant/third_party/nucleus/io/fasta.py", line 106, in __init__
+    self._reader = reference.IndexedFastaReader.from_file(
+ValueError: NOT_FOUND: could not load fasta and/or fai for fasta GRCh38_full_analysis_set_plus_decoy_hla.fa
+I0914 04:18:08.760846 138583734703936 genomics_reader.py:222] Reading hg002_mini.identity_verified.bam with NativeSamReader
+I0914 04:18:08.769432 138583734703936 make_examples_core.py:301] Task 2/12: Preparing inputs
+[E::fai_load3_core] Failed to open FASTA index GRCh38_full_analysis_set_plus_decoy_hla.fa.fai: No such file or directory
+Traceback (most recent call last):
+  File "/tmp/Bazel.runfiles_tf8v4re6/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 234, in <module>
+    app.run(main)
+  File "/tmp/Bazel.runfiles_tf8v4re6/runfiles/absl_py/absl/app.py", line 312, in run
+    _run_main(main, args)
+  File "/tmp/Bazel.runfiles_tf8v4re6/runfiles/absl_py/absl/app.py", line 258, in _run_main
+    sys.exit(main(argv))
+  File "/tmp/Bazel.runfiles_tf8v4re6/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 224, in main
+    make_examples_core.make_examples_runner(options)
+  File "/tmp/Bazel.runfiles_tf8v4re6/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2739, in make_examples_runner
+    regions, calling_regions = processing_regions_from_options(options)
+  File "/tmp/Bazel.runfiles_tf8v4re6/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2600, in processing_regions_from_options
+    ref_contigs = fasta.IndexedFastaReader(
+  File "/tmp/Bazel.runfiles_tf8v4re6/runfiles/com_google_deepvariant/third_party/nucleus/io/fasta.py", line 106, in __init__
+    self._reader = reference.IndexedFastaReader.from_file(
+ValueError: NOT_FOUND: could not load fasta and/or fai for fasta GRCh38_full_analysis_set_plus_decoy_hla.fa
+I0914 04:18:08.842374 136475458918208 genomics_reader.py:222] Reading hg002_mini.identity_verified.bam with NativeSamReader
+I0914 04:18:08.851114 136475458918208 make_examples_core.py:301] Task 4/12: Preparing inputs
+[E::fai_load3_core] Failed to open FASTA index GRCh38_full_analysis_set_plus_decoy_hla.fa.fai: No such file or directory
+Traceback (most recent call last):
+  File "/tmp/Bazel.runfiles_9s64ille/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 234, in <module>
+    app.run(main)
+  File "/tmp/Bazel.runfiles_9s64ille/runfiles/absl_py/absl/app.py", line 312, in run
+    _run_main(main, args)
+  File "/tmp/Bazel.runfiles_9s64ille/runfiles/absl_py/absl/app.py", line 258, in _run_main
+    sys.exit(main(argv))
+  File "/tmp/Bazel.runfiles_9s64ille/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 224, in main
+    make_examples_core.make_examples_runner(options)
+  File "/tmp/Bazel.runfiles_9s64ille/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2739, in make_examples_runner
+    regions, calling_regions = processing_regions_from_options(options)
+  File "/tmp/Bazel.runfiles_9s64ille/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2600, in processing_regions_from_options
+    ref_contigs = fasta.IndexedFastaReader(
+  File "/tmp/Bazel.runfiles_9s64ille/runfiles/com_google_deepvariant/third_party/nucleus/io/fasta.py", line 106, in __init__
+    self._reader = reference.IndexedFastaReader.from_file(
+ValueError: NOT_FOUND: could not load fasta and/or fai for fasta GRCh38_full_analysis_set_plus_decoy_hla.fa
+I0914 04:18:08.895750 139980581160768 genomics_reader.py:222] Reading hg002_mini.identity_verified.bam with NativeSamReader
+I0914 04:18:08.904080 139980581160768 make_examples_core.py:301] Task 10/12: Preparing inputs
+[E::fai_load3_core] Failed to open FASTA index GRCh38_full_analysis_set_plus_decoy_hla.fa.fai: No such file or directory
+Traceback (most recent call last):
+  File "/tmp/Bazel.runfiles_xtd5xy9c/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 234, in <module>
+    app.run(main)
+  File "/tmp/Bazel.runfiles_xtd5xy9c/runfiles/absl_py/absl/app.py", line 312, in run
+    _run_main(main, args)
+  File "/tmp/Bazel.runfiles_xtd5xy9c/runfiles/absl_py/absl/app.py", line 258, in _run_main
+    sys.exit(main(argv))
+  File "/tmp/Bazel.runfiles_xtd5xy9c/runfiles/com_google_deepvariant/deepvariant/make_examples.py", line 224, in main
+    make_examples_core.make_examples_runner(options)
+  File "/tmp/Bazel.runfiles_xtd5xy9c/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2739, in make_examples_runner
+    regions, calling_regions = processing_regions_from_options(options)
+  File "/tmp/Bazel.runfiles_xtd5xy9c/runfiles/com_google_deepvariant/deepvariant/make_examples_core.py", line 2600, in processing_regions_from_options
+    ref_contigs = fasta.IndexedFastaReader(
+  File "/tmp/Bazel.runfiles_xtd5xy9c/runfiles/com_google_deepvariant/third_party/nucleus/io/fasta.py", line 106, in __init__
+    self._reader = reference.IndexedFastaReader.from_file(
+ValueError: NOT_FOUND: could not load fasta and/or fai for fasta GRCh38_full_analysis_set_plus_decoy_hla.fa
+parallel: This job failed:
+/opt/deepvariant/bin/make_examples --mode calling --ref GRCh38_full_analysis_set_plus_decoy_hla.fa --reads hg002_mini.identity_verified.bam --examples /tmp/tmph3xf3nsy/make_examples.tfrecord@12.gz --channels insert_size --regions /media/jmk/Extreme\ Pro/pipeline_references/beds/OncoPanel_v4.2_Master_hs38DH.bed --task 1
+
+real	0m2.769s
+user	0m2.987s
+sys	0m2.460s

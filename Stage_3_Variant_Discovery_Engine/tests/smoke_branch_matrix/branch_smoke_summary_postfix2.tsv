@@ -1,0 +1,7 @@
+branch	exit_code	proc_seen	manifest_found	audit_found	log
+snv_indel	1	yes	no	no	tests/smoke_branch_matrix/runs_postfix2/snv_indel/run.log
+structural_variants	1	yes	no	no	tests/smoke_branch_matrix/runs_postfix2/structural_variants/run.log
+copy_number_cnv	0	yes	no	no	tests/smoke_branch_matrix/runs_postfix2/copy_number_cnv/run.log
+str_expansions	1	yes	no	no	tests/smoke_branch_matrix/runs_postfix2/str_expansions/run.log
+trisomy_aneuploidy	0	yes	no	no	tests/smoke_branch_matrix/runs_postfix2/trisomy_aneuploidy/run.log
+homologous_pseudogenes	1	yes	no	no	tests/smoke_branch_matrix/runs_postfix2/homologous_pseudogenes/run.log

@@ -32,7 +32,10 @@ ancestry = json.loads(Path(ancestry_path).read_text(encoding='utf-8'))
 
 fragment = {
     'sample_id': sid,
+    'run_mode': meta.get('run_mode', 'production'),
     'validation_token': meta.get('validation_token', ''),
+    'stage2_contamination_status': meta.get('stage2_contamination_status', ''),
+    'stage2_contamination_policy_action': meta.get('stage2_contamination_policy_action', ''),
     'consent_tokens': meta.get('consent_tokens', {}),
     'stage0_consent_tokens': meta.get('stage0_consent_tokens', {}),
     'variant_branches': meta.get('variant_branches', {}),

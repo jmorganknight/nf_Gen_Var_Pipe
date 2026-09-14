@@ -1,6 +1,6 @@
 process STAGE3_VARIANT_ENGINE {
     label 'process_low'
-    container 'genvar-core:2.0.0'
+    container 'genvar-core:2.1.0'
     publishDir "${params.outdir}", mode: 'copy', overwrite: true
 
     input:

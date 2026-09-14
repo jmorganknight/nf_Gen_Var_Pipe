@@ -25,6 +25,7 @@ tmp/
 
 # Local Test Output Sinks & Banked Fixtures (Kept locally for debugging)
 tests/fixtures/banked_stage*/
+tests/mini_control/
 tests/fmea/runs/
 results/
 out/
@@ -45,4 +46,5 @@ __pycache__/
 
 # Stage-local fixture/output sinks (recursive)
 **/tests/fixtures/banked_stage*/
+**/tests/mini_control/
 **/tests/fmea/runs/

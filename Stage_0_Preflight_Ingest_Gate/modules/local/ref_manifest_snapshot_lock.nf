@@ -48,6 +48,8 @@ import os
 import sys
 from datetime import datetime, timezone
 
+FALLBACK_REF_ROOT = '/opt/reference'
+
 def parse_scalar(value):
     value = value.strip()
     if value.startswith(('"', "'")) and value.endswith(('"', "'")):
@@ -130,7 +132,21 @@ def sha256_of_directory(root_dir):
     return digest.hexdigest()
 
 
-def sha256_of_path(p):
+def resolve_reference_path(path_text, ref_data_root):
+    if os.path.isabs(path_text):
+        return path_text
+
+    root_text = (ref_data_root or '').strip() or FALLBACK_REF_ROOT
+    rooted = os.path.normpath(os.path.join(root_text, path_text))
+    if os.path.exists(rooted):
+        return rooted
+
+    fallback = os.path.normpath(os.path.join(FALLBACK_REF_ROOT, path_text))
+    return fallback
+
+
+def sha256_of_path(p, ref_data_root):
+    p = resolve_reference_path(p, ref_data_root)
     if os.path.isdir(p):
         return sha256_of_directory(p)
     return sha256_of_file(p)
@@ -175,6 +191,10 @@ refs_doc = load_yaml_simple('${references_yaml}')
 refs = refs_doc.get('references', {})
 if not refs:
     raise RuntimeError('[REF_LOCK] No references block parsed from references manifest')
+yaml_ref_data_root = refs_doc.get('ref_data_root')
+if yaml_ref_data_root is None:
+    yaml_ref_data_root = FALLBACK_REF_ROOT
+yaml_ref_data_root = str(yaml_ref_data_root).strip() or FALLBACK_REF_ROOT
 assert_reference_consistency(refs)
 infra_doc = load_yaml_simple('${infrastructure_yaml}')
 
@@ -212,7 +232,7 @@ def walk_refs(obj, prefix=''):
             walk_refs(v, f'{prefix}.{k}' if prefix else k)
     elif isinstance(obj, str):
         if '/' in obj:
-            manifest['reference_hashes'][prefix] = sha256_of_path(obj)
+            manifest['reference_hashes'][prefix] = sha256_of_path(obj, yaml_ref_data_root)
 
 walk_refs(refs)
 
@@ -235,7 +255,7 @@ for label, path in [
     ('thresholds_yaml', '${thresholds_yaml}'),
     ('infrastructure_yaml', '${infrastructure_yaml}'),
 ]:
-    manifest['reference_hashes'][label] = sha256_of_path(path)
+    manifest['reference_hashes'][label] = sha256_of_file(path)
 
 tokens_str = json.dumps(manifest, indent=2)
 with open('reference_snapshot.tokens', 'w') as out:

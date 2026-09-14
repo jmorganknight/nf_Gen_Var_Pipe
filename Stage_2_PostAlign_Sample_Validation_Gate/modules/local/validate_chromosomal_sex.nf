@@ -75,12 +75,11 @@ y_region = f"{y_contig}:2781480-56887902"
 
 def mean_depth(region: str):
     cmd = ['samtools', 'depth', '-aa', '-r', region, '${bam}']
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    if proc.returncode != 0:
-        raise RuntimeError(f"samtools depth failed for {region}: {proc.stderr.strip()}")
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     total = 0
     n = 0
-    for raw in proc.stdout.splitlines():
+    assert proc.stdout is not None
+    for raw in proc.stdout:
         parts = raw.split('\t')
         if len(parts) != 3:
             continue
@@ -89,6 +88,10 @@ def mean_depth(region: str):
             n += 1
         except ValueError:
             continue
+    stderr_text = proc.stderr.read() if proc.stderr else ''
+    exit_code = proc.wait()
+    if exit_code != 0:
+        raise RuntimeError(f"samtools depth failed for {region}: {stderr_text.strip()}")
     return (float(total) / float(n)) if n > 0 else 0.0, total, n
 
 

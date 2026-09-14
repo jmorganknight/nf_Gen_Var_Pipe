@@ -105,10 +105,10 @@ Stage 2 emits a compact scalar block for Stage 3 calibration:
 cd Stage_2_PostAlign_Sample_Validation_Gate
 nextflow run main.nf \
   -profile docker \
-  --input ../Stage_1_Alignment_Read_Processing/tests/fixtures/banked_stage1/samples_hg002_banked_stage1.yaml \
+  --input ../Stage_1_Alignment_Read_Processing/tests/mini_control/samples_hg002_banked_stage1.yaml \
   --references ../conf/references.yaml \
   --thresholds ../conf/thresholds.yaml \
-  --outdir tests/fixtures/banked_stage2/
+  --outdir tests/mini_control/
 ```
 
 ## FMEA

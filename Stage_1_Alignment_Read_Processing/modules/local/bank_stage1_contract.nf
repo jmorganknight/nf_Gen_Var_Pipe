@@ -49,6 +49,7 @@ sid = '${sid}'
 base = '${params.outdir}'
 fragment = {
     'sample_id': sid,
+    'run_mode': '${meta.run_mode ?: 'production'}',
     'patient_id': '${patientId}',
     'case_id': '${caseId}',
     'accession_id': '${accessionId}',
@@ -78,9 +79,12 @@ fragment = {
     'preflight_lock': '${meta.preflight_lock ?: ''}',
     'preflight_lock_status': '${meta.preflight_lock_status ?: ''}',
     'reference_snapshot_tokens': '${meta.reference_snapshot_tokens ?: ''}',
-    'mapped_bam': f"{base}/aligned/{sid}.identity_verified.bam",
-    'mapped_bai': f"{base}/aligned/{sid}.identity_verified.bam.bai",
-    'identity_audit': f"{base}/audit_and_qc/stage1/{sid}.identity_audit.json",
+    # CROSS_SAMPLE_IDENTITY_GATE publishes identity artifacts under
+    # <outdir>/<sample_id>/audit_and_qc/identity/*. Keep the banked contract
+    # aligned to those concrete published paths for downstream Stage 2 checks.
+    'mapped_bam': f"{base}/{sid}/audit_and_qc/identity/{sid}.identity_verified.bam",
+    'mapped_bai': f"{base}/{sid}/audit_and_qc/identity/{sid}.identity_verified.bam.bai",
+    'identity_audit': f"{base}/{sid}/audit_and_qc/identity/{sid}.identity_audit.json",
     'reference_build': ref,
     'save_dir': base
 }

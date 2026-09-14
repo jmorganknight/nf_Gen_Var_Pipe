@@ -2,6 +2,15 @@
 
 `Stage_3_Variant_Discovery_Engine` consumes the Stage 2 banked manifest and executes only the variant branches explicitly enabled in the contract.
 
+Current production-wired branches:
+
+- `snv_indel`
+- `structural_variants` (SV and large indels)
+- `copy_number_cnv`
+- `str_expansions`
+- `trisomy_aneuploidy`
+- `homologous_pseudogenes`
+
 ## Clinical Scope
 
 Stage 3 is the production discovery and harmonization gate that converts Stage 2 QC-qualified samples into schema-validated, Stage 4-ready normalized variant payloads.
@@ -29,12 +38,12 @@ flowchart TD
 
 ## Branch Toggles
 
-- `snv_indel`
-- `structural_variants`
-- `copy_number_cnv`
-- `str_expansions`
-- `trisomy_aneuploidy`
-- `homologous_pseudogenes`
+All listed branch toggles are implemented in active Stage 3 wiring.
+
+SNV caller selection:
+
+- Default: `deepvariant` (`params.stage3_snv_caller = 'deepvariant'`)
+- Alternate: `bcftools` (`params.stage3_snv_caller = 'bcftools'`)
 
 ## Dynamic Calibration and Filters
 
@@ -48,10 +57,40 @@ Stage 3 derives runtime filter parameters from Stage 2 `sample_qc_meta`:
 
 Core SNV/indel lane behavior:
 
-- `bcftools mpileup` + `bcftools call`
-- `bcftools norm --atomize`
+- `run_deepvariant` primary caller (or `bcftools` alternate path)
 - Post-atomization `AD`/`DP` normalization per record
 - Contamination-aware binomial-style allele-balance filtering (`LOW_AB`) and purity-aware VAF filtering (`LOW_VAF`) with audit counters
+
+Core structural-variant lane behavior (modeled on WES-Onco SV lane design):
+
+- `configManta.py` + `runWorkflow.py` for discovery
+- target-region intersection using `bcftools view -R` for non-WGS inputs
+- QUAL floor filtering using governed thresholds (`somatic_qual_floor` / `germline_qual_floor`)
+- structural/large-indel retention with `BRANCH=structural_variants` INFO tag and branch audit counters
+- fail-closed tool checks (no silent placeholder fallback in active execution path)
+
+Core CNV lane behavior:
+
+- CNVkit segmentation/calling from BAM evidence
+- Independent depth validation lane (`samtools depth`) for concordance auditing
+- CNV VCF emission with branch tags and `LOW_LOG2` filter states
+
+Core STR lane behavior:
+
+- ExpansionHunter using governed catalog
+- VCF-first ingestion with JSON fallback parsing
+- STR VCF emission tagged as `BRANCH=str_expansions`
+
+Core trisomy/aneuploidy lane behavior:
+
+- Chromosome-level depth model from `samtools idxstats`
+- Conservative trisomy signals (chr13/18/21) based on ratio and z-score thresholds
+- Addon-style VCF emission only when thresholds are exceeded
+
+Core homologous/pseudogene lane behavior:
+
+- Mask-restricted calling (`bcftools mpileup/call` over homologous-risk BED)
+- `PARALOG_HOMOLOGY=1` evidence tagging for downstream PGx-aware interpretation
 
 ## MANE Prioritization
 
@@ -86,12 +125,13 @@ This prevents silent success on deliberately malformed payloads.
 
 ## Module Inventory
 
-- `modules/local/load_stage2_contract.nf`
-- `modules/local/branch_snv_indel.nf`
-- `modules/local/branch_structural_variants.nf`
-- `modules/local/branch_copy_number_cnv.nf`
-- `modules/local/branch_str_expansions.nf`
-- `modules/local/branch_trisomy_aneuploidy.nf`
+- `modules/local/stage3_snv_indel.nf`
+- `modules/local/stage3_snv_indel_deepvariant.nf`
+- `modules/local/stage3_structural_variants.nf`
+- `modules/local/stage3_copy_number_cnv.nf`
+- `modules/local/stage3_str_expansions.nf`
+- `modules/local/stage3_trisomy_aneuploidy.nf`
+- `modules/local/stage3_homologous_pseudogenes.nf`
 - `modules/local/mane_transcript_selector.nf`
 - `modules/local/master_harmonized_vcf_payload.nf`
 - `modules/local/assemble_stage3_banked_manifest.nf`
@@ -104,7 +144,7 @@ This prevents silent success on deliberately malformed payloads.
 
 ## Outputs
 
-- `tests/fixtures/banked_stage3/samples_hg002_banked_stage3.yaml`
+- `tests/mini_control/samples_hg002_banked_stage3.yaml`
 
 ## Execute
 
@@ -112,8 +152,8 @@ This prevents silent success on deliberately malformed payloads.
 cd Stage_3_Variant_Discovery_Engine
 nextflow run main.nf \
     -profile docker \
-    --input ../Stage_2_PostAlign_Sample_Validation_Gate/tests/fixtures/banked_stage2/samples_hg002_banked_stage2.yaml \
-    --outdir tests/fixtures/banked_stage3
+    --input ../Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control/samples_hg002_banked_stage2.yaml \
+    --outdir tests/mini_control
 ```
 
 ## FMEA

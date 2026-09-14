@@ -254,6 +254,16 @@ workflow {
         throw new IllegalArgumentException('STAGE6_PRECONDITION_FAILURE: Stage 5 manifest contains no samples')
     }
 
+    def runModeBySample = samples.collectEntries { sample ->
+        [(sample.sample_id?.toString() ?: 'UNKNOWN'): (sample.run_mode ?: 'production').toString()]
+    }
+    def stage2StatusBySample = samples.collectEntries { sample ->
+        [(sample.sample_id?.toString() ?: 'UNKNOWN'): (sample.stage2_contamination_status ?: '').toString()]
+    }
+    def stage2PolicyBySample = samples.collectEntries { sample ->
+        [(sample.sample_id?.toString() ?: 'UNKNOWN'): (sample.stage2_contamination_policy_action ?: '').toString()]
+    }
+
     def referencesMeta = [
         reference_genome : refsMerged.reference_genome ?: refsMerged.grch38_fasta,
         reference_fai    : refsMerged.reference_fai ?: refsMerged.grch38_fai,
@@ -324,6 +334,9 @@ workflow {
 
         def meta = [
             sample_id        : sid,
+            run_mode         : runModeBySample[sid] ?: 'production',
+            stage2_contamination_status: stage2StatusBySample[sid] ?: '',
+            stage2_contamination_policy_action: stage2PolicyBySample[sid] ?: '',
             validation_token : token,
             stage5_manifest  : stage5ManifestFile.toString(),
             stage5_root      : stage5Root.toString(),

@@ -1,0 +1,41 @@
+{
+  "sample_id": "hg002_mini",
+  "validation_token": "VALID_PASS|SAMPLE_VALIDATED",
+  "sorted_bam": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_1_Alignment_Read_Processing/tests/mini_control/hg002_mini/audit_and_qc/identity/hg002_mini.identity_verified.bam",
+  "sorted_bai": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_1_Alignment_Read_Processing/tests/mini_control/hg002_mini/audit_and_qc/identity/hg002_mini.identity_verified.bam.bai",
+  "variant_branches": {
+    "snv_indel": true,
+    "structural_variants": false,
+    "copy_number_cnv": false,
+    "str_expansions": false,
+    "trisomy_aneuploidy": false,
+    "homologous_pseudogenes": false
+  },
+  "active_branches": [
+    "snv_indel"
+  ],
+  "normalized_vcf": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/smoke_branch_matrix/runs/snv_indel/out_retry3/hg002_mini.normalized.vcf.gz",
+  "normalized_vcf_tbi": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/smoke_branch_matrix/runs/snv_indel/out_retry3/hg002_mini.normalized.vcf.gz.tbi",
+  "workdir_normalized_vcf": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/smoke_branch_matrix/runs/snv_indel/work_retry3/cb/a19827a07e26e7264fb099e1551852/hg002_mini.normalized.vcf.gz",
+  "workdir_normalized_vcf_tbi": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/smoke_branch_matrix/runs/snv_indel/work_retry3/cb/a19827a07e26e7264fb099e1551852/hg002_mini.normalized.vcf.gz.tbi",
+  "mane_selector_audit": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/smoke_branch_matrix/runs/snv_indel/work_retry3/37/7fc6a16ab836acdbba02fc52725a84/stage3.mane_transcript_selector.audit.json",
+  "dynamic_calibration_audit": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/smoke_branch_matrix/runs/snv_indel/work_retry3/37/b3c20748f8c1055cb422f3ccfb57d9/stage3.deepvariant_calibration.json",
+  "schema_validation": {
+    "sample_id": "hg002_mini",
+    "node": "MASTER_HARMONIZED_VCF_PAYLOAD",
+    "schema_path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/schemas/v4.2_Production_Schema.json",
+    "schema_path_declared": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/schemas/v4.2_Production_Schema.json",
+    "schema_sha256": "dbd124ea671820a67bc0bab177bb31f08bac590a204fdaf32b7b16eea7145d4f",
+    "validated_vcf": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/smoke_branch_matrix/runs/snv_indel/work_retry3/37/7fc6a16ab836acdbba02fc52725a84/snv_indel.mane_selected.vcf",
+    "normalized_vcf": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/smoke_branch_matrix/runs/snv_indel/work_retry3/cb/a19827a07e26e7264fb099e1551852/hg002_mini.normalized.vcf.gz",
+    "normalized_vcf_tbi": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/smoke_branch_matrix/runs/snv_indel/work_retry3/cb/a19827a07e26e7264fb099e1551852/hg002_mini.normalized.vcf.gz.tbi",
+    "published_normalized_vcf": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/smoke_branch_matrix/runs/snv_indel/out_retry3/hg002_mini.normalized.vcf.gz",
+    "published_normalized_vcf_tbi": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/smoke_branch_matrix/runs/snv_indel/out_retry3/hg002_mini.normalized.vcf.gz.tbi",
+    "normalized_vcf_sha256": "e838a7d72975db483fec790b3fcd6a3b2ce15d7689dcb48fe35fac6983636059",
+    "normalized_vcf_tbi_sha256": "69557ac30ae1542c6722459a5c472d9f6a5d093348729e59cd95dfa00187921d",
+    "record_count": 221,
+    "ga4gh_vcf_version": "4.2",
+    "status": "PASS"
+  },
+  "status": "PASS"
+}

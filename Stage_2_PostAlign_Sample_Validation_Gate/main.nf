@@ -186,8 +186,10 @@ def buildStage2InputChannel() {
         throw new IllegalArgumentException('STAGE2_PRECONDITION_FAILURE: samples manifest contains no samples')
     }
 
+    // Contract-first merge: stage-local params.refs acts only as optional fallback
+    // and must not override governed reference mappings from references.yaml.
     def refsFromParams = mapOrEmpty(params.refs)
-    def refsCombined = refsParsed + refsFromParams
+    def refsCombined = refsFromParams + refsParsed
     def refsNormalized = mapOrEmpty(refsCombined) + [
         reference_genome: (refsCombined.reference_genome ?: refsCombined.grch38_fasta),
         reference_fai   : (refsCombined.reference_fai ?: refsCombined.grch38_fai),
@@ -274,6 +276,7 @@ def buildStage2InputChannel() {
         def baseMeta = buildMetaRow(sample as Map, params.outdir.toString()) + [
             intake_validation_token: sample.intake_validation_token ?: sample.validation_token,
             intake_validation_token_value: token,
+            run_mode: (sample.run_mode ?: 'production').toString(),
             validation_token: 'VALID_PASS|SAMPLE_VALIDATED'
         ]
 
@@ -307,6 +310,7 @@ def buildMetaRow(Map sample, String outdir) {
         physician_tumor_purity: sample.physician_tumor_purity ?: sample.pathologist_tumor_burden ?: 0.0,
         gender: sample.gender,
         reported_sex: normalizeSexToken(sample.reported_sex ?: sample.biological_context?.declared_sex ?: sample.gender),
+        run_mode: (sample.run_mode ?: 'production').toString(),
         consent: mapOrEmpty(sample.consent),
         consent_tokens: mapOrEmpty(sample.consent_tokens),
         variant_branches: mapOrEmpty(sample.variant_branches),

@@ -1,6 +1,6 @@
 process ASSEMBLE_STAGE3_BANKED_MANIFEST {
     label 'process_low'
-    container 'genvar-core:2.0.0'
+    container 'genvar-core:2.1.0'
 
     publishDir "${params.outdir}", mode: 'copy', overwrite: true
 
@@ -29,6 +29,9 @@ lines = [
 for rec in records:
     lines.append('  - sample_id: ' + json.dumps(rec['sample_id']))
     lines.append('    validation_token: ' + json.dumps(rec.get('validation_token', '')))
+    lines.append('    run_mode: ' + json.dumps(rec.get('run_mode', 'production')))
+    lines.append('    stage2_contamination_status: ' + json.dumps(rec.get('stage2_contamination_status', '')))
+    lines.append('    stage2_contamination_policy_action: ' + json.dumps(rec.get('stage2_contamination_policy_action', '')))
     lines.append('    sorted_bam: ' + json.dumps(rec.get('sorted_bam', '')))
     lines.append('    sorted_bai: ' + json.dumps(rec.get('sorted_bai', '')))
     variant_branches = rec.get('variant_branches') or {}

@@ -50,7 +50,7 @@ flowchart TD
     P2 --> M
     P3 --> M
     G --> M
-  M --> O["tests/fixtures/banked_stage5/samples_hg002_banked_stage5.yaml"]
+  M --> O["tests/mini_control/samples_hg002_banked_stage5.yaml"]
 ```
 
 ## Cryptographic Integrity
@@ -87,7 +87,7 @@ Signature fields include:
 
 Expected input:
 
-- `--input ../Stage_4_Ancestry_Phasing_Highway/tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml`
+- `--input ../Stage_4_Ancestry_Phasing_Highway/tests/mini_control/samples_hg002_banked_stage4.yaml`
 
 Required per sample:
 
@@ -99,7 +99,7 @@ Required per sample:
 
 ## Outputs
 
-Published under `tests/fixtures/banked_stage5/`:
+Published under `tests/mini_control/`:
 
 - `annotation/*.vep_core_annotations.json`
 - `annotation/*.vep_to_acmg_rules.json`
@@ -123,17 +123,17 @@ Published under `tests/fixtures/banked_stage5/`:
 cd Stage_5_Clinical_Annotation_PGx_Triage
 nextflow run main.nf \
   -profile docker \
-  --input ../Stage_4_Ancestry_Phasing_Highway/tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml \
+  --input ../Stage_4_Ancestry_Phasing_Highway/tests/mini_control/samples_hg002_banked_stage4.yaml \
   --references ../conf/references.yaml \
   --thresholds ../conf/thresholds.yaml \
-  --outdir tests/fixtures/banked_stage5/
+  --outdir tests/mini_control/
 ```
 
 For signer key overrides:
 
 ```bash
 nextflow run main.nf -profile docker \
-  --input ../Stage_4_Ancestry_Phasing_Highway/tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml \
+  --input ../Stage_4_Ancestry_Phasing_Highway/tests/mini_control/samples_hg002_banked_stage4.yaml \
   --signer_key_path ../keys/clinical_signer.pem \
   --signer_pub_path ../keys/clinical_signer.pub.pem
 ```

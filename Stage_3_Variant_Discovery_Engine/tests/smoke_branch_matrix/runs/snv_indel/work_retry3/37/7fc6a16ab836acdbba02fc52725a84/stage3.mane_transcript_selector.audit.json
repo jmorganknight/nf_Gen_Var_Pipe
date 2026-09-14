@@ -1,0 +1,9 @@
+{
+  "sample_id": "hg002_mini",
+  "node": "MANE_TRANSCRIPT_SELECTOR",
+  "mane_asset": "/media/jmk/Extreme Pro/pipeline_references/beds/mane_select_v1.3.bed",
+  "mane_plus_clinical_records": 0,
+  "mane_select_records": 221,
+  "none_records": 0,
+  "status": "PASS"
+}

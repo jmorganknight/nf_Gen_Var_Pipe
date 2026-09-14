@@ -1,6 +1,6 @@
 process BRANCH_STR_EXPANSIONS {
     label 'process_low'
-    container 'genvar-core:2.0.0'
+    container 'genvar-core:2.1.0'
 
     input:
     tuple path(contract_json), path(branch_plan_json)

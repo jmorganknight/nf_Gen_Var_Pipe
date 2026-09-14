@@ -64,6 +64,7 @@ import json
 
 fragment = {
     'sample_id': '${sid}',
+    'run_mode': '${meta.run_mode ?: 'production'}',
     'patient_id': '${patientId}',
     'case_id': '${caseId}',
     'accession_id': '${accessionId}',

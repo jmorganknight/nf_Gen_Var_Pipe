@@ -1,13 +1,13 @@
 process MANE_TRANSCRIPT_SELECTOR {
 
     label 'process_low'
-    container 'genvar-core:2.0.0'
+    container 'genvar-core:2.1.0'
 
     input:
-    tuple val(sample_id), path(input_vcf), path(calibration_audit), path(mane_transcripts_file), val(stage3_refs), val(sample_meta)
+    tuple val(sample_id), path(input_vcf), path(calibration_audit), path(mane_transcripts_file), path(vcf_schema), val(stage3_refs), val(sample_meta)
 
     output:
-    tuple val(sample_id), path('snv_indel.mane_selected.vcf'), path('stage3.mane_transcript_selector.audit.json'), val(stage3_refs), val(sample_meta), path(calibration_audit), emit: selected_vcf
+    tuple val(sample_id), path('snv_indel.mane_selected.vcf'), path('stage3.mane_transcript_selector.audit.json'), path(vcf_schema), val(stage3_refs), val(sample_meta), path(calibration_audit), emit: selected_vcf
 
     script:
     """
@@ -47,10 +47,11 @@ def parse_mane_records(path: Path):
             label = cols[4]
 
         upper = (label + ' ' + transcript).upper()
-        if 'MANE PLUS CLINICAL' in upper:
+        normalized_label = upper.replace('_', ' ').replace('-', ' ')
+        if 'MANE PLUS CLINICAL' in normalized_label:
             priority = 2
             priority_name = 'MANE_PLUS_CLINICAL'
-        elif 'MANE SELECT' in upper:
+        elif 'MANE SELECT' in normalized_label:
             priority = 1
             priority_name = 'MANE_SELECT'
         else:

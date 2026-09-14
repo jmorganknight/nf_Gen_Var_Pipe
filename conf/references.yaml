@@ -1,118 +1,129 @@
-# Master reference asset map pinned to the governed container mount path.
-# The host-side root is supplied by `params.ref_data_root` and mounted to
-# `/opt/reference` at runtime. Compatibility aliases are retained under
-# `references` for existing stage configs that parse `references.yaml` as
-# `references.*`.
+# Master reference asset map using root-relative entries.
+# Resolution precedence is: absolute literal path, then `ref_data_root`, then
+# `/opt/reference` fallback inside containerized runs.
+# Compatibility aliases are retained under `references` for stage configs that
+# parse `references.yaml` as `references.*`.
 
-ref_data_root: "/opt/reference"
+ref_data_root: "/media/jmk/Extreme Pro/pipeline_references"
 
 # Core Genome Assembly & Index
-fasta: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
-fai: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
-dict: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
-bwa_index: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+fasta: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+fai: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
+dict: "reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
+bwa_index: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+reference_genome: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+reference_fai: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
+reference_dict: "reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
+bwa_index_base: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
 
 # Target BED Masks & Clinical Panels
-target_bed_acmg: "/opt/reference/beds/ACMG_SF_v3.2_hs38DH.bed"
-target_bed_mane: "/opt/reference/beds/mane_select_v1.3.bed"
-target_bed_onco: "/opt/reference/beds/OncoPanel_v4.2_Master_hs38DH.bed"
-somatic_hotspots: "/opt/reference/beds/somatic_hotspots_v2.1.bed_hs38DH"
+target_bed_acmg: "beds/ACMG_SF_v3.2_hs38DH.bed"
+target_bed_mane: "beds/mane_select_v1.3.bed"
+target_bed_onco: "beds/OncoPanel_v4.2_Master_hs38DH.bed"
+somatic_hotspots: "beds/somatic_hotspots_v2.1.bed_hs38DH"
 
 # Clinical Databases & Frequency Repositories
-clinvar_vcf: "/opt/reference/clinvar/clinvar_20260601.vcf.gz"
-clinvar_3star_vcf: "/opt/reference/clinvar/clinvar_3star_pathogenic_20260601.vcf.gz"
-gnomad_vcf: "/opt/reference/clinvar/gnomad.v4.0.genomes.vcf.gz"
-dbsnp_vcf: "/opt/reference/clinvar/dbsnp_156_hs38DH.vcf.gz"
-hgmd_pro_mock_vcf: "/opt/reference/clinvar/hgmd_pro_mock.vcf.gz"
+clinvar_vcf: "clinvar/clinvar_20260601.vcf.gz"
+clinvar_3star_vcf: "clinvar/clinvar_3star_pathogenic_20260601.vcf.gz"
+gnomad_vcf: "clinvar/gnomad.v4.0.genomes.vcf.gz"
+dbsnp_vcf: "clinvar/dbsnp_156_hs38DH.vcf.gz"
+hgmd_pro_mock_vcf: "clinvar/hgmd_pro_mock.vcf.gz"
 
 # Pathogenicity & Splicing Models
-cadd_tsv: "/opt/reference/models/CADD_GRCh38_v1.7.tsv.gz"
-revel_tsv: "/opt/reference/models/revel_GRCh38_v1.7.tsv.gz"
-pangolin_weights: "/opt/reference/models/Pangolin_Weights_v1.0"
-pgs_weights: "/opt/reference/models/pgs_weights_v1.tsv"
+cadd_tsv: "models/CADD_GRCh38_v1.7.tsv.gz"
+revel_tsv: "models/revel_GRCh38_v1.7.tsv.gz"
+pangolin_weights: "models/Pangolin_Weights_v1.0"
+pgs_weights: "models/pgs_weights_v1.tsv"
 
 # Ancestry & Phasing Models
-poppca_model_dir: "/opt/reference/PopPCA_models/models"
-pgen_1000g_prefix: "/opt/reference/1000G/all_hg38"
+poppca_model_dir: "PopPCA_models/models"
+pop_pca_model_dir: "PopPCA_models/models"
+pgen_1000g_prefix: "1000G/all_hg38"
 
 # Pharmacogenomic & Clinical Annotation Assets
-cpic_allele_table: "/opt/reference/pgx/cpic"
-pharmvar_star_alleles: "/opt/reference/pgx/pharmvar"
-acmg_schema: "/opt/reference/clinical/acmg"
-mane_transcripts: "/opt/reference/beds/mane_select_v1.3.bed"
-cyp2d6_mask_bed: "/opt/reference/beds/paralog_homology_masks.bed"
-paralog_safe_regions: "/opt/reference/beds/paralog_homology_masks.bed"
-pgx_gene_panel: "/opt/reference/pgx/panel/pgx_gene_panel.yaml"
-gene_rule_set: "/opt/reference/pgx/rules/gene_rule_set.yaml"
+cpic_allele_table: "pgx/cpic"
+pgx_cpic_dir: "pgx/cpic"
+pgx_pharmvar_dir: "pgx/pharmvar/definitions"
+pharmvar_star_alleles: "pgx/pharmvar"
+acmg_schema: "clinical/acmg"
+mane_transcripts: "beds/mane_select_v1.3.bed"
+cyp2d6_mask_bed: "beds/paralog_homology_masks.bed"
+paralog_safe_regions: "beds/paralog_homology_masks.bed"
+pgx_gene_panel: "pgx/panel/pgx_gene_panel.yaml"
+gene_rule_set: "pgx/rules/gene_rule_set.yaml"
 
 pgx:
-  cpic_allele_table: "/opt/reference/pgx/cpic"
-  pharmvar_star_alleles: "/opt/reference/pgx/pharmvar"
-  cyp2d6_mask_bed: "/opt/reference/beds/paralog_homology_masks.bed"
-  paralog_safe_regions: "/opt/reference/beds/paralog_homology_masks.bed"
-  pgx_gene_panel: "/opt/reference/pgx/panel/pgx_gene_panel.yaml"
-  gene_rule_set: "/opt/reference/pgx/rules/gene_rule_set.yaml"
+  cpic_allele_table: "pgx/cpic"
+  pharmvar_star_alleles: "pgx/pharmvar"
+  cyp2d6_mask_bed: "beds/paralog_homology_masks.bed"
+  paralog_safe_regions: "beds/paralog_homology_masks.bed"
+  pgx_gene_panel: "pgx/panel/pgx_gene_panel.yaml"
+  gene_rule_set: "pgx/rules/gene_rule_set.yaml"
 
 clinical:
-  acmg_schema: "/opt/reference/clinical/acmg"
-  mane_transcripts: "/opt/reference/beds/mane_select_v1.3.bed"
+  acmg_schema: "clinical/acmg"
+  mane_transcripts: "beds/mane_select_v1.3.bed"
 
 # Stage 3 Caller-Specific WGS Asset Map Targets
-pseudogene_mask: "/opt/reference/beds/paralog_homology_masks.bed"
-expansionhunter_catalog: "/opt/reference/beds/variant_catalog_grch38.json"
-cnvkit_wgs_flat_ref: "/opt/reference/models/flat_reference_grch38.cnn"
+pseudogene_mask: "beds/paralog_homology_masks.bed"
+expansionhunter_catalog: "beds/variant_catalog_grch38.json"
+cnvkit_wgs_flat_ref: "models/flat_reference_grch38.cnn"
 
 references:
-  reference_checksum_manifest: "../assets/reference_checksums.sha256"
-  reference_genome: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
-  grch38_fasta: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
-  reference_fai: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
-  grch38_fai: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
-  reference_dict: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
-  grch38_dict: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
-  bwa_index_base: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
-  bwa_index: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
-  bwa_index_amb: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.amb"
-  bwa_index_ann: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.ann"
-  bwa_index_pac: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.pac"
-  bwa_index_bwt_2bit_64: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.bwt.2bit.64"
-  bwa_index_0123: "/opt/reference/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.0123"
+  reference_checksum_manifest: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/assets/reference_checksums.sha256"
+  reference_genome: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+  grch38_fasta: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+  reference_fai: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
+  grch38_fai: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
+  reference_dict: "reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
+  grch38_dict: "reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
+  bwa_index_base: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+  bwa_index: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+  bwa_index_amb: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.amb"
+  bwa_index_ann: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.ann"
+  bwa_index_pac: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.pac"
+  bwa_index_bwt_2bit_64: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.bwt.2bit.64"
+  bwa_index_0123: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.0123"
 
-  onco_target_bed: "/opt/reference/beds/OncoPanel_v4.2_Master_hs38DH.bed"
-  capture_wes_bed: "/opt/reference/beds/OncoPanel_v4.2_Master_hs38DH.bed"
-  sf_bed: "/opt/reference/beds/ACMG_SF_v3.2_hs38DH.bed"
-  mane_db: "/opt/reference/beds/mane_select_v1.3.bed"
-  hotspot_registry: "/opt/reference/beds/somatic_hotspots_v2.1.bed_hs38DH"
+  onco_target_bed: "beds/OncoPanel_v4.2_Master_hs38DH.bed"
+  capture_wes_bed: "beds/OncoPanel_v4.2_Master_hs38DH.bed"
+  sf_bed: "beds/ACMG_SF_v3.2_hs38DH.bed"
+  mane_db: "beds/mane_select_v1.3.bed"
+  hotspot_registry: "beds/somatic_hotspots_v2.1.bed_hs38DH"
 
-  clinvar_db: "/opt/reference/clinvar/clinvar_20260601.vcf.gz"
-  clinvar_3star_db: "/opt/reference/clinvar/clinvar_3star_pathogenic_20260601.vcf.gz"
-  gnomad_db: "/opt/reference/clinvar/gnomad.v4.0.genomes.vcf.gz"
-  gnomad_vcf: "/opt/reference/clinvar/gnomad.v4.0.genomes.vcf.gz"
-  dbsnp_resource: "/opt/reference/clinvar/dbsnp_156_hs38DH.vcf.gz"
-  hgmd_db: "/opt/reference/clinvar/hgmd_pro_mock.vcf.gz"
-  hgmd_pro_db: "/opt/reference/clinvar/hgmd_pro_mock.vcf.gz"
+  clinvar_db: "clinvar/clinvar_20260601.vcf.gz"
+  clinvar_3star_db: "clinvar/clinvar_3star_pathogenic_20260601.vcf.gz"
+  gnomad_db: "clinvar/gnomad.v4.0.genomes.vcf.gz"
+  gnomad_vcf: "clinvar/gnomad.v4.0.genomes.vcf.gz"
+  dbsnp_resource: "clinvar/dbsnp_156_hs38DH.vcf.gz"
+  hgmd_db: "clinvar/hgmd_pro_mock.vcf.gz"
+  hgmd_pro_db: "clinvar/hgmd_pro_mock.vcf.gz"
 
-  prs_weights: "/opt/reference/models/pgs_weights_v1.tsv"
+  prs_weights: "models/pgs_weights_v1.tsv"
   models:
-    cadd_scores: "/opt/reference/models/CADD_GRCh38_v1.7.tsv.gz"
-    revel_scores: "/opt/reference/models/revel_GRCh38_v1.7.tsv.gz"
-    pangolin_weights: "/opt/reference/models/Pangolin_Weights_v1.0"
-    poppca_models: "/opt/reference/PopPCA_models/models"
+    cadd_scores: "models/CADD_GRCh38_v1.7.tsv.gz"
+    revel_scores: "models/revel_GRCh38_v1.7.tsv.gz"
+    pangolin_weights: "models/Pangolin_Weights_v1.0"
+    poppca_models: "PopPCA_models/models"
+
+  pgx_cpic_dir: "pgx/cpic"
+  pgx_pharmvar_dir: "pgx/pharmvar/definitions"
+  pop_pca_model_dir: "PopPCA_models/models"
 
   pgx:
-    cpic_allele_table: "/opt/reference/pgx/cpic"
-    pharmvar_star_alleles: "/opt/reference/pgx/pharmvar"
-    cyp2d6_mask_bed: "/opt/reference/beds/paralog_homology_masks.bed"
-    paralog_safe_regions: "/opt/reference/beds/paralog_homology_masks.bed"
-    pgx_gene_panel: "/opt/reference/pgx/panel/pgx_gene_panel.yaml"
-    gene_rule_set: "/opt/reference/pgx/rules/gene_rule_set.yaml"
+    cpic_allele_table: "pgx/cpic"
+    pharmvar_star_alleles: "pgx/pharmvar"
+    cyp2d6_mask_bed: "beds/paralog_homology_masks.bed"
+    paralog_safe_regions: "beds/paralog_homology_masks.bed"
+    pgx_gene_panel: "pgx/panel/pgx_gene_panel.yaml"
+    gene_rule_set: "pgx/rules/gene_rule_set.yaml"
 
   clinical:
-    acmg_schema: "/opt/reference/clinical/acmg"
-    mane_transcripts: "/opt/reference/beds/mane_select_v1.3.bed"
+    acmg_schema: "clinical/acmg"
+    mane_transcripts: "beds/mane_select_v1.3.bed"
 
   stage3:
-    stage3_vcf_schema: "../Stage_3_Variant_Discovery_Engine/tests/schemas/v4.2_Production_Schema.json"
-    expansionhunter_variant_catalog: "/opt/reference/beds/variant_catalog_grch38.json"
-    cnvkit_pooled_reference: "/opt/reference/models/flat_reference_grch38.cnn"
-    cyp2d6_paralog_mask_bed: "/opt/reference/beds/paralog_homology_masks.bed"
+    stage3_vcf_schema: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/schemas/v4.2_Production_Schema.json"
+    expansionhunter_variant_catalog: "beds/variant_catalog_grch38.json"
+    cnvkit_pooled_reference: "models/flat_reference_grch38.cnn"
+    cyp2d6_paralog_mask_bed: "beds/paralog_homology_masks.bed"

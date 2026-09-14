@@ -1,0 +1,10 @@
+{
+  "sample_id": "hg002_mini",
+  "estimated_in_silico_purity": 1.0,
+  "contamination_rate": 0.0,
+  "computed_sex": "XY",
+  "sample_type": "germline",
+  "somatic_mode": false,
+  "dynamic_min_vaf": 0.05,
+  "dynamic_ab_floor": 0.2
+}

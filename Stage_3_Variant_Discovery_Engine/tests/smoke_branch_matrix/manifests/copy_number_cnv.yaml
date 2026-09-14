@@ -1,0 +1,91 @@
+{
+  "samples": [
+    {
+      "sample_id": "hg002_mini",
+      "patient_id": "hg002_mini",
+      "case_id": "hg002_mini",
+      "run_mode": "audit_only",
+      "sample_type": "germline",
+      "sequencing_type": "WES",
+      "reported_sex": "XY",
+      "consent": {
+        "prs_opt_in": true,
+        "sf_opt_in": true,
+        "research_opt_in": false,
+        "data_sharing_opt_in": false,
+        "recontact_opt_in": false,
+        "consent_version": "UNSPECIFIED",
+        "consent_signed_utc": null,
+        "consent_source": "DECLARED_IN_SAMPLESHEET"
+      },
+      "consent_tokens": {
+        "prs_reporting": "CONSENTED|PRS_ENABLED",
+        "secondary_findings": "CONSENTED|SF_ENABLED",
+        "research_use": "WITHHELD|RESEARCH_DISABLED",
+        "data_sharing": "WITHHELD|DATA_SHARING_DISABLED",
+        "recontact": "WITHHELD|RECONTACT_PROHIBITED"
+      },
+      "variant_branches": {
+        "snv_indel": false,
+        "structural_variants": false,
+        "copy_number_cnv": true,
+        "str_expansions": false,
+        "trisomy_aneuploidy": false,
+        "homologous_pseudogenes": false
+      },
+      "biological_context": {},
+      "diagnosis": {},
+      "specimen": {},
+      "clinical_context": {},
+      "sequencer": {
+        "platform": "illumina",
+        "model": "unknown",
+        "flowcell_geometry": "unknown"
+      },
+      "pathologist_tumor_burden": 0.0,
+      "physician_tumor_purity": 0.0,
+      "intake_validation_token": "Stage_0_Preflight_Ingest_Gate/tests/mini_control/intake_token/hg002_mini.intake_validation_token",
+      "validation_token": "VALID_PASS|SAMPLE_VALIDATED",
+      "intake_validation_report": "Stage_0_Preflight_Ingest_Gate/tests/mini_control/hg002_mini/audit_and_qc/hg002_mini.intake_validation_report.json",
+      "intake_route_decision": "Stage_0_Preflight_Ingest_Gate/tests/mini_control/hg002_mini/audit_and_qc/hg002_mini.intake_route_decision.json",
+      "stage0_audit_bundle": "Stage_0_Preflight_Ingest_Gate/tests/mini_control/audit_bundle/hg002_mini.stage0.audit_bundle.tar.gz",
+      "identity_audit": "Stage_1_Alignment_Read_Processing/tests/mini_control/hg002_mini/audit_and_qc/identity/hg002_mini.identity_audit.json",
+      "sorted_bam": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_1_Alignment_Read_Processing/tests/mini_control/hg002_mini/audit_and_qc/identity/hg002_mini.identity_verified.bam",
+      "sorted_bai": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_1_Alignment_Read_Processing/tests/mini_control/hg002_mini/audit_and_qc/identity/hg002_mini.identity_verified.bam.bai",
+      "snv_mask_bed": "/media/jmk/Extreme Pro/pipeline_references/beds/OncoPanel_v4.2_Master_hs38DH.bed",
+      "cnv_target_bed": "/media/jmk/Extreme Pro/pipeline_references/beds/OncoPanel_v4.2_Master_hs38DH.bed",
+      "sv_calling_enabled": true,
+      "stage2_router_token": "WES|TARGET_VALIDATED",
+      "stage2_precondition_audit": "/scratch/nextflow_work/81/2019243d58b9f1947697dbbcadc6fc/hg002_mini.stage2_precondition_audit.json",
+      "contamination_audit": "/scratch/nextflow_work/22/f4848295200f4d29e4299f36b2fe63/hg002_mini.contamination_audit.json",
+      "purity_and_sex_validation_audit": "/scratch/nextflow_work/15/93764d8cd71fafe711df17e054f19f/hg002_mini.purity_and_sex_validation_audit.json",
+      "assay_target_router_audit": "/scratch/nextflow_work/49/7e3bf1f6c263ab9026bce4740763e2/hg002_mini.assay_target_router_audit.json",
+      "stage2_contamination_status": "FAIL",
+      "stage2_contamination_policy_action": "CONTINUE_FOR_AUDIT",
+      "estimated_in_silico_purity": null,
+      "contamination_rate": null,
+      "computed_sex": "XY",
+      "sex_concordance_pass": true,
+      "purity_concordance_pass": true,
+      "sample_qc_meta": {
+        "estimated_in_silico_purity": null,
+        "contamination_rate": null,
+        "computed_sex": "XY",
+        "sex_concordance_pass": true,
+        "purity_concordance_pass": true
+      },
+      "reference_build": {
+        "reference_genome": "/media/jmk/Extreme Pro/pipeline_references/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa",
+        "reference_fai": "/media/jmk/Extreme Pro/pipeline_references/reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai",
+        "reference_dict": "/media/jmk/Extreme Pro/pipeline_references/reference/GRCh38_full_analysis_set_plus_decoy_hla.dict",
+        "capture_wes_bed": "/media/jmk/Extreme Pro/pipeline_references/beds/OncoPanel_v4.2_Master_hs38DH.bed",
+        "onco_target_bed": "/media/jmk/Extreme Pro/pipeline_references/beds/OncoPanel_v4.2_Master_hs38DH.bed",
+        "sf_bed": "/media/jmk/Extreme Pro/pipeline_references/beds/ACMG_SF_v3.2_hs38DH.bed",
+        "clinvar_db": "/media/jmk/Extreme Pro/pipeline_references/clinvar/clinvar_20260601.vcf.gz"
+      },
+      "save_dir": "Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control",
+      "stage2_timestamp_utc": "2026-09-14T02:30:02.867068+00:00",
+      "stage2_governance_note": "CONTAMINATION_FAILURE_CONTINUED_FOR_AUDIT_ONLY"
+    }
+  ]
+}

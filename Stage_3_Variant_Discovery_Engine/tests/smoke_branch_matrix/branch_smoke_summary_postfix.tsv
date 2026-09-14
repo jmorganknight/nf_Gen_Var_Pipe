@@ -1,0 +1,3 @@
+branch	exit_code	proc_seen	manifest_found	audit_found	log
+snv_indel	0	yes	no	no	tests/smoke_branch_matrix/runs_postfix/snv_indel/run.log
+structural_variants	1	yes	no	no	tests/smoke_branch_matrix/runs_postfix/structural_variants/run.log

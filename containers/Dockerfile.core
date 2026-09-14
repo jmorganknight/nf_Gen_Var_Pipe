@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest \
     | tar -xvj -C /usr/local/bin --strip-components=1 bin/micromamba && \
     micromamba create -y -p /opt/conda -c conda-forge -c bioconda \
-      python=3.11 \
+            python=3.10 \
       bcftools \
       samtools \
       htslib \
@@ -43,13 +43,15 @@ RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest \
       minimap2 \
       fastp \
       verifybamid2 \
-      cnvkit=0.9.10 \
+    cnvkit=0.9.10 \
+            mosdepth \
       whatshap \
       shapeit5 \
       ensembl-vep \
       pypgx \
-      strelka \
       gatk4 && \
+        micromamba create -y -p /opt/conda-py2 -c conda-forge python=2.7 && \
+        ln -sf /opt/conda-py2/bin/python /usr/local/bin/python2 && \
     micromamba clean -a -y
 
 # 3. Python support packages plus auxiliary clinical wrappers.
@@ -60,21 +62,33 @@ RUN /opt/conda/bin/pip install --no-cache-dir --upgrade pip && \
       scipy \
       biopython \
       PyYAML \
-      cryptography && \
+    cryptography && \
     printf '#!/usr/bin/env bash\nexec /opt/conda/bin/gatk Mutect2 "$@"\n' > /usr/local/bin/Mutect2 && \
     printf '#!/usr/bin/env bash\nif command -v VerifyBamID >/dev/null 2>&1; then exec VerifyBamID "$@"; fi\nexec /opt/conda/bin/VerifyBamID "$@"\n' > /usr/local/bin/VerifyBamID2 && \
     printf '#!/usr/bin/env bash\nif command -v configureStrelkaGermlineWorkflow.py >/dev/null 2>&1; then exec configureStrelkaGermlineWorkflow.py "$@"; fi\nif command -v strelka >/dev/null 2>&1; then exec strelka "$@"; fi\necho "Strelka2 wrapper could not locate an installed Strelka entrypoint" >&2\nexit 127\n' > /usr/local/bin/Strelka2 && \
+    printf '#!/usr/bin/env bash\nif command -v phase_common >/dev/null 2>&1; then exec phase_common "$@"; fi\necho "shapeit5 wrapper could not locate phase_common executable" >&2\nexit 127\n' > /usr/local/bin/shapeit5 && \
     printf '#!/usr/bin/env bash\nif [[ "${ELPREP_PLACEHOLDER:-1}" == "1" ]]; then\n  echo "CONTAINER_BINARY_VALIDATION_FAILURE: elprep placeholder wrapper detected; install licensed elprep binary before production alignment" >&2\n  exit 127\nfi\necho "CONTAINER_BINARY_VALIDATION_FAILURE: elprep invocation failed and no validated binary was available" >&2\nexit 127\n' > /usr/local/bin/elprep && \
     printf '#!/usr/bin/env bash\nif [[ "${PHARMCAT_PLACEHOLDER:-1}" == "1" ]]; then\n  echo "CONTAINER_BINARY_VALIDATION_FAILURE: pharmcat placeholder wrapper detected; install PharmCAT CLI/JAR before production PGx reporting" >&2\n  exit 127\nfi\necho "CONTAINER_BINARY_VALIDATION_FAILURE: pharmcat invocation failed and no validated binary was available" >&2\nexit 127\n' > /usr/local/bin/pharmcat && \
-    chmod +x /usr/local/bin/Mutect2 /usr/local/bin/VerifyBamID2 /usr/local/bin/Strelka2 /usr/local/bin/elprep /usr/local/bin/pharmcat
+    chmod +x /usr/local/bin/Mutect2 /usr/local/bin/VerifyBamID2 /usr/local/bin/Strelka2 /usr/local/bin/shapeit5 /usr/local/bin/elprep /usr/local/bin/pharmcat
 
-# 4. ExpansionHunter v5.0.0 binary for STR expansion branch
+# 4. Manta and Strelka binaries from official Illumina release tarballs.
+RUN wget -q https://github.com/Illumina/manta/releases/download/v1.6.0/manta-1.6.0.centos6_x86_64.tar.bz2 && \
+    tar -xjf manta-1.6.0.centos6_x86_64.tar.bz2 && \
+    ln -sf /manta-1.6.0.centos6_x86_64/bin/configManta.py /usr/local/bin/configManta.py && \
+    rm -f manta-1.6.0.centos6_x86_64.tar.bz2 && \
+    wget -q https://github.com/Illumina/strelka/releases/download/v2.9.10/strelka-2.9.10.centos6_x86_64.tar.bz2 && \
+    tar -xjf strelka-2.9.10.centos6_x86_64.tar.bz2 && \
+    ln -sf /strelka-2.9.10.centos6_x86_64/bin/configureStrelkaGermlineWorkflow.py /usr/local/bin/configureStrelkaGermlineWorkflow.py && \
+    ln -sf /strelka-2.9.10.centos6_x86_64/bin/configureStrelkaSomaticWorkflow.py /usr/local/bin/configureStrelkaSomaticWorkflow.py && \
+    rm -f strelka-2.9.10.centos6_x86_64.tar.bz2
+
+# 5. ExpansionHunter v5.0.0 binary for STR expansion branch
 RUN wget https://github.com/Illumina/ExpansionHunter/releases/download/v5.0.0/ExpansionHunter-v5.0.0-linux_x86_64.tar.gz \
     && tar -zxvf ExpansionHunter-v5.0.0-linux_x86_64.tar.gz \
     && mv ExpansionHunter-v5.0.0-linux_x86_64/bin/ExpansionHunter /usr/local/bin/ \
     && rm -rf ExpansionHunter-v5.0.0-*
 
-# 5. Capability verification and audit coverage for workflow-called binaries.
+# 6. Capability verification and audit coverage for workflow-called binaries.
 RUN command -v bwa-mem2 && \
     command -v minimap2 && \
     command -v samtools && \
@@ -84,6 +98,8 @@ RUN command -v bwa-mem2 && \
     command -v VerifyBamID2 && \
     command -v Mutect2 && \
     command -v Strelka2 && \
+    command -v configManta.py && \
+    command -v mosdepth && \
     command -v whatshap && \
     command -v shapeit5 && \
     command -v vep && \
@@ -101,7 +117,7 @@ audit = {
     'implemented_binaries': [
         'bwa-mem2', 'minimap2', 'samtools', 'bcftools', 'fastp',
         'VerifyBamID2', 'Mutect2', 'Strelka2', 'whatshap', 'shapeit5',
-        'vep', 'pypgx', 'ExpansionHunter'
+        'vep', 'pypgx', 'ExpansionHunter', 'configManta.py', 'mosdepth'
     ],
     'placeholder_binaries': {
         'elprep': 'requires separately supplied licensed/runtime binary',

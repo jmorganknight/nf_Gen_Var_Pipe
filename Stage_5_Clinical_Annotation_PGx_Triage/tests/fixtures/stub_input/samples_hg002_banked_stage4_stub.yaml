@@ -1,7 +1,0 @@
-samples:
-  - sample_id: "HG002_STUB"
-    validation_token: "VALID_PASS|VARIANTS_HARMONIZED"
-    phased_vcf: "../stub_assets/stub.vcf"
-    phased_vcf_tbi: "../stub_assets/stub.vcf.tbi"
-    ancestry_metrics_json: "../stub_assets/stub.ancestry_metrics.json"
-    phasing_audit_json: "../stub_assets/stub.phasing_audit.json"

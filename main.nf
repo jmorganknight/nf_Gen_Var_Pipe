@@ -371,11 +371,14 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         tuple(meta, file(fq1, checkIfExists: true), file(fq2, checkIfExists: true))
     }
 
+    def chSamplesManifestSource = channel.value(inputManifest.canonicalPath)
+
     STAGE0_PREFLIGHT_INGEST(
         chRawReads,
         channel.value(thresholdsFile),
         channel.value(referencesFile),
         channel.value(inputManifest),
+        chSamplesManifestSource,
         channel.value(infrastructureFile),
         channel.value(file(signerKeyResolved, checkIfExists: true)),
         channel.value(file(signerPubResolved, checkIfExists: true))
@@ -453,6 +456,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
             sorted_bai: bai.toString(),
             mapped_bam: bam.toString(),
             mapped_bai: bai.toString(),
+            run_mode: (meta.run_mode ?: 'production').toString(),
             intake_validation_token_value: tokenValue,
             validation_token: 'VALID_PASS|SAMPLE_VALIDATED',
             save_dir: params.outdir.toString()
@@ -519,6 +523,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
                 sample_id: sampleId,
                 sample_type: rec.sample_type ?: 'germline',
                 sequencing_type: sequencingType,
+                run_mode: (rec.run_mode ?: 'production').toString(),
                 validation_token: rec.validation_token?.toString() ?: 'VALID_PASS|SAMPLE_VALIDATED',
                 sorted_bam: sortedBamRaw,
                 sorted_bai: sortedBaiRaw ?: (sortedBamRaw ? "${sortedBamRaw}.bai" : null),
@@ -564,6 +569,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
                 sample_id: rec.sample_id,
                 patient_id: rec.patient_id ?: rec.sample_id,
                 case_id: rec.case_id ?: rec.patient_id ?: rec.sample_id,
+                run_mode: (rec.run_mode ?: 'production').toString(),
                 validation_token: stage4Token,
                 consent_tokens: mapOrEmpty(rec.consent_tokens),
                 stage0_consent_tokens: mapOrEmpty(rec.stage0_consent_tokens) ?: mapOrEmpty(rec.consent_tokens),
@@ -640,8 +646,8 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         reference_checksum_manifest: checksumManifest.toString(),
         reference_asset_checksums: checksumMap
     ]
-    def stage6NoFileBundle = file("${projectDir}/assets/NO_FILE.bundle", checkIfExists: true)
-    def stage6NoFileProvenance = file("${projectDir}/assets/NO_FILE.provenance", checkIfExists: true)
+    def stage6NoFileBundle = file('NO_FILE', checkIfExists: false)
+    def stage6NoFileProvenance = file('NO_FILE', checkIfExists: false)
 
     def chStage6Input = STAGE5_CLINICAL_ANNOTATION_PGX_TRIAGE.out.banked_manifest.flatMap { stage5Manifest ->
         def rows = ys.parse(stage5Manifest)?.samples ?: []
@@ -673,6 +679,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
 
             def meta = [
                 sample_id: sid,
+                run_mode: (rec.run_mode ?: 'production').toString(),
                 validation_token: rec.validation_token?.toString() ?: 'VALID_PASS|VARIANTS_HARMONIZED|STAGE5_COMPLETE',
                 stage5_manifest: stage5Manifest.toString(),
                 stage5_root: stage5Root.toString(),

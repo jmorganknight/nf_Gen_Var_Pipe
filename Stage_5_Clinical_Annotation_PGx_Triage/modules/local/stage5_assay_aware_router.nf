@@ -93,6 +93,7 @@ if prs_enabled and prs_cov < float('${params.prs_min_backbone_coverage}'):
 payload = {
     'node': 'STAGE5_ASSAY_AWARE_ROUTER',
     'sample_id': sid,
+    'run_mode': str(meta.get('run_mode', 'production')),
     'sequencing_type': str(meta.get('sequencing_type', 'WES')),
     'snv_mask_bed': snv_mask_bed,
     'sf_bed': sf_bed,
@@ -121,7 +122,7 @@ PYEOF
 
     stub:
     """
-    printf '{"node":"STAGE5_ASSAY_AWARE_ROUTER","sample_id":"%s","sequencing_type":"WES","snv_mask_bed":"stub","sf_bed":"stub","prs_backbone_bed":"stub","sf_consent_token":"WITHHELD|SF_DISABLED","prs_consent_token":"WITHHELD|PRS_DISABLED","sf_enabled":false,"prs_enabled":false,"sf_mask_coverage":1.0,"prs_backbone_coverage":1.0,"prs_gate_pass":false,"warnings":[],"router_audit_code":"PASS","stub":true}' "${meta.sample_id}" > "${meta.sample_id}.stage5_router.json"
+    printf '{"node":"STAGE5_ASSAY_AWARE_ROUTER","sample_id":"%s","run_mode":"production","sequencing_type":"WES","snv_mask_bed":"stub","sf_bed":"stub","prs_backbone_bed":"stub","sf_consent_token":"WITHHELD|SF_DISABLED","prs_consent_token":"WITHHELD|PRS_DISABLED","sf_enabled":false,"prs_enabled":false,"sf_mask_coverage":1.0,"prs_backbone_coverage":1.0,"prs_gate_pass":false,"warnings":[],"router_audit_code":"PASS","stub":true}' "${meta.sample_id}" > "${meta.sample_id}.stage5_router.json"
     printf '{"sample_id":"%s","component":"router","router":{"stub":true}}' "${meta.sample_id}" > "${meta.sample_id}.stage5_router.fragment.json"
     """
 }
