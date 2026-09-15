@@ -55,7 +55,7 @@ Stage 0 is configured to fail closed before any downstream analytical stage:
 
 - Corrupt/truncated read archives can be rejected immediately when `ingest_manifest.strict_pair_count_check=true`, producing `FASTQ_CORRUPT_GZIP` and routing to `INGEST_FAIL_REJECT`.
 - R1/R2 read-count asymmetry under strict pair-count checking produces `READ_PAIR_COUNT_MISMATCH` and immediate rejection routing.
-- Reference integrity drift (path mismatch, missing files, checksum expectation mismatch) fails in `REF_MANIFEST_SNAPSHOT_LOCK` before sample progression.
+- Reference integrity drift (path mismatch, missing files, checksum expectation mismatch) fails in `PREFLIGHT_INGESTION_GUARD` before sample progression.
 - Operational objective: chaos/FMEA paths should terminate or reject in under 10 seconds and emit auditable artifacts (`ingest_rejection_audit.json` or lockout error trace).
 
 ## Banked Deliverables Contract

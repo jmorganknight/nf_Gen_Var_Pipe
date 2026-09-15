@@ -50,7 +50,12 @@ Stage 5 now enforces immutable, fail-closed branch routing from the sample manif
 
 ```mermaid
 flowchart LR
-	S0["Stage 0 Intake Gate"] --> S1["Stage 1 Alignment"]
+	Y1["samples.yaml"] --> P0["Stage 0 PREFLIGHT_INGESTION_GUARD\nUnified intake audit and contract lock"]
+	Y2["references.yaml"] --> P0
+	Y3["thresholds.yaml"] --> P0
+	Y4["infrastructure.yaml"] --> P0
+	P0 --> S0["Stage 0 Intake Gate\nAUTOMATED_INGEST_GATE + route audit"]
+	S0 --> S1["Stage 1 Alignment"]
 	S1 --> S2["Stage 2 Identity and QC Gate"]
 	S2 --> S3["Stage 3 Variant Discovery"]
 	S3 --> S4["Stage 4 Phasing and PopPCA"]
