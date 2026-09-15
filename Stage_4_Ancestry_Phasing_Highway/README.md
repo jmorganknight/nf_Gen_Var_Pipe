@@ -12,6 +12,12 @@ Execution order is enforced as:
 2. read-backed phasing over the ancestry-projected payload
 3. immutable Stage 4 contract banking for Stage 5
 
+## September 2026 Update
+
+- Stage 4 handoff documentation now explicitly includes Stage 5 branch control-plane continuity.
+- `requested_branches` is a required Stage 5 control-plane directive and must be present on Stage 5 intake manifests.
+- Missing or malformed branch-control directives are now fail-closed at Stage 5 intake (`STAGE5_CONTROL_PLANE_FAILURE`), so Stage 4 contract integrity is critical.
+
 ## Architecture Flow
 
 ```mermaid
@@ -26,6 +32,7 @@ flowchart TD
     D --> G
     G --> H["ASSEMBLE_STAGE4_BANKED_MANIFEST"]
     H --> I["tests/mini_control/samples_hg002_banked_stage4.yaml"]
+    I --> J["Stage 5 intake (requires requested_branches)\nrequested-vs-skipped branch router"]
 ```
 
 ## Population Projection and Phasing Stack
@@ -66,6 +73,7 @@ Required fields:
 - `sorted_bai`
 - `reference_build`
 - `consent_tokens` / `stage0_consent_tokens`
+- `requested_branches` (Stage 5 branch control-plane list; consumed fail-closed by Stage 5 intake)
 
 ## Outputs
 

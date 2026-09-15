@@ -36,15 +36,30 @@ The production clinical execution path is:
 
 Stage 0 remains the intake/preflight control gate that validates incoming manifests and route decisions before Stage 1.
 
+## September 2026 Compliance Update
+
+Stage 5 now enforces immutable, fail-closed branch routing from the sample manifest control plane.
+
+- `requested_branches` is mandatory per sample and must be a non-duplicate list of recognized branch identifiers.
+- Missing/malformed/unknown branch directives fail hard with non-zero exit (`STAGE5_CONTROL_PLANE_FAILURE`).
+- Unrequested branches do not execute compute; they emit explicit audited skip manifests (`SKIPPED_BY_CLINICAL_DIRECTIVE`).
+- Requested branches are explicitly annotated as `COMPLETED` and included in immutable Stage 5 banked manifest provenance.
+- Stage 6 continues from a complete five-branch Stage 5 manifest set where each branch is explicitly `COMPLETED` or `SKIPPED_BY_CLINICAL_DIRECTIVE`.
+
 ## System Architecture and Scope
 
 ```mermaid
 flowchart LR
-		S1["Stage 1 Alignment"] --> S2["Stage 2 Identity and QC Gate"]
-		S2 --> S3["Stage 3 Variant Discovery"]
-		S3 --> S4["Stage 4 Phasing and PopPCA"]
-		S4 --> S5["Stage 5 Clinical Triage"]
-		S5 --> S6["Stage 6 Telemetry and FHIR"]
+	S0["Stage 0 Intake Gate"] --> S1["Stage 1 Alignment"]
+	S1 --> S2["Stage 2 Identity and QC Gate"]
+	S2 --> S3["Stage 3 Variant Discovery"]
+	S3 --> S4["Stage 4 Phasing and PopPCA"]
+	S4 --> CP["Stage 5 Control Plane\nrequested_branches[]"]
+	CP --> S5A["Requested branches execute"]
+	CP --> S5B["Unrequested branches emit audited skip manifests"]
+	S5A --> S5M["Stage 5 immutable banked manifest\n(COMPLETED or SKIPPED per branch)"]
+	S5B --> S5M
+	S5M --> S6["Stage 6 Telemetry and FHIR"]
 ```
 
 ### Stage 1: Alignment Read Processing

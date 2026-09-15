@@ -6,6 +6,17 @@ Production Stage 5 branch engine that consumes Stage 4 phased/ancestry-ready pay
 
 Stage 5 is the interpretation and packaging layer between Stage 4 phasing and Stage 6 reporting. It enforces Stage 4 token/asset preconditions, fans out into independent branch lanes, then cryptographically signs the assembled clinical bundle.
 
+## September 2026 Control-Plane Hardening
+
+- Stage 5 now enforces fail-closed branch routing from `requested_branches` per sample.
+- Missing `requested_branches`, non-list values, blank branch identifiers, unknown branches, or duplicates fail hard with `STAGE5_CONTROL_PLANE_FAILURE`.
+- Unrequested branches do not execute branch compute; they emit explicit audited skip manifests with:
+  - `status: SKIPPED_BY_CLINICAL_DIRECTIVE`
+  - `skip_reason: branch_not_requested_in_manifest_control_plane`
+  - `audit_class: CAP_CLIA_BRANCH_BYPASS`
+- Requested branches are post-annotated with `status: COMPLETED` and `audit_class: CAP_CLIA_BRANCH_EXECUTED`.
+- Stage 5 multi-branch manifest assembly is fail-closed if any of the five branch manifest slots are missing for a sample.
+
 ## Branch Topology
 
 | Branch | Core module path | Primary artifact |
@@ -82,12 +93,16 @@ Each queued/updated variant carries `upgrade_reason` for audit traceability.
 ```mermaid
 flowchart TD
     A["Stage 4 banked manifest"] --> B["Stage 5 precondition checks"]
-    B --> C["STAGE5_INPUT_NORMALIZER"]
-    C --> D["STAGE5_CLINICAL_TRIAGE (5 parallel branches)"]
-    D --> E["CLINICAL_PROVENANCE_MANIFEST\nRS256 signed clinical bundle"]
-    E --> F["STAGE5_COMPAT_EXPORT\nStage 6 compatibility artifacts"]
-    F --> G["ASSEMBLE_STAGE5_BANKED_MANIFEST"]
-    G --> H["samples_hg002_banked_stage5.yaml"]
+  B --> C["Control-plane validation\nrequested_branches required"]
+  C --> D{"Per-branch router"}
+  D -->|Requested| E["Run branch workflow\nannotate COMPLETED manifest"]
+  D -->|Not requested| F["Emit skip manifest\nSKIPPED_BY_CLINICAL_DIRECTIVE"]
+  E --> G["5-branch completeness check"]
+  F --> G
+  G --> H["STAGE5_BUILD_MULTI_BRANCH_MANIFEST"]
+  H --> I["samples_hg002_banked_stage5.yaml\nexplicit status per branch"]
+  I --> J["CLINICAL_PROVENANCE_MANIFEST\nRS256 signed clinical bundle"]
+  J --> K["Stage 6 compatibility artifacts"]
 ```
 
 ## Reference Resolution

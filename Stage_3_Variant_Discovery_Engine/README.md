@@ -15,6 +15,12 @@ Current production-wired branches:
 
 Stage 3 is the production discovery and harmonization gate that converts Stage 2 QC-qualified samples into schema-validated, Stage 4-ready normalized variant payloads.
 
+## September 2026 Update
+
+- Stage 3 branch execution remains strictly driven by contract-declared `variant_branches`.
+- Stage 3 banking remains immutable and schema-governed, producing a stable Stage 4 handoff contract.
+- Contract portability hardening was applied in Stage 3 zero-loss manifest assembly so BAM/BAI references remain stable across execution roots.
+
 ## Architecture Flow
 
 ```mermaid
@@ -33,7 +39,8 @@ flowchart TD
     G --> J
     H --> J
     I --> J
-    J --> K["Stage 3 banked manifest"]
+    J --> K["Stage 3 banked manifest\n(normalized variants + downstream control-plane passthrough)"]
+    K --> L["Stage 4 phasing and ancestry"]
 ```
 
 ## Branch Toggles
