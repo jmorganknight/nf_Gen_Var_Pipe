@@ -60,11 +60,6 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def portable_name(text) -> str:
-    if not text:
-        return ''
-    return Path(str(text)).name
-
 branch_counts = {str(path.resolve()): count_vcf_rows(path) for path in branch_vcf_paths}
 pre_merge_row_sum = sum(branch_counts.values())
 merged_row_count = count_vcf_rows(merged_vcf)
@@ -124,61 +119,12 @@ contract_fragment['hashes'] = {
     'normalized_vcf_sha256': normalized_vcf_sha256,
     'normalized_vcf_tbi_sha256': normalized_vcf_tbi_sha256,
 }
+contract_fragment['normalized_vcf_sha256'] = normalized_vcf_sha256
+contract_fragment['normalized_vcf_tbi_sha256'] = normalized_vcf_tbi_sha256
 contract_fragment_path.write_text(json.dumps(contract_fragment, indent=2) + NL, encoding='utf-8')
 
-lines = [
-    '# ==============================================================================',
-    '# STAGE 3 BANKED MANIFEST (IMMUTABLE)',
-    '# ==============================================================================',
-    'samples:',
-    f'  - sample_id: {json.dumps(sample_id)}',
-    f'    validation_token: {json.dumps(validation_token)}',
-    f'    run_mode: {json.dumps(contract_fragment.get("run_mode", "production"))}',
-    f'    stage2_contamination_status: {json.dumps(contract_fragment.get("stage2_contamination_status", ""))}',
-    f'    stage2_contamination_policy_action: {json.dumps(contract_fragment.get("stage2_contamination_policy_action", ""))}',
-    f'    sorted_bam: {json.dumps(portable_name(contract_fragment.get("sorted_bam", "")))}',
-    f'    sorted_bai: {json.dumps(portable_name(contract_fragment.get("sorted_bai", "")))}',
-]
-
-variant_branches = contract_fragment.get('variant_branches') or {}
-if variant_branches:
-    lines.append('    variant_branches:')
-    for key in sorted(variant_branches.keys()):
-        value = 'true' if bool(variant_branches.get(key)) else 'false'
-        lines.append(f'      {key}: {value}')
-else:
-    lines.append('    variant_branches: {}')
-
-active_branches = contract_fragment.get('active_branches') or sorted(branch_names)
-if active_branches:
-    lines.append('    active_branches:')
-    for branch in active_branches:
-        lines.append(f'      - {json.dumps(branch)}')
-else:
-    lines.append('    active_branches: []')
-
-lines.extend([
-    f'    normalized_vcf: {json.dumps(portable_name(contract_fragment.get("normalized_vcf", normalized_vcf_gz)))}',
-    f'    normalized_vcf_tbi: {json.dumps(portable_name(contract_fragment.get("normalized_vcf_tbi", normalized_vcf_tbi)))}',
-    f'    harmonization_audit: {json.dumps(portable_name(contract_fragment.get("harmonization_audit", harmonization_audit_path)))}',
-    f'    zero_loss_audit: {json.dumps(portable_name(Path(f"{sample_id}.stage3.zero_loss_audit.json")))}',
-    f'    pre_merge_row_sum: {pre_merge_row_sum}',
-    f'    merged_row_count: {merged_row_count}',
-    f'    normalized_row_count: {normalized_row_count}',
-    '    dropped_rows: 0',
-    f'    normalized_vcf_sha256: {json.dumps(normalized_vcf_sha256)}',
-    f'    normalized_vcf_tbi_sha256: {json.dumps(normalized_vcf_tbi_sha256)}',
-])
-
-reference_build = contract_fragment.get('reference_build') or {}
-if reference_build:
-    lines.append('    reference_build:')
-    for key in sorted(reference_build.keys()):
-        lines.append(f'      {key}: {json.dumps(reference_build.get(key, ""))}')
-
-lines.append(f'    stage4_handoff_note: {json.dumps(contract_fragment.get("stage4_handoff_note", "Normalized, atomized, schema-validated VCF ready for annotation."))}')
-
-Path(f'samples_{sample_id}_banked_stage3.yaml').write_text(NL.join(lines) + NL, encoding='utf-8')
+stage3_manifest = {'samples': [contract_fragment]}
+Path(f'samples_{sample_id}_banked_stage3.yaml').write_text(json.dumps(stage3_manifest, indent=2) + NL, encoding='utf-8')
 PYEOF
     """
 }

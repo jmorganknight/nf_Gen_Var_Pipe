@@ -89,10 +89,10 @@ workflow STAGE5_ISOLATED_BRANCH_ARCHITECTURE {
     ch_stage5_inputs
 
     main:
-    def ch_branch_routes = ch_stage5_inputs.flatMap { sid, phasedVcf, phasedTbi, ancestryJson, phasingAuditJson, refs, requestedBranches ->
+    def ch_branch_routes = ch_stage5_inputs.flatMap { sid, phasedVcf, phasedTbi, ancestryJson, phasingAuditJson, refs, requestedBranches, samplePayload, runMode ->
         def requested = requestedBranches as List
         ['germline', 'pgx', 'sf', 'prs', 'somatic'].collect { branchName ->
-            tuple(sid, branchName, branchRequested(requested, branchName), phasedVcf, phasedTbi, ancestryJson, phasingAuditJson, refs, requested)
+            tuple(sid, branchName, branchRequested(requested, branchName), phasedVcf, phasedTbi, ancestryJson, phasingAuditJson, refs, requested, samplePayload, runMode)
         }
     }
 
@@ -138,6 +138,18 @@ workflow STAGE5_ISOLATED_BRANCH_ARCHITECTURE {
     def ch_all_branch_manifests = STAGE5_ANNOTATE_REQUESTED_BRANCH_MANIFEST.out.branch_manifest
         .mix(STAGE5_EMIT_BRANCH_SKIP_MANIFEST.out.branch_manifest)
 
+    def ch_sample_payload_by_sample = ch_stage5_inputs
+        .map { sid, _phasedVcf, _phasedTbi, _ancestryJson, _phasingAuditJson, _refs, _requestedBranches, samplePayload, _runMode ->
+            tuple(sid, samplePayload)
+        }
+        .unique()
+
+    def ch_run_mode_by_sample = ch_stage5_inputs
+        .map { sid, _phasedVcf, _phasedTbi, _ancestryJson, _phasingAuditJson, _refs, _requestedBranches, _samplePayload, runMode ->
+            tuple(sid, runMode?.toString()?.trim()?.toLowerCase() ?: 'production')
+        }
+        .unique()
+
     def builderCandidates = [
         new File(projectDir.toString(), 'bin/stage5_build_stage5_manifest.py'),
         new File(projectDir.toString(), 'Stage_5_Clinical_Annotation_PGx_Triage/bin/stage5_build_stage5_manifest.py')
@@ -148,7 +160,7 @@ workflow STAGE5_ISOLATED_BRANCH_ARCHITECTURE {
     }
     def builderScriptFile = file(builderScript, checkIfExists: true)
 
-    def ch_manifest_bundle = ch_all_branch_manifests
+    def ch_manifest_grouped = ch_all_branch_manifests
         .groupTuple()
         .map { sid, branchNames, manifestPaths ->
             def byBranch = [:]
@@ -160,7 +172,14 @@ workflow STAGE5_ISOLATED_BRANCH_ARCHITECTURE {
             if (!missing.isEmpty()) {
                 throw new IllegalStateException("STAGE5_ROUTING_FAILURE: incomplete branch manifest set for sample '${sid}' missing=${missing}")
             }
-            tuple(sid, byBranch['germline'], byBranch['pgx'], byBranch['sf'], byBranch['prs'], byBranch['somatic'], builderScriptFile)
+            tuple(sid, byBranch['germline'], byBranch['pgx'], byBranch['sf'], byBranch['prs'], byBranch['somatic'])
+        }
+
+    def ch_manifest_bundle = ch_manifest_grouped
+        .join(ch_sample_payload_by_sample)
+        .join(ch_run_mode_by_sample)
+        .map { sid, germlineManifest, pgxManifest, sfManifest, prsManifest, somaticManifest, samplePayload, runMode ->
+            tuple(sid, runMode, samplePayload, germlineManifest, pgxManifest, sfManifest, prsManifest, somaticManifest, builderScriptFile)
         }
 
     STAGE5_BUILD_MULTI_BRANCH_MANIFEST(ch_manifest_bundle)

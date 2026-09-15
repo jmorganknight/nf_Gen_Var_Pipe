@@ -37,17 +37,22 @@ process BANK_STAGE1_CONTRACT {
     def specimenJson = groovy.json.JsonOutput.toJson(meta.specimen ?: [:]).replace('\n', ' ').replace('\r', '')
     def clinicalContextJson = groovy.json.JsonOutput.toJson(meta.clinical_context ?: [:]).replace('\n', ' ').replace('\r', '')
     def refJson = groovy.json.JsonOutput.toJson(reference_meta).replace('\n', ' ').replace('\r', '')
+    def metaJson = groovy.json.JsonOutput.toJson(meta).replace('\n', ' ').replace('\r', '')
     def branchTargetCatalogJson = groovy.json.JsonOutput.toJson(meta.branch_target_catalog ?: '').replace('\n', ' ').replace('\r', '')
     """
     set -euo pipefail
 
     python3 - <<'PYEOF'
 import json
+from pathlib import Path
 
 ref = json.loads('''${refJson}''')
+meta = json.loads('''${metaJson}''')
 sid = '${sid}'
 base = '${params.outdir}'
-fragment = {
+asset_base_uri = f"{base}/{sid}/audit_and_qc/identity"
+fragment = dict(meta)
+fragment.update({
     'sample_id': sid,
     'run_mode': '${meta.run_mode ?: 'production'}',
     'patient_id': '${patientId}',
@@ -79,15 +84,17 @@ fragment = {
     'preflight_lock': '${meta.preflight_lock ?: ''}',
     'preflight_lock_status': '${meta.preflight_lock_status ?: ''}',
     'reference_snapshot_tokens': '${meta.reference_snapshot_tokens ?: ''}',
-    # CROSS_SAMPLE_IDENTITY_GATE publishes identity artifacts under
-    # <outdir>/<sample_id>/audit_and_qc/identity/*. Keep the banked contract
-    # aligned to those concrete published paths for downstream Stage 2 checks.
-    'mapped_bam': f"{base}/{sid}/audit_and_qc/identity/{sid}.identity_verified.bam",
-    'mapped_bai': f"{base}/{sid}/audit_and_qc/identity/{sid}.identity_verified.bam.bai",
-    'identity_audit': f"{base}/{sid}/audit_and_qc/identity/{sid}.identity_audit.json",
+    # Preserve both portable names and stable base URI for downstream re-materialization.
+    'asset_base_uri': asset_base_uri,
+    'stage1_asset_base_uri': asset_base_uri,
+    'mapped_bam': f"{asset_base_uri}/{sid}.identity_verified.bam",
+    'mapped_bai': f"{asset_base_uri}/{sid}.identity_verified.bam.bai",
+    'mapped_bam_basename': f"{sid}.identity_verified.bam",
+    'mapped_bai_basename': f"{sid}.identity_verified.bam.bai",
+    'identity_audit': f"{asset_base_uri}/{sid}.identity_audit.json",
     'reference_build': ref,
     'save_dir': base
-}
+})
 with open(f"{sid}.banked_stage1.fragment.json", 'w', encoding='utf-8') as out:
     json.dump(fragment, out, indent=2)
 PYEOF

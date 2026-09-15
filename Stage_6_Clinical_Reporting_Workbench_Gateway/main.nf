@@ -168,6 +168,34 @@ def resolveStage5Artifact(File stage5Root, String artifactName, String fallbackN
     return artifactName ? resolvePath(artifactName, stage5Root.toString()) : (fallbackName ? new File(stage5Root, fallbackName) : null)
 }
 
+process STAGE6_RUO_DEV_REPORT_LOCK {
+    label 'process_low'
+    container 'wes-onco-core:1.0.0'
+    stageInMode 'symlink'
+    publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'RUO_DEV_REPORT_LOCKED.txt'
+
+    input:
+    path stage5_manifest
+    val clinical_validity
+    val regulatory_warning
+
+    output:
+    path 'RUO_DEV_REPORT_LOCKED.txt', emit: lock_notice
+
+    script:
+    """
+    set -euo pipefail
+    cat > RUO_DEV_REPORT_LOCKED.txt <<TXT
+STAGE6_CLINICAL_REPORTING_LOCKED
+Reason: Stage 5 manifest is marked RESEARCH_USE_ONLY from dev mode.
+Manifest: ${stage5_manifest}
+CLINICAL_VALIDITY: ${clinical_validity}
+REGULATORY_WARNING: ${regulatory_warning}
+Action: Clinical PDF generation and EMR transmission were bypassed.
+TXT
+    """
+}
+
 
 workflow STAGE6_CLINICAL_REPORTING_WORKBENCH_GATEWAY {
     take:
@@ -252,6 +280,35 @@ workflow {
 
     if (!(samples instanceof List) || samples.isEmpty()) {
         throw new IllegalArgumentException('STAGE6_PRECONDITION_FAILURE: Stage 5 manifest contains no samples')
+    }
+
+    def clinicalValidity = stage5Parsed.CLINICAL_VALIDITY?.toString()?.trim()
+    def regulatoryWarning = stage5Parsed.REGULATORY_WARNING?.toString()?.trim() ?: ''
+    def isRuoDevManifest = clinicalValidity == 'RESEARCH_USE_ONLY'
+    def hasDevModeSample = samples.any { sample ->
+        def mode = (sample.run_mode ?: 'production').toString().trim().toLowerCase()
+        mode in ['dev', 'audit_only']
+    }
+
+    if (hasDevModeSample && !isRuoDevManifest) {
+        writeStage6Rejection(
+            params.outdir.toString(),
+            'GLOBAL',
+            'DEV_MODE_MANIFEST_WATERMARK_MISSING',
+            "run_mode=dev detected but CLINICAL_VALIDITY is not RESEARCH_USE_ONLY"
+        )
+        throw new IllegalStateException(
+            'STAGE6_PRECONDITION_FAILURE: dev-mode Stage 5 manifest missing required CLINICAL_VALIDITY watermark'
+        )
+    }
+
+    if (isRuoDevManifest) {
+        STAGE6_RUO_DEV_REPORT_LOCK(
+            channel.value(file(stage5ManifestFile, checkIfExists: true)),
+            channel.value(clinicalValidity),
+            channel.value(regulatoryWarning)
+        )
+        return
     }
 
     def runModeBySample = samples.collectEntries { sample ->

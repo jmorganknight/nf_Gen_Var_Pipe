@@ -52,36 +52,14 @@ sample_qc_meta = {
     'purity_concordance_pass': bool(purity_block.get('purity_concordance_pass', False)),
 }
 
-payload = {
+payload = dict(meta)
+payload.update({
     'sample_id': sid,
-    'patient_id': meta.get('patient_id'),
-    'case_id': meta.get('case_id'),
     'run_mode': run_mode,
-    'sample_type': meta.get('sample_type'),
-    'sequencing_type': meta.get('sequencing_type'),
-    'reported_sex': meta.get('reported_sex'),
-    'consent': meta.get('consent', {}),
-    'consent_tokens': meta.get('consent_tokens', {}),
-    'variant_branches': meta.get('variant_branches', {}),
-    'biological_context': meta.get('biological_context', {}),
-    'diagnosis': meta.get('diagnosis', {}),
-    'specimen': meta.get('specimen', {}),
-    'clinical_context': meta.get('clinical_context', {}),
-    'sequencer': meta.get('sequencer', {}),
-    'pathologist_tumor_burden': meta.get('pathologist_tumor_burden', 0.0),
-    'physician_tumor_purity': meta.get('physician_tumor_purity', 0.0),
-    'intake_validation_token': meta.get('intake_validation_token'),
-    'validation_token': meta.get('validation_token'),
-    'intake_validation_report': meta.get('intake_validation_report'),
-    'intake_route_decision': meta.get('intake_route_decision'),
-    'stage0_audit_bundle': meta.get('stage0_audit_bundle'),
-    'identity_audit': meta.get('identity_audit'),
     'sorted_bam': str(Path('${bam}').resolve()),
     'sorted_bai': str(Path('${bai}').resolve()),
-    'snv_mask_bed': meta.get('snv_mask_bed'),
-    'cnv_target_bed': meta.get('cnv_target_bed'),
-    'sv_calling_enabled': meta.get('sv_calling_enabled'),
-    'stage2_router_token': meta.get('stage2_router_token'),
+    'sorted_bam_basename': meta.get('sorted_bam_basename') or Path('${bam}').name,
+    'sorted_bai_basename': meta.get('sorted_bai_basename') or Path('${bai}').name,
     'stage2_precondition_audit': str(Path('${precondition_audit}').resolve()),
     'contamination_audit': str(Path('${contamination_audit}').resolve()),
     'purity_and_sex_validation_audit': str(Path('${purity_sex_audit}').resolve()),
@@ -95,6 +73,7 @@ payload = {
     'purity_concordance_pass': sample_qc_meta['purity_concordance_pass'],
     'sample_qc_meta': sample_qc_meta,
     'reference_build': {
+        **(meta.get('reference_build') or {}),
         'reference_genome': refs.get('reference_genome'),
         'reference_fai': refs.get('reference_fai'),
         'reference_dict': refs.get('reference_dict'),
@@ -105,7 +84,7 @@ payload = {
     },
     'save_dir': meta.get('save_dir'),
     'stage2_timestamp_utc': datetime.now(timezone.utc).isoformat(),
-}
+})
 
 if contam_status != 'PASS' and audit_mode:
     payload['stage2_governance_note'] = 'CONTAMINATION_FAILURE_CONTINUED_FOR_DEV_MODE'

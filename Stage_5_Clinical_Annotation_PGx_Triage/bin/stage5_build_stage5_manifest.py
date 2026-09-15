@@ -79,6 +79,8 @@ def assert_branch_sample_ids(branches: dict[str, dict], expected_sample_id: str)
 def main():
     ap = argparse.ArgumentParser(description="Assemble immutable Stage5 multi-branch manifest")
     ap.add_argument("--sample-id", required=True)
+    ap.add_argument("--run-mode", default="production")
+    ap.add_argument("--stage4-sample-json", required=True)
     ap.add_argument("--germline", required=True)
     ap.add_argument("--pgx", required=True)
     ap.add_argument("--sf", required=True)
@@ -97,6 +99,18 @@ def main():
 
     branches = {name: load_manifest(path) for name, path in files.items()}
     sid = args.sample_id
+    stage4_sample = json.loads(Path(args.stage4_sample_json).read_text(encoding="utf-8"))
+    if not isinstance(stage4_sample, dict):
+        raise SystemExit("STAGE5_MANIFEST_FAILURE: stage4 sample payload must be a JSON object")
+    stage4_sid = str(stage4_sample.get("sample_id", "")).strip()
+    if stage4_sid and stage4_sid != sid:
+        raise SystemExit(
+            "STAGE5_CLINICAL_INTEGRITY_FAILURE: stage4 sample payload sample_id mismatch; "
+            f"observed='{stage4_sid}' expected='{sid}'"
+        )
+    run_mode = str(args.run_mode or "production").strip().lower()
+    if run_mode == "audit_only":
+        run_mode = "dev"
     assert_branch_sample_ids(branches, sid)
 
     requested_sets = []
@@ -122,33 +136,51 @@ def main():
         "# ==============================================================================",
         "# STAGE 5 BANKED MANIFEST (IMMUTABLE)",
         "# ==============================================================================",
-        "samples:",
-        f'  - sample_id: "{sid}"',
-        '    validation_token: "VALID_PASS|VARIANTS_HARMONIZED"',
-        "    branches:",
     ]
+
+    if run_mode == "dev":
+        lines.extend([
+            'CLINICAL_VALIDITY: "RESEARCH_USE_ONLY"',
+            'REGULATORY_WARNING: "UNVALIDATED_DEV_RUN - DO NOT USE FOR DIAGNOSTIC DECISIONS"',
+        ])
+
+    stage5_sample = dict(stage4_sample)
+    stage5_sample["sample_id"] = sid
+    stage5_sample["run_mode"] = run_mode
+    stage5_sample["validation_token"] = str(stage4_sample.get("validation_token") or "VALID_PASS|VARIANTS_HARMONIZED")
+    stage5_sample["stage5_handoff_note"] = "Stage 5 branch-governed annotation and triage complete."
+
+    branch_payloads = {}
 
     for name in ALLOWED_BRANCHES:
         b = branches[name]
         status = str(b.get("status", "")).strip()
         requested = normalize_requested(b)
-        lines.append(f"      {name}:")
-        lines.append(f'        status: "{status}"')
-        lines.append(f'        skip_reason: "{str(b.get("skip_reason", ""))}"')
-        lines.append(f'        requested_branches: {json.dumps(requested)}')
-        lines.append(f'        skipped: {str(status == STATUS_SKIPPED).lower()}')
-        lines.append('        bypass_policy: "CLINICAL_DIRECTIVE_CONTROL_PLANE"')
-        lines.append(f'        branch_manifest_json: "{str(files[name].resolve())}"')
-        lines.append(f'        branch_manifest_sha256: "{sha256(files[name])}"')
-        lines.append(f'        primary_vcf: "{b.get("primary_vcf", "")}"')
-        lines.append(f'        primary_vcf_tbi: "{b.get("primary_vcf_tbi", "")}"')
-        lines.append(f'        primary_vcf_sha256: "{b.get("primary_vcf_sha256", "")}"')
-        lines.append(f'        primary_vcf_tbi_sha256: "{b.get("primary_vcf_tbi_sha256", "")}"')
-        lines.append(f'        input_rows: {int(b.get("input_rows", 0))}')
-        lines.append(f'        output_rows: {int(b.get("output_rows", 0))}')
-        lines.append(f'        dropped_rows: {int(b.get("dropped_rows", 0))}')
+        branch_payloads[name] = {
+            "status": status,
+            "skip_reason": str(b.get("skip_reason", "")),
+            "requested_branches": requested,
+            "skipped": status == STATUS_SKIPPED,
+            "bypass_policy": "CLINICAL_DIRECTIVE_CONTROL_PLANE",
+            "branch_manifest_json": str(files[name].resolve()),
+            "branch_manifest_sha256": sha256(files[name]),
+            "primary_vcf": b.get("primary_vcf", ""),
+            "primary_vcf_tbi": b.get("primary_vcf_tbi", ""),
+            "primary_vcf_sha256": b.get("primary_vcf_sha256", ""),
+            "primary_vcf_tbi_sha256": b.get("primary_vcf_tbi_sha256", ""),
+            "input_rows": int(b.get("input_rows", 0)),
+            "output_rows": int(b.get("output_rows", 0)),
+            "dropped_rows": int(b.get("dropped_rows", 0)),
+        }
 
-    Path(args.out_yaml).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    stage5_sample["branches"] = branch_payloads
+    out_payload = {"samples": [stage5_sample]}
+
+    if run_mode == "dev":
+        out_payload["CLINICAL_VALIDITY"] = "RESEARCH_USE_ONLY"
+        out_payload["REGULATORY_WARNING"] = "UNVALIDATED_DEV_RUN - DO NOT USE FOR DIAGNOSTIC DECISIONS"
+
+    Path(args.out_yaml).write_text(json.dumps(out_payload, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

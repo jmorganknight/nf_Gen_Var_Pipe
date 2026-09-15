@@ -79,6 +79,23 @@ def resolvePath(String rawPath, String rootDir) {
     return rooted
 }
 
+def resolveAssetPath(String rawPath, String rootDir, String baseUri = null) {
+    if (!rawPath) {
+        return null
+    }
+    def asGiven = resolvePath(rawPath, rootDir)
+    if (asGiven.exists()) {
+        return asGiven
+    }
+    if (baseUri) {
+        def joined = resolvePath(new File(baseUri, rawPath).path, rootDir)
+        if (joined.exists()) {
+            return joined
+        }
+    }
+    return asGiven
+}
+
 def resolveStageConfigPath(Object overridePath, Object configuredPath, String fileName) {
     def overrideText = overridePath?.toString()?.trim()
     if (overrideText) {
@@ -237,14 +254,17 @@ def buildStage2InputChannel() {
 
     def sampleRows = samplesParsed.collect { sample ->
         def sid = (sample.sample_id ?: 'UNKNOWN').toString()
-        def sortedBamRaw = (sample.sorted_bam ?: sample.mapped_bam)?.toString()
+        def stage1AssetBase = (sample.stage1_asset_base_uri ?: sample.asset_base_uri)?.toString()
+        def mappedBamBasename = (sample.mapped_bam_basename ?: sample.mapped_bam)?.toString()
+        def mappedBaiBasename = (sample.mapped_bai_basename ?: sample.mapped_bai)?.toString()
+        def sortedBamRaw = (sample.sorted_bam ?: mappedBamBasename)?.toString()
         if (!sortedBamRaw) {
             writeStage2Rejection(params.outdir.toString(), sid, 'MISSING_SORTED_BAM', 'sample did not declare sorted_bam or mapped_bam')
             throw new IllegalStateException("STAGE2_PRECONDITION_FAILURE: sorted_bam/mapped_bam missing for sample '${sid}'")
         }
-        def sortedBam = resolvePath(sortedBamRaw, samplesRoot)
-        def sortedBaiRaw = (sample.sorted_bai ?: sample.mapped_bai ?: "${sortedBamRaw}.bai")?.toString()
-        def sortedBai = resolvePath(sortedBaiRaw, samplesRoot)
+        def sortedBam = resolveAssetPath(sortedBamRaw, samplesRoot, stage1AssetBase)
+        def sortedBaiRaw = (sample.sorted_bai ?: mappedBaiBasename ?: "${sortedBamRaw}.bai")?.toString()
+        def sortedBai = resolveAssetPath(sortedBaiRaw, samplesRoot, stage1AssetBase)
 
         if (!sortedBam.exists() || !sortedBai.exists()) {
             writeStage2Rejection(params.outdir.toString(), sid, 'SORTED_BAM_OR_BAI_MISSING', "bam=${sortedBam}; bai=${sortedBai}")
@@ -277,7 +297,13 @@ def buildStage2InputChannel() {
             intake_validation_token: sample.intake_validation_token ?: sample.validation_token,
             intake_validation_token_value: token,
             run_mode: (sample.run_mode ?: 'production').toString(),
-            validation_token: 'VALID_PASS|SAMPLE_VALIDATED'
+            validation_token: 'VALID_PASS|SAMPLE_VALIDATED',
+            stage1_asset_base_uri: stage1AssetBase,
+            asset_base_uri: stage1AssetBase ?: sample.asset_base_uri,
+            mapped_bam_basename: mappedBamBasename ? new File(mappedBamBasename).name : null,
+            mapped_bai_basename: mappedBaiBasename ? new File(mappedBaiBasename).name : null,
+            sorted_bam_basename: sortedBam ? sortedBam.name : null,
+            sorted_bai_basename: sortedBai ? sortedBai.name : null
         ]
 
         tuple(
@@ -293,9 +319,11 @@ def buildStage2InputChannel() {
 }
 
 def buildMetaRow(Map sample, String outdir) {
-    def sortedBam = sample.sorted_bam ?: sample.mapped_bam
-    def sortedBai = sample.sorted_bai ?: sample.mapped_bai ?: (sortedBam ? "${sortedBam}.bai" : null)
-    [
+    def stage1AssetBase = sample.stage1_asset_base_uri ?: sample.asset_base_uri
+    def sortedBam = sample.sorted_bam ?: sample.mapped_bam_basename ?: sample.mapped_bam
+    def sortedBai = sample.sorted_bai ?: sample.mapped_bai_basename ?: sample.mapped_bai ?: (sortedBam ? "${sortedBam}.bai" : null)
+    def preserved = new LinkedHashMap(sample)
+    preserved + [
         sample_id: sample.sample_id,
         patient_id: sample.patient_id ?: sample.sample_id,
         case_id: sample.case_id ?: sample.patient_id ?: sample.sample_id,
@@ -326,8 +354,14 @@ def buildMetaRow(Map sample, String outdir) {
         identity_audit: sample.identity_audit,
         mapped_bam: sample.mapped_bam,
         mapped_bai: sample.mapped_bai,
+        mapped_bam_basename: sample.mapped_bam_basename ?: (sample.mapped_bam ? new File(sample.mapped_bam.toString()).name : null),
+        mapped_bai_basename: sample.mapped_bai_basename ?: (sample.mapped_bai ? new File(sample.mapped_bai.toString()).name : null),
+        stage1_asset_base_uri: stage1AssetBase,
+        asset_base_uri: stage1AssetBase ?: sample.asset_base_uri,
         sorted_bam: sortedBam,
         sorted_bai: sortedBai,
+        sorted_bam_basename: sample.sorted_bam_basename ?: (sortedBam ? new File(sortedBam.toString()).name : null),
+        sorted_bai_basename: sample.sorted_bai_basename ?: (sortedBai ? new File(sortedBai.toString()).name : null),
         save_dir: outdir
     ]
 }

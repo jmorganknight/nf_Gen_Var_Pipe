@@ -30,20 +30,11 @@ ancestry_path = json.loads('''${ancestryJson}''')
 sid = '${sid}'
 ancestry = json.loads(Path(ancestry_path).read_text(encoding='utf-8'))
 
-fragment = {
+fragment = dict(meta)
+fragment.update({
     'sample_id': sid,
     'run_mode': meta.get('run_mode', 'production'),
     'validation_token': meta.get('validation_token', ''),
-    'stage2_contamination_status': meta.get('stage2_contamination_status', ''),
-    'stage2_contamination_policy_action': meta.get('stage2_contamination_policy_action', ''),
-    'consent_tokens': meta.get('consent_tokens', {}),
-    'stage0_consent_tokens': meta.get('stage0_consent_tokens', {}),
-    'variant_branches': meta.get('variant_branches', {}),
-    'active_branches': meta.get('active_branches', []),
-    'sorted_bam': meta.get('sorted_bam', ''),
-    'sorted_bai': meta.get('sorted_bai', ''),
-    'normalized_vcf': meta.get('normalized_vcf', ''),
-    'normalized_vcf_tbi': meta.get('normalized_vcf_tbi', ''),
     'phased_vcf': '${phased_vcf}',
     'phased_vcf_tbi': '${phased_tbi}',
     'ancestry_metrics_json': ancestry_path,
@@ -55,7 +46,7 @@ fragment = {
     'reference_build': meta.get('reference_build', {}),
     'stage4_handoff_note': 'Ancestry-projected, phased VCF ready for Stage 5 annotation and PGx triage.',
     'save_dir': meta.get('save_dir', ''),
-}
+})
 with open(f'{sid}.banked_stage4.fragment.json', 'w', encoding='utf-8') as handle:
     json.dump(fragment, handle, indent=2)
 PYEOF

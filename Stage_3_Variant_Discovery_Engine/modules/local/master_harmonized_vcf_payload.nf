@@ -152,12 +152,17 @@ harmonization_audit = {
 
 Path('${sample_id}.harmonization_audit.json').write_text(json.dumps(harmonization_audit, indent=2) + chr(10), encoding='utf-8')
 
-fragment = {
+fragment = dict(meta)
+fragment.update({
     'sample_id': '${sample_id}',
     'validation_token': stage3_token,
     'run_mode': meta.get('run_mode', 'production'),
     'sorted_bam': meta.get('sorted_bam', ''),
     'sorted_bai': meta.get('sorted_bai', ''),
+    'sorted_bam_basename': meta.get('sorted_bam_basename') or Path(str(meta.get('sorted_bam', ''))).name,
+    'sorted_bai_basename': meta.get('sorted_bai_basename') or Path(str(meta.get('sorted_bai', ''))).name,
+    'stage1_asset_base_uri': meta.get('stage1_asset_base_uri') or meta.get('asset_base_uri'),
+    'asset_base_uri': meta.get('stage1_asset_base_uri') or meta.get('asset_base_uri'),
     'stage2_contamination_status': meta.get('stage2_contamination_status', ''),
     'stage2_contamination_policy_action': meta.get('stage2_contamination_policy_action', ''),
     'variant_branches': meta.get('variant_branches', {}),
@@ -167,7 +172,7 @@ fragment = {
     'harmonization_audit': str(published_dir / '${sample_id}.harmonization_audit.json'),
     'reference_build': meta.get('reference_build', {}),
     'stage4_handoff_note': 'Normalized, atomized, schema-validated VCF ready for annotation.',
-}
+})
 Path('${sample_id}.stage3.contract.fragment.json').write_text(json.dumps(fragment, indent=2) + chr(10), encoding='utf-8')
 PYEOF
     """

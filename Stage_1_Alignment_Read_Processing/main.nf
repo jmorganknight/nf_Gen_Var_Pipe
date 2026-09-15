@@ -280,7 +280,8 @@ def buildMetaRow(Map sample, String outdir, String branchTargetCatalogDefault = 
     def platform = normalizePlatform(platformRaw.toString())
     def consent = normalizeConsent(sample.consent)
     def assayRoute = inferAssayRoute(sample)
-    [
+    def preserved = new LinkedHashMap(sample)
+    preserved + [
         sample_id: sample.sample_id,
         patient_id: (sample.patient_id ?: sample.sample_id),
         case_id: (sample.case_id ?: sample.patient_id ?: sample.sample_id),

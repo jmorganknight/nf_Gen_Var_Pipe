@@ -99,6 +99,31 @@ def resolveHostPath(def rawPath, String refDir) {
     return p
 }
 
+def resolveStageAssetPath(String rawPath, String rootDir, String baseUri = null) {
+    if (!rawPath) {
+        return null
+    }
+    def direct = new File(rawPath)
+    if (direct.isAbsolute() || direct.exists()) {
+        return direct.toString()
+    }
+    if (baseUri) {
+        def joined = new File(baseUri, rawPath)
+        if (joined.exists()) {
+            return joined.toString()
+        }
+    }
+    def rooted = new File(rootDir, rawPath)
+    if (rooted.exists()) {
+        return rooted.toString()
+    }
+    def projectRelative = new File(projectDir.toString(), rawPath)
+    if (projectRelative.exists()) {
+        return projectRelative.toString()
+    }
+    return rooted.toString()
+}
+
 def resolveStageConfigPath(Object overridePath, Object configuredPath, String fileName) {
     def overrideText = overridePath?.toString()?.trim()
     if (overrideText) {
@@ -435,11 +460,14 @@ workflow STAGE3_VARIANT_DISCOVERY {
         .map { rec ->
             def sample = rec as Map
             def sampleId = (sample.sample_id ?: 'UNKNOWN').toString()
-            def sortedBam = sample.sorted_bam?.toString()
+            def stage1AssetBase = [sample.stage1_asset_base_uri, sample.asset_base_uri].find { v -> v != null && v.toString().trim() }?.toString()
+            def sortedBamRaw = [sample.sorted_bam, sample.sorted_bam_basename, sample.mapped_bam_basename, sample.mapped_bam].find { v -> v != null && v.toString().trim() }?.toString()
+            def sortedBam = sortedBamRaw ? resolveStageAssetPath(sortedBamRaw, stage2Manifest.parent?.toString() ?: projectDir.toString(), stage1AssetBase) : null
             if (!sortedBam) {
                 throw new IllegalStateException("STAGE3_PRECONDITION_FAILURE: sorted_bam missing for sample '${sampleId}'")
             }
-            def sortedBai = sample.sorted_bai?.toString() ?: "${sortedBam}.bai"
+            def sortedBaiRaw = [sample.sorted_bai, sample.sorted_bai_basename, sample.mapped_bai_basename, sample.mapped_bai, "${sortedBamRaw}.bai"].find { v -> v != null && v.toString().trim() }?.toString()
+            def sortedBai = resolveStageAssetPath(sortedBaiRaw, stage2Manifest.parent?.toString() ?: projectDir.toString(), stage1AssetBase)
             def sequencingType = (([sample.sequencing_type, sample.seq_type, 'WES'].find { v -> v != null && v.toString().trim() }) ?: 'WES').toString().trim().toUpperCase()
             def isWgs = sequencingType == 'WGS'
             def sampleType = (sample.sample_type ?: 'germline').toString().toLowerCase()
@@ -515,7 +543,8 @@ workflow STAGE3_VARIANT_DISCOVERY {
                 throw new IllegalStateException("STAGE3_PRECONDITION_FAILURE: invalid Stage 2 validation token for sample '${sampleId}'")
             }
 
-            def sampleMeta = [
+            def preserved = new LinkedHashMap(sample)
+            def sampleMeta = preserved + [
                 sample_id       : sampleId,
                 sample_type     : sampleType,
                 sequencing_type : sequencingType,
@@ -534,6 +563,10 @@ workflow STAGE3_VARIANT_DISCOVERY {
                 ],
                 sorted_bam      : sortedBam,
                 sorted_bai      : sortedBai,
+                sorted_bam_basename: sample.sorted_bam_basename ?: new File(sortedBam).name,
+                sorted_bai_basename: sample.sorted_bai_basename ?: new File(sortedBai).name,
+                stage1_asset_base_uri: stage1AssetBase,
+                asset_base_uri: stage1AssetBase,
                 variant_branches: variantBranches,
                 stage3_branch_plan: stage3BranchPlan,
                 expected_active_branch_count: activeBranches.size(),

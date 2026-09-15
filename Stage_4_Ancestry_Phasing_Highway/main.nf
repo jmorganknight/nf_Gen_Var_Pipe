@@ -87,6 +87,23 @@ def resolvePath(String rawPath, String rootDir) {
     return primary
 }
 
+def resolveAssetPath(String rawPath, String rootDir, String baseUri = null) {
+    if (!rawPath) {
+        return null
+    }
+    def resolved = resolvePath(rawPath, rootDir)
+    if (resolved.exists()) {
+        return resolved
+    }
+    if (baseUri) {
+        def joined = resolvePath(new File(baseUri, rawPath).path, rootDir)
+        if (joined.exists()) {
+            return joined
+        }
+    }
+    return resolved
+}
+
 def resolveStageConfigPath(Object overridePath, Object configuredPath, String fileName) {
     def overrideText = overridePath?.toString()?.trim()
     if (overrideText) {
@@ -170,7 +187,9 @@ def buildMetaRow(Map sample, String outdir) {
     def consentTokens = mapOrEmpty(sample.consent_tokens)
     def stage0Tokens = mapOrEmpty(sample.stage0_consent_tokens) ?: consentTokens
     def referenceBuild = mapOrEmpty(sample.reference_build)
-    [
+    def stage1AssetBase = (sample.stage1_asset_base_uri ?: sample.asset_base_uri)?.toString()
+    def preserved = new LinkedHashMap(sample)
+    preserved + [
         sample_id: sample.sample_id,
         patient_id: (sample.patient_id ?: sample.sample_id),
         case_id: (sample.case_id ?: sample.patient_id ?: sample.sample_id),
@@ -186,6 +205,10 @@ def buildMetaRow(Map sample, String outdir) {
         normalized_vcf_tbi: sample.normalized_vcf_tbi?.toString(),
         sorted_bam: sample.sorted_bam?.toString(),
         sorted_bai: sample.sorted_bai?.toString(),
+        sorted_bam_basename: (sample.sorted_bam_basename ?: (sample.sorted_bam ? new File(sample.sorted_bam.toString()).name : null)),
+        sorted_bai_basename: (sample.sorted_bai_basename ?: (sample.sorted_bai ? new File(sample.sorted_bai.toString()).name : null)),
+        stage1_asset_base_uri: stage1AssetBase,
+        asset_base_uri: stage1AssetBase,
         harmonization_audit: sample.harmonization_audit?.toString(),
         reference_build: referenceBuild,
         stage4_handoff_note: (sample.stage4_handoff_note ?: 'Stage 4 ancestry and phasing handoff.'),
@@ -286,19 +309,36 @@ workflow {
 
     samples.each { sample ->
         def sid = (sample.sample_id ?: 'UNKNOWN').toString()
+        def stage1AssetBase = [sample.stage1_asset_base_uri, sample.asset_base_uri].find { v -> v != null && v.toString().trim() }?.toString()
         def token = sample.validation_token?.toString()
         if (!token || !token.contains('VALID_PASS|VARIANTS_HARMONIZED')) {
             writeStage4Rejection(params.outdir.toString(), sid, 'INVALID_STAGE3_TOKEN', token ?: 'missing')
             throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: invalid Stage 3 validation token for sample '${sid}'")
         }
 
-        ['normalized_vcf', 'normalized_vcf_tbi', 'sorted_bam', 'sorted_bai'].each { field ->
+        ['normalized_vcf', 'normalized_vcf_tbi'].each { field ->
             def raw = sample[field]?.toString()
             if (!raw) {
                 writeStage4Rejection(params.outdir.toString(), sid, 'MISSING_STAGE3_ASSET', field)
                 throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: missing '${field}' for sample '${sid}'")
             }
             def resolved = resolvePath(raw, samplesRoot)
+            if (!resolved.exists()) {
+                writeStage4Rejection(params.outdir.toString(), sid, 'STAGE3_ASSET_NOT_FOUND', "${field}=${raw}")
+                throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: stage 3 asset not found '${field}' for sample '${sid}'")
+            }
+        }
+
+        [
+            sorted_bam: [sample.sorted_bam, sample.sorted_bam_basename, sample.mapped_bam_basename, sample.mapped_bam],
+            sorted_bai: [sample.sorted_bai, sample.sorted_bai_basename, sample.mapped_bai_basename, sample.mapped_bai]
+        ].each { field, candidates ->
+            def raw = candidates.find { v -> v != null && v.toString().trim() }?.toString()
+            if (!raw) {
+                writeStage4Rejection(params.outdir.toString(), sid, 'MISSING_STAGE3_ASSET', field)
+                throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: missing '${field}' for sample '${sid}'")
+            }
+            def resolved = resolveAssetPath(raw, samplesRoot, stage1AssetBase)
             if (!resolved.exists()) {
                 writeStage4Rejection(params.outdir.toString(), sid, 'STAGE3_ASSET_NOT_FOUND', "${field}=${raw}")
                 throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: stage 3 asset not found '${field}' for sample '${sid}'")
@@ -352,10 +392,13 @@ workflow {
 
     def chStage4Inputs = channel.fromList(samples).map { sample ->
         def meta = buildMetaRow(sample as Map, params.outdir.toString())
+        def stage1AssetBase = [sample.stage1_asset_base_uri, sample.asset_base_uri].find { v -> v != null && v.toString().trim() }?.toString()
         def normalizedVcf = resolvePath(sample.normalized_vcf.toString(), samplesRoot)
         def normalizedVcfTbi = resolvePath(sample.normalized_vcf_tbi.toString(), samplesRoot)
-        def sortedBam = resolvePath(sample.sorted_bam.toString(), samplesRoot)
-        def sortedBai = resolvePath(sample.sorted_bai.toString(), samplesRoot)
+        def sortedBamRaw = [sample.sorted_bam, sample.sorted_bam_basename, sample.mapped_bam_basename, sample.mapped_bam].find { v -> v != null && v.toString().trim() }?.toString()
+        def sortedBaiRaw = [sample.sorted_bai, sample.sorted_bai_basename, sample.mapped_bai_basename, sample.mapped_bai].find { v -> v != null && v.toString().trim() }?.toString()
+        def sortedBam = resolveAssetPath(sortedBamRaw, samplesRoot, stage1AssetBase)
+        def sortedBai = resolveAssetPath(sortedBaiRaw, samplesRoot, stage1AssetBase)
         tuple(
             meta,
             file(normalizedVcf, checkIfExists: true),

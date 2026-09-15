@@ -282,6 +282,8 @@ workflow {
 
     def chStage5Inputs = channel.fromList(samples).map { sample ->
         def sid = (sample.sample_id ?: 'UNKNOWN').toString()
+        def runMode = (sample.run_mode ?: 'production').toString().trim().toLowerCase()
+        def samplePayload = new LinkedHashMap(sample as Map)
         def phasedVcf = resolveStage4Asset(sample.phased_vcf.toString(), stage4ManifestFile.parent?.toString() ?: projectRoot)
         def phasedVcfTbi = resolveStage4Asset(sample.phased_vcf_tbi.toString(), stage4ManifestFile.parent?.toString() ?: projectRoot)
         def ancestryMetrics = resolveStage4Asset(sample.ancestry_metrics_json?.toString() ?: '', stage4ManifestFile.parent?.toString() ?: projectRoot)
@@ -298,7 +300,9 @@ workflow {
             file(ancestryMetrics, checkIfExists: true),
             file(phasingAudit, checkIfExists: true),
             stage5BranchRefs,
-            requestedBranches
+            requestedBranches,
+            samplePayload,
+            runMode
         )
     }
 
