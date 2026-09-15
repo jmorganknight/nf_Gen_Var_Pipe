@@ -1,0 +1,4 @@
+profile	status	stage6_manifest	pipeline_infra	stage3_infra	run_log
+small	RUN_FAILED	NA	PIPELINE_INFRA: profile=small; available_cpus=28; available_memory_gb=480; max_cpus=32; max_memory_gb=256	NA	/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/tests/infrastructure_profile_matrix/small/run.log
+medium	RUN_FAILED	NA	PIPELINE_INFRA: profile=medium; available_cpus=28; available_memory_gb=480; max_cpus=32; max_memory_gb=256	NA	/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/tests/infrastructure_profile_matrix/medium/run.log
+large	RUN_FAILED	NA	PIPELINE_INFRA: profile=large; available_cpus=28; available_memory_gb=480; max_cpus=32; max_memory_gb=256	NA	/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/tests/infrastructure_profile_matrix/large/run.log

@@ -1,0 +1,6 @@
+{
+  "sample_id": "HG002_STUB",
+  "component": "secondary_findings",
+  "sf_report": "",
+  "sf_bypass_audit": "HG002_STUB.acmg_sf_bypassed_audit.json"
+}

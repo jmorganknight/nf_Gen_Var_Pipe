@@ -6,7 +6,7 @@ include { STAGE2_SAMPLE_VALIDATION as STAGE2_POSTALIGN_SAMPLE_VALIDATION_GATE } 
 include { STAGE3_VARIANT_DISCOVERY_ENGINE } from './Stage_3_Variant_Discovery_Engine/main'
 include { ASSEMBLE_STAGE3_BANKED_MANIFEST } from './Stage_3_Variant_Discovery_Engine/modules/local/assemble_stage3_banked_manifest.nf'
 include { STAGE4_ANCESTRY_PHASING as STAGE4_ANCESTRY_PHASING_HIGHWAY } from './Stage_4_Ancestry_Phasing_Highway/main'
-include { STAGE5_ANNOTATION_PGX_TRIAGE as STAGE5_CLINICAL_ANNOTATION_PGX_TRIAGE } from './Stage_5_Clinical_Annotation_PGx_Triage/main'
+include { STAGE5_ISOLATED_BRANCH_ARCHITECTURE } from './Stage_5_Clinical_Annotation_PGx_Triage/workflows/stage5_isolated.nf'
 include { STAGE6_CLINICAL_REPORTING_WORKBENCH_GATEWAY as STAGE6_CLINICAL_REPORTING_WORKBENCH_GATE } from './Stage_6_Clinical_Reporting_Workbench_Gateway/main'
 
 def mapOrEmpty(Object value) {
@@ -243,6 +243,110 @@ def resolveStage5Artifact(File stage5Root, String artifactName, String fallbackN
     return artifactName ? resolvePathWithBases(artifactName, [stage5Root.toString(), projectDir.toString()]) : (fallbackName ? new File(stage5Root, fallbackName) : null)
 }
 
+def toIntSafe(Object value, int fallback) {
+    try {
+        return value == null ? fallback : Integer.parseInt(value.toString())
+    } catch (Exception _ignored) {
+        return fallback
+    }
+}
+
+def cliHasParam(String key) {
+    def commandLine = workflow.hasProperty('commandLine') ? (workflow.commandLine ?: '') : ''
+    commandLine.contains("--${key}")
+}
+
+def resolvePipelineInfrastructurePolicy(Map infrastructureParsed) {
+    def fallback = [
+        selected_profile: 'medium',
+        available_cpus: Math.max(1, toIntSafe(params.max_cpus, 32)),
+        available_memory_gb: Math.max(4, toIntSafe(params.max_memory_gb, 256)),
+        max_cpus: Math.max(1, toIntSafe(params.max_cpus, 32)),
+        max_memory_gb: Math.max(4, toIntSafe(params.max_memory_gb, 256)),
+    ]
+
+    def execution = mapOrEmpty(infrastructureParsed?.pipeline_execution)
+    def local = mapOrEmpty(execution.local_system)
+    def profiles = mapOrEmpty(execution.profiles)
+    def thresholds = mapOrEmpty(execution.auto_thresholds)
+
+    if (profiles.isEmpty()) {
+        return fallback
+    }
+
+    def detectedCpus = Runtime.runtime.availableProcessors()
+    def totalCpus = toIntSafe(local.total_cpus, detectedCpus)
+    def reserveCpus = toIntSafe(local.reserve_cpus, 0)
+    def totalMemGb = toIntSafe(local.total_memory_gb, 64)
+    def reserveMemGb = toIntSafe(local.reserve_memory_gb, 8)
+
+    def availableCpus = Math.max(1, totalCpus - reserveCpus)
+    def availableMemGb = Math.max(4, totalMemGb - reserveMemGb)
+
+    def mode = (execution.profile_selection_mode ?: 'auto').toString().trim().toLowerCase()
+    def forcedProfile = params.execution_profile?.toString()?.trim()
+    def selectedProfile = null
+
+    if (forcedProfile) {
+        if (!profiles.containsKey(forcedProfile)) {
+            throw new IllegalStateException("INFRASTRUCTURE_PROFILE_INVALID: execution_profile '${forcedProfile}' is not one of ${profiles.keySet().sort().join(', ')}")
+        }
+        selectedProfile = forcedProfile
+    } else if (mode == 'manual') {
+        selectedProfile = (execution.active_profile ?: 'medium').toString().trim()
+    } else {
+        def smallMax = toIntSafe(thresholds.small_max_available_cpus, 12)
+        def mediumMax = toIntSafe(thresholds.medium_max_available_cpus, 24)
+        if (availableCpus <= smallMax) {
+            selectedProfile = 'small'
+        } else if (availableCpus <= mediumMax) {
+            selectedProfile = 'medium'
+        } else {
+            selectedProfile = 'large'
+        }
+    }
+
+    if (!profiles.containsKey(selectedProfile)) {
+        throw new IllegalStateException("INFRASTRUCTURE_PROFILE_RESOLUTION_FAILURE: profile '${selectedProfile}' not defined under pipeline_execution.profiles")
+    }
+
+    def selected = mapOrEmpty(profiles[selectedProfile])
+    def policyCpus = Math.max(1, toIntSafe(selected.max_cpus, fallback.max_cpus))
+    def policyMemGb = Math.max(4, toIntSafe(selected.max_memory_gb, fallback.max_memory_gb))
+
+    if (policyCpus > availableCpus) {
+        policyCpus = availableCpus
+    }
+    if (policyMemGb > availableMemGb) {
+        policyMemGb = availableMemGb
+    }
+
+    return [
+        selected_profile: selectedProfile,
+        available_cpus: availableCpus,
+        available_memory_gb: availableMemGb,
+        max_cpus: policyCpus,
+        max_memory_gb: policyMemGb,
+    ]
+}
+
+def applyPipelineInfrastructurePolicy(Map infrastructureParsed) {
+    def resolved = resolvePipelineInfrastructurePolicy(infrastructureParsed)
+    params.execution_profile = params.execution_profile ?: resolved.selected_profile
+
+    if (!cliHasParam('max_cpus')) {
+        params.max_cpus = resolved.max_cpus
+    }
+    if (!cliHasParam('max_memory_gb')) {
+        params.max_memory_gb = resolved.max_memory_gb
+    }
+    if (!cliHasParam('max_memory')) {
+        params.max_memory = (params.max_memory_gb as int).GB
+    }
+
+    log.info("PIPELINE_INFRA: profile=${params.execution_profile}; available_cpus=${resolved.available_cpus}; available_memory_gb=${resolved.available_memory_gb}; max_cpus=${params.max_cpus}; max_memory_gb=${params.max_memory_gb}")
+}
+
 def loadAtomicIntakeContract() {
     def ys = new groovy.yaml.YamlSlurper()
     def projectRoot = projectDir.toString()
@@ -295,6 +399,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
     def refsParsed = intake.refsParsed as Map
     def thresholdsParsed = intake.thresholdsParsed as Map
     def infrastructureParsed = intake.infrastructureParsed as Map
+    applyPipelineInfrastructurePolicy(infrastructureParsed)
     def projectRoot = intake.projectRoot.toString()
     def inputRoot = intake.inputRoot.toString()
     def infrastructureRoot = intake.infrastructureRoot.toString()
@@ -371,11 +476,14 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         tuple(meta, file(fq1, checkIfExists: true), file(fq2, checkIfExists: true))
     }
 
+    def chSamplesManifestSource = channel.value(inputManifest.canonicalPath)
+
     STAGE0_PREFLIGHT_INGEST(
         chRawReads,
         channel.value(thresholdsFile),
         channel.value(referencesFile),
         channel.value(inputManifest),
+        chSamplesManifestSource,
         channel.value(infrastructureFile),
         channel.value(file(signerKeyResolved, checkIfExists: true)),
         channel.value(file(signerPubResolved, checkIfExists: true))
@@ -453,6 +561,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
             sorted_bai: bai.toString(),
             mapped_bam: bam.toString(),
             mapped_bai: bai.toString(),
+            run_mode: (meta.run_mode ?: 'production').toString(),
             intake_validation_token_value: tokenValue,
             validation_token: 'VALID_PASS|SAMPLE_VALIDATED',
             save_dir: params.outdir.toString()
@@ -519,6 +628,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
                 sample_id: sampleId,
                 sample_type: rec.sample_type ?: 'germline',
                 sequencing_type: sequencingType,
+                run_mode: (rec.run_mode ?: 'production').toString(),
                 validation_token: rec.validation_token?.toString() ?: 'VALID_PASS|SAMPLE_VALIDATED',
                 sorted_bam: sortedBamRaw,
                 sorted_bai: sortedBaiRaw ?: (sortedBamRaw ? "${sortedBamRaw}.bai" : null),
@@ -545,7 +655,14 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         }
     }
 
-    STAGE3_VARIANT_DISCOVERY_ENGINE(chStage3Input)
+    STAGE3_VARIANT_DISCOVERY_ENGINE(
+        chStage3Input,
+        chStage3Input,
+        chStage3Input,
+        chStage3Input,
+        chStage3Input,
+        chStage3Input
+    )
 
     ASSEMBLE_STAGE3_BANKED_MANIFEST(STAGE3_VARIANT_DISCOVERY_ENGINE.out.stage3_manifest.collect())
 
@@ -564,6 +681,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
                 sample_id: rec.sample_id,
                 patient_id: rec.patient_id ?: rec.sample_id,
                 case_id: rec.case_id ?: rec.patient_id ?: rec.sample_id,
+                run_mode: (rec.run_mode ?: 'production').toString(),
                 validation_token: stage4Token,
                 consent_tokens: mapOrEmpty(rec.consent_tokens),
                 stage0_consent_tokens: mapOrEmpty(rec.stage0_consent_tokens) ?: mapOrEmpty(rec.consent_tokens),
@@ -619,7 +737,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         tuple(meta.sample_id.toString(), phasedVcf, phasedTbi, ancestryMetrics, _phasingAudit, stage5ReferencesMeta)
     }
 
-    STAGE5_CLINICAL_ANNOTATION_PGX_TRIAGE(chStage5Input)
+    STAGE5_ISOLATED_BRANCH_ARCHITECTURE(chStage5Input)
 
     def stage6ReferencesMeta = [
         reference_genome : refGenome,
@@ -640,10 +758,10 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         reference_checksum_manifest: checksumManifest.toString(),
         reference_asset_checksums: checksumMap
     ]
-    def stage6NoFileBundle = file("${projectDir}/assets/NO_FILE.bundle", checkIfExists: true)
-    def stage6NoFileProvenance = file("${projectDir}/assets/NO_FILE.provenance", checkIfExists: true)
+    def stage6NoFileBundle = file('NO_FILE', checkIfExists: false)
+    def stage6NoFileProvenance = file('NO_FILE', checkIfExists: false)
 
-    def chStage6Input = STAGE5_CLINICAL_ANNOTATION_PGX_TRIAGE.out.banked_manifest.flatMap { stage5Manifest ->
+    def chStage6Input = STAGE5_ISOLATED_BRANCH_ARCHITECTURE.out.banked_manifest.flatMap { stage5Manifest ->
         def rows = ys.parse(stage5Manifest)?.samples ?: []
         def stage5Root = stage5Manifest.parent ? stage5Manifest.parent.toFile() : new File(projectRoot)
         def stage5OutRoot = new File(params.outdir.toString())
@@ -673,6 +791,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
 
             def meta = [
                 sample_id: sid,
+                run_mode: (rec.run_mode ?: 'production').toString(),
                 validation_token: rec.validation_token?.toString() ?: 'VALID_PASS|VARIANTS_HARMONIZED|STAGE5_COMPLETE',
                 stage5_manifest: stage5Manifest.toString(),
                 stage5_root: stage5Root.toString(),
@@ -708,7 +827,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
     stage2_manifest = STAGE2_POSTALIGN_SAMPLE_VALIDATION_GATE.out.stage2_contract
     stage3_manifest = STAGE3_VARIANT_DISCOVERY_ENGINE.out.stage3_manifest
     stage4_manifest = STAGE4_ANCESTRY_PHASING_HIGHWAY.out.banked_manifest
-    stage5_manifest = STAGE5_CLINICAL_ANNOTATION_PGX_TRIAGE.out.banked_manifest
+    stage5_manifest = STAGE5_ISOLATED_BRANCH_ARCHITECTURE.out.banked_manifest
     stage6_manifest = STAGE6_CLINICAL_REPORTING_WORKBENCH_GATE.out.banked_manifest
 }
 

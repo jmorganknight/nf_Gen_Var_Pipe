@@ -6,7 +6,7 @@ process PYPGX_PHARMCAT_CALLER {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/pgx", mode: 'rellink', overwrite: true, pattern: '*.json'
+    publishDir "${params.outdir}/pgx", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(phased_vcf), path(phased_tbi), val(reference_meta)

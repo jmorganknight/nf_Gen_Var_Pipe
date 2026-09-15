@@ -138,6 +138,7 @@ for rec in records:
     append_kv(lines, 4, 'specimen_id', rec.get('specimen_id'), 'Physical specimen identifier from accessioning or biobank custody.')
     append_kv(lines, 4, 'analysis_batch_id', rec.get('analysis_batch_id'), 'Batch or run-set identifier used for operational grouping.')
     append_kv(lines, 4, 'sample_type', rec.get('sample_type'), 'Primary biological context enum such as germline or somatic.')
+    append_kv(lines, 4, 'run_mode', rec.get('run_mode', 'production'), 'Sample-sheet governed run mode; production stays fail-closed while audit/dev can continue.')
     append_kv(lines, 4, 'pathologist_tumor_burden', rec.get('pathologist_tumor_burden', 0.0), 'Tumor burden fraction on a 0-1 scale; preserved for downstream callers and review.')
     append_kv(lines, 4, 'gender', rec.get('gender'), 'Declared sex/gender field carried forward from the intake contract.')
     append_map(lines, 4, 'consent', rec.get('consent', {}), consent_comments)

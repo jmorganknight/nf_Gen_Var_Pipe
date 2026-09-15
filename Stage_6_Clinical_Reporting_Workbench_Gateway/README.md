@@ -11,6 +11,12 @@ Stage 6 consumes Stage 5 banked artifacts and enforces final fail-closed report 
 - Builds Medical Director workbench payload and FHIR/HTML/PDF reporting outputs.
 - Emits production telemetry sinks and Stage 6 manifest.
 
+## September 2026 Interface Update
+
+- Stage 6 now consumes Stage 5 manifests where every branch has explicit immutable status metadata.
+- Stage 5 branch entries are expected to be either `COMPLETED` or `SKIPPED_BY_CLINICAL_DIRECTIVE` with auditable bypass policy fields.
+- This preserves CAP/CLIA audit lineage when a clinical directive intentionally bypasses one or more Stage 5 branches.
+
 ## Architecture Flow
 
 ```mermaid
@@ -54,7 +60,7 @@ flowchart TD
 
 Expected input:
 
-- `--input ../Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/banked_stage5/samples_hg002_banked_stage5.yaml`
+- `--input ../Stage_5_Clinical_Annotation_PGx_Triage/tests/mini_control/samples_hg002_banked_stage5.yaml`
 
 Required fields and artifacts:
 
@@ -62,6 +68,7 @@ Required fields and artifacts:
 - Stage 5 clinical bundle (`clinical_bundle.tar.gz`)
 - Stage 5 provenance JSON with signature block
 - Stage 5 annotation/VUS/SF/PRS/PGx artifacts referenced in contract
+- Stage 5 `branches.*.status` and bypass metadata for executed and skipped branch accounting
 
 ## Outputs
 
@@ -129,10 +136,10 @@ Stage 6 consolidates two telemetry channels:
 cd Stage_6_Clinical_Reporting_Workbench_Gateway
 nextflow run main.nf \
   -profile docker \
-  --input ../Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/banked_stage5/samples_hg002_banked_stage5.yaml \
+  --input ../Stage_5_Clinical_Annotation_PGx_Triage/tests/mini_control/samples_hg002_banked_stage5.yaml \
   --references ../conf/references.yaml \
   --thresholds ../conf/thresholds.yaml \
-  --outdir tests/fixtures/banked_stage6
+  --outdir tests/mini_control
 ```
 
 ## FMEA

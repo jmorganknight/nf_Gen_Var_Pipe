@@ -17,7 +17,6 @@ process STAGE4_PGX_PHASE_FILTER {
 
     script:
     def sid = meta.sample_id
-    def pgxGenes = ['CYP2D6', 'CYP2C19', 'DPYD']
     """
     set -euo pipefail
 
@@ -40,7 +39,7 @@ payload.update({
     'phase_region_targets': ['CYP2D6', 'CYP2C19', 'DPYD'],
     'status': 'PASS'
 })
-Path(f'{sid}.pgx_phasing_audit.json').write_text(json.dumps(payload, indent=2) + '\n', encoding='utf-8')
+Path(f'{sid}.pgx_phasing_audit.json').write_text(json.dumps(payload, indent=2) + '\\n', encoding='utf-8')
 PYEOF
     """
 }

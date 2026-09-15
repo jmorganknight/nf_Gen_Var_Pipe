@@ -1,3 +1,6 @@
+⚠️ **CLINICAL PIPELINE UNDER CONSTRUCTION & ACTIVE REFACTORING** ⚠️
+*Notice: This pipeline is currently undergoing a major architectural refactor to enforce CAP/CLIA zero-loss data provenance and strict branch isolation. Upstream stages (1-3) are being cryptographically locked, and Stage 5 is being severed into isolated clinical domains (Germline, PGx, SF, PRS, Somatic). Do not use for production runs until this notice is removed.*
+
 # nf_Gen_Var_Pipe
 
 ## Status
@@ -33,15 +36,35 @@ The production clinical execution path is:
 
 Stage 0 remains the intake/preflight control gate that validates incoming manifests and route decisions before Stage 1.
 
+## September 2026 Compliance Update
+
+Stage 5 now enforces immutable, fail-closed branch routing from the sample manifest control plane.
+
+- `requested_branches` is mandatory per sample and must be a non-duplicate list of recognized branch identifiers.
+- Missing/malformed/unknown branch directives fail hard with non-zero exit (`STAGE5_CONTROL_PLANE_FAILURE`).
+- Unrequested branches do not execute compute; they emit explicit audited skip manifests (`SKIPPED_BY_CLINICAL_DIRECTIVE`).
+- Requested branches are explicitly annotated as `COMPLETED` and included in immutable Stage 5 banked manifest provenance.
+- Stage 6 continues from a complete five-branch Stage 5 manifest set where each branch is explicitly `COMPLETED` or `SKIPPED_BY_CLINICAL_DIRECTIVE`.
+
 ## System Architecture and Scope
 
 ```mermaid
 flowchart LR
-		S1["Stage 1 Alignment"] --> S2["Stage 2 Identity and QC Gate"]
-		S2 --> S3["Stage 3 Variant Discovery"]
-		S3 --> S4["Stage 4 Phasing and PopPCA"]
-		S4 --> S5["Stage 5 Clinical Triage"]
-		S5 --> S6["Stage 6 Telemetry and FHIR"]
+	Y1["samples.yaml"] --> P0["Stage 0 PREFLIGHT_INGESTION_GUARD\nUnified intake audit and contract lock"]
+	Y2["references.yaml"] --> P0
+	Y3["thresholds.yaml"] --> P0
+	Y4["infrastructure.yaml"] --> P0
+	P0 --> S0["Stage 0 Intake Gate\nAUTOMATED_INGEST_GATE + route audit"]
+	S0 --> S1["Stage 1 Alignment"]
+	S1 --> S2["Stage 2 Identity and QC Gate"]
+	S2 --> S3["Stage 3 Variant Discovery"]
+	S3 --> S4["Stage 4 Phasing and PopPCA"]
+	S4 --> CP["Stage 5 Control Plane\nrequested_branches[]"]
+	CP --> S5A["Requested branches execute"]
+	CP --> S5B["Unrequested branches emit audited skip manifests"]
+	S5A --> S5M["Stage 5 immutable banked manifest\n(COMPLETED or SKIPPED per branch)"]
+	S5B --> S5M
+	S5M --> S6["Stage 6 Telemetry and FHIR"]
 ```
 
 ### Stage 1: Alignment Read Processing
@@ -101,6 +124,59 @@ Key runtime conventions:
 - Reference data is mounted through Docker/Apptainer profile mount options.
 - Resource tiers are label-driven (`process_low`, `process_medium`, `process_high`, `process_high_memory`).
 - Fail-closed process policy defaults to retry only for selected infrastructure exits.
+
+## Whole-Pipeline Infrastructure Allocation
+
+Infrastructure-aware allocation now applies at the orchestrator level (Stages 0-6), not only within Stage 3.
+
+Primary control surface:
+- `conf/infrastructure.yaml` -> `pipeline_execution`
+
+Key fields:
+- `local_system.total_cpus`, `local_system.total_memory_gb`
+- `local_system.reserve_cpus`, `local_system.reserve_memory_gb`
+- `profile_selection_mode` (`auto` or `manual`)
+- `active_profile` (used in manual mode)
+- `auto_thresholds.small_max_available_cpus`, `auto_thresholds.medium_max_available_cpus`
+- `profiles.small|medium|large` (`max_cpus`, `max_memory_gb`)
+
+Resolution behavior:
+- `auto` mode computes available resources (`total - reserve`) and selects `small`/`medium`/`large` by thresholds.
+- `manual` mode uses `active_profile`.
+- CLI `--execution_profile <profile>` overrides policy selection.
+- CLI `--max_cpus`, `--max_memory_gb`, `--max_memory` override resolved values.
+
+Operational outcome:
+- Low-core systems naturally reduce global task parallelism.
+- High-core systems scale throughput while remaining bounded by policy.
+- Resolved policy is emitted in orchestrator logs (`PIPELINE_INFRA: ...`) for audit traceability.
+
+## Stage 3 Infrastructure Allocation
+
+Stage 3 now resolves branch allocation from the governed infrastructure contract rather than fixed host assumptions.
+
+Primary control surface:
+- `conf/infrastructure.yaml` -> `stage3_variant_discovery`
+- If `stage3_variant_discovery.local_system` is omitted, Stage 3 inherits `pipeline_execution.local_system`.
+
+Key fields:
+- `local_system.total_cpus`, `local_system.total_memory_gb`
+- `local_system.reserve_cpus`, `local_system.reserve_memory_gb`
+- `profile_selection_mode` (`auto` or `manual`)
+- `active_profile` (used in manual mode)
+- `auto_thresholds.small_max_available_cpus`, `auto_thresholds.medium_max_available_cpus`
+- `profiles.small|medium|large` (`variant_heavy_cpus`, `process_medium_cpus`, memory envelopes, `max_parallel_branches`)
+
+Resolution behavior:
+- `auto` mode computes available resources (`total - reserve`) and selects `small`/`medium`/`large` by thresholds.
+- `manual` mode uses `active_profile`.
+- CLI `--infrastructure_profile <profile>` overrides both.
+- Branch-specific CPU flags (for example `--stage3_cnv_cpus`) still override profile defaults.
+
+Operational outcome:
+- Low-core systems naturally downshift branch concurrency.
+- High-core systems scale to broader parallel execution.
+- Resolved policy is emitted in Stage 3 logs (`STAGE3_INFRA: ...`) for audit traceability.
 
 ## Cryptographic Integrity and Telemetry
 
@@ -177,6 +253,52 @@ python3 Stage_4_Ancestry_Phasing_Highway/tests/fmea/run_stage4_fmea_suite.py
 python3 Stage_5_Clinical_Annotation_PGx_Triage/tests/fmea/run_stage5_fmea_suite.py
 python3 Stage_6_Clinical_Reporting_Workbench_Gateway/tests/fmea/run_stage6_fmea_suite.py
 ```
+
+### Stage 3 Infrastructure Profile Matrix
+
+Use this runner to generate profile-evidence across `small`, `medium`, and `large` Stage 3 infrastructure policies:
+
+```bash
+scripts/run_stage3_infrastructure_profile_matrix.sh
+```
+
+Useful options:
+
+```bash
+scripts/run_stage3_infrastructure_profile_matrix.sh \
+	--input Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control/samples_hg002_banked_stage2_snv_only.yaml \
+	--profiles "small medium large"
+```
+
+Outputs:
+- Per-profile run directories under `Stage_3_Variant_Discovery_Engine/tests/infrastructure_profile_matrix/`
+- Run logs containing the resolved `STAGE3_INFRA` line
+- Summary table `matrix_summary.tsv` for comparative review
+
+### Whole-Pipeline Infrastructure Profile Matrix
+
+Use this runner to generate orchestrator-level (`Stages 0-6`) profile evidence for `small`, `medium`, and `large` execution policies:
+
+```bash
+scripts/run_pipeline_infrastructure_profile_matrix.sh
+```
+
+Prerequisite:
+- Use this only after Stages 4-6 are production-ready for your target validation path.
+- If downstream stages are still under active debugging, use the Stage 3 matrix as the interim infrastructure evidence set.
+
+Useful options:
+
+```bash
+scripts/run_pipeline_infrastructure_profile_matrix.sh \
+	--input assets/mini_control/samples_hg002_mini.yaml \
+	--profiles "small medium large"
+```
+
+Outputs:
+- Per-profile run directories under `tests/infrastructure_profile_matrix/`
+- Run logs with resolved `PIPELINE_INFRA` and `STAGE3_INFRA` lines
+- Summary table `tests/infrastructure_profile_matrix/matrix_summary.tsv`
 
 ## Development Notes
 

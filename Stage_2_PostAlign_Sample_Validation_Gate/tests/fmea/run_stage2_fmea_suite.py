@@ -17,13 +17,14 @@ PIPELINE_ROOT = ROOT.parent
 MAIN_NF = ROOT / "main.nf"
 STAGE1_ROOT = PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing"
 BASE_MANIFEST_CANDIDATES = [
+    STAGE1_ROOT / "tests" / "mini_control" / "samples_hg002_banked_stage1.yaml",
     STAGE1_ROOT / "tests" / "fixtures" / "banked_stage1" / "samples_hg002_banked_stage1.yaml",
     STAGE1_ROOT / "tests" / "fmea" / "runs" / "nominal_hg002" / "out" / "samples_hg002_banked_stage1.yaml",
 ]
 REFERENCES = PIPELINE_ROOT / "conf" / "references.yaml"
 THRESHOLDS = PIPELINE_ROOT / "conf" / "thresholds.yaml"
-SEX_CASE_BAM = STAGE1_ROOT / "tests" / "fixtures" / "banked_stage1" / "HG002_ILLUMINA" / "audit_and_qc" / "identity" / "HG002_ILLUMINA.identity_verified.bam"
-SEX_CASE_BAI = STAGE1_ROOT / "tests" / "fixtures" / "banked_stage1" / "HG002_ILLUMINA" / "audit_and_qc" / "identity" / "HG002_ILLUMINA.identity_verified.bam.bai"
+SEX_CASE_BAM = STAGE1_ROOT / "tests" / "mini_control" / "HG002_ILLUMINA" / "audit_and_qc" / "identity" / "HG002_ILLUMINA.identity_verified.bam"
+SEX_CASE_BAI = STAGE1_ROOT / "tests" / "mini_control" / "HG002_ILLUMINA" / "audit_and_qc" / "identity" / "HG002_ILLUMINA.identity_verified.bam.bai"
 SEX_CASE_INTAKE_TOKEN = STAGE1_ROOT / "tests" / "fmea" / "inputs" / "valid_stage0_token.txt"
 
 
@@ -114,6 +115,9 @@ def materialize_stage1_fixture_paths(manifest_text: str) -> str:
     stage1_root = STAGE1_ROOT.resolve().as_posix()
     pipeline_root = PIPELINE_ROOT.resolve().as_posix()
     return manifest_text.replace(
+        '"tests/mini_control/',
+        f'"{stage1_root}/tests/mini_control/',
+    ).replace(
         '"tests/fixtures/banked_stage1/',
         f'"{stage1_root}/tests/fixtures/banked_stage1/',
     ).replace(
@@ -125,6 +129,12 @@ def materialize_stage1_fixture_paths(manifest_text: str) -> str:
     ).replace(
         '/aligned/HG002_ILLUMINA.identity_verified.bam.bai"',
         '/audit_and_qc/identity/HG002_ILLUMINA.identity_verified.bam.bai"',
+    ).replace(
+        f'mapped_bam: "{stage1_root}/tests/mini_control/aligned/HG002_ILLUMINA.identity_verified.bam"',
+        f'mapped_bam: "{stage1_root}/tests/mini_control/HG002_ILLUMINA/audit_and_qc/identity/HG002_ILLUMINA.identity_verified.bam"',
+    ).replace(
+        f'mapped_bai: "{stage1_root}/tests/mini_control/aligned/HG002_ILLUMINA.identity_verified.bam.bai"',
+        f'mapped_bai: "{stage1_root}/tests/mini_control/HG002_ILLUMINA/audit_and_qc/identity/HG002_ILLUMINA.identity_verified.bam.bai"',
     ).replace(
         f'mapped_bam: "{stage1_root}/tests/fixtures/banked_stage1/aligned/HG002_ILLUMINA.identity_verified.bam"',
         f'mapped_bam: "{stage1_root}/tests/fixtures/banked_stage1/HG002_ILLUMINA/audit_and_qc/identity/HG002_ILLUMINA.identity_verified.bam"',

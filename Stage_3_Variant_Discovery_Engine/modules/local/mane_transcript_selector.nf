@@ -1,13 +1,13 @@
 process MANE_TRANSCRIPT_SELECTOR {
 
     label 'process_low'
-    container 'genvar-core:2.0.0'
+    container 'genvar-core:2.1.0'
 
     input:
-    tuple val(sample_id), path(input_vcf), path(calibration_audit), path(mane_transcripts_file), val(stage3_refs), val(sample_meta)
+    tuple val(sample_id), val(branch_name), path(input_vcf), path(calibration_audit), path(mane_transcripts_file), path(vcf_schema), val(stage3_refs), val(sample_meta)
 
     output:
-    tuple val(sample_id), path('snv_indel.mane_selected.vcf'), path('stage3.mane_transcript_selector.audit.json'), val(stage3_refs), val(sample_meta), path(calibration_audit), emit: selected_vcf
+    tuple val(sample_id), val(branch_name), path("${sample_id}_${branch_name}.mane_selected.vcf"), path("${sample_id}_${branch_name}.mane_transcript_selector.audit.json"), path(vcf_schema), val(stage3_refs), val(sample_meta), path(calibration_audit), emit: selected_vcf
 
     script:
     """
@@ -16,6 +16,9 @@ process MANE_TRANSCRIPT_SELECTOR {
     python3 - <<'PYEOF'
 import json
 from pathlib import Path
+
+NL = chr(10)
+TAB = chr(9)
 
 mane_file = Path('${mane_transcripts_file}')
 if not mane_file.exists():
@@ -28,7 +31,7 @@ def parse_mane_records(path: Path):
         line = raw.strip()
         if not line or line.startswith('#'):
             continue
-        cols = line.split('\t')
+        cols = line.split(TAB)
         if len(cols) < 3:
             continue
         chrom = cols[0].replace('chr', '')
@@ -47,10 +50,11 @@ def parse_mane_records(path: Path):
             label = cols[4]
 
         upper = (label + ' ' + transcript).upper()
-        if 'MANE PLUS CLINICAL' in upper:
+        normalized_label = upper.replace('_', ' ').replace('-', ' ')
+        if 'MANE PLUS CLINICAL' in normalized_label:
             priority = 2
             priority_name = 'MANE_PLUS_CLINICAL'
-        elif 'MANE SELECT' in upper:
+        elif 'MANE SELECT' in normalized_label:
             priority = 1
             priority_name = 'MANE_SELECT'
         else:
@@ -80,10 +84,11 @@ mane_plus = 0
 mane_select = 0
 none = 0
 
-with Path('snv_indel.mane_selected.vcf').open('w', encoding='utf-8') as out:
-    out.write('\\n'.join(header) + '\\n')
+selected_out = Path('${sample_id}_${branch_name}.mane_selected.vcf')
+with selected_out.open('w', encoding='utf-8') as out:
+    out.write(NL.join(header) + NL)
     for rec in body:
-        cols = rec.split('\t')
+        cols = rec.split(TAB)
         if len(cols) < 8:
             continue
         chrom = cols[0].replace('chr', '')
@@ -110,12 +115,14 @@ with Path('snv_indel.mane_selected.vcf').open('w', encoding='utf-8') as out:
         else:
             none += 1
 
-        out.write('\\t'.join(cols) + '\\n')
+        out.write(TAB.join(cols) + NL)
 
-Path('stage3.mane_transcript_selector.audit.json').write_text(
+audit_out = Path('${sample_id}_${branch_name}.mane_transcript_selector.audit.json')
+audit_out.write_text(
     json.dumps(
         {
             'sample_id': '${sample_id}',
+            'branch_name': '${branch_name}',
             'node': 'MANE_TRANSCRIPT_SELECTOR',
             'mane_asset': str(mane_file.resolve()),
             'mane_plus_clinical_records': mane_plus,
@@ -125,7 +132,7 @@ Path('stage3.mane_transcript_selector.audit.json').write_text(
         },
         indent=2,
     )
-    + '\\n',
+    + NL,
     encoding='utf-8',
 )
 PYEOF
@@ -133,10 +140,11 @@ PYEOF
 
     stub:
     """
-    cp "${input_vcf}" snv_indel.mane_selected.vcf
-    cat > stage3.mane_transcript_selector.audit.json <<'JSON'
+    cp "${input_vcf}" "${sample_id}_${branch_name}.mane_selected.vcf"
+    cat > "${sample_id}_${branch_name}.mane_transcript_selector.audit.json" <<'JSON'
 {
   "sample_id": "${sample_id}",
+  "branch_name": "${branch_name}",
   "node": "MANE_TRANSCRIPT_SELECTOR",
   "status": "PASS",
   "stub": true

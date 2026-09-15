@@ -289,6 +289,7 @@ def buildMetaRow(Map sample, String outdir, String branchTargetCatalogDefault = 
         specimen_id: sample.specimen_id,
         analysis_batch_id: sample.analysis_batch_id,
         sample_type: (sample.sample_type ?: 'germline'),
+        run_mode: (sample.run_mode ?: 'production').toString(),
         pathologist_tumor_burden: sample.pathologist_tumor_burden ?: 0.0,
         physician_tumor_purity: sample.physician_tumor_purity,
         gender: (sample.gender ?: 'unknown'),
@@ -406,6 +407,7 @@ workflow STAGE1_ALIGNMENT {
     PREFLIGHT_INGESTION_GUARD(
         chPreflightRows,
         channel.value(referencesFile),
+        channel.value(samplesFile),
         channel.value(samplesFile),
         channel.value(thresholdsFile),
         channel.value(infrastructureFile)

@@ -1,0 +1,14 @@
+{
+  "node": "STAGE5_COMPAT_EXPORT",
+  "sample_id": "HG002_STUB",
+  "consent_state": "BYPASS",
+  "summary": {
+    "sample_id": "HG002_STUB",
+    "branch": "prs",
+    "prs_consent": "OPT_OUT",
+    "status": "OPT_OUT",
+    "reason": "prs_consent: OPT_OUT",
+    "computed_utc": "2026-09-15T02:04:18.517011+00:00"
+  },
+  "source_summary_json": "HG002_STUB.prs_summary.json"
+}

@@ -26,6 +26,7 @@ process PREFLIGHT_INGESTION_GUARD {
     val preflight_sample_rows
     path references_yaml
     path samples_yaml
+    val samples_manifest_source
     path thresholds_yaml
     path infrastructure_yaml
 
@@ -36,6 +37,7 @@ process PREFLIGHT_INGESTION_GUARD {
 
     script:
     def sampleRowsJson = groovy.json.JsonOutput.toJson(preflight_sample_rows ?: []).replace('\n', ' ').replace('\r', '')
+    def samplesManifestSourceJson = groovy.json.JsonOutput.toJson(samples_manifest_source?.toString() ?: samples_yaml.getName().toString())
     """
     set -euo pipefail
 
@@ -44,6 +46,8 @@ import hashlib
 import json
 import os
 from datetime import datetime, timezone
+
+FALLBACK_REF_ROOT = '/opt/reference'
 
 
 def parse_scalar(value):
@@ -71,7 +75,7 @@ def load_yaml_simple(path):
             if not raw.strip() or raw.lstrip().startswith('#'):
                 continue
             indent = len(raw) - len(raw.lstrip(' '))
-            line = raw.rstrip('\n')
+            line = raw.rstrip('\\n')
             if ':' not in line:
                 continue
             key, value = line.strip().split(':', 1)
@@ -129,7 +133,21 @@ def sha256_of_directory(root_dir):
     return digest.hexdigest()
 
 
-def sha256_of_path(path_text):
+def resolve_reference_path(path_text, ref_data_root):
+    if os.path.isabs(path_text):
+        return path_text
+
+    root_text = (ref_data_root or '').strip() or FALLBACK_REF_ROOT
+    rooted = os.path.normpath(os.path.join(root_text, path_text))
+    if os.path.exists(rooted):
+        return rooted
+
+    fallback = os.path.normpath(os.path.join(FALLBACK_REF_ROOT, path_text))
+    return fallback
+
+
+def sha256_of_path(path_text, ref_data_root):
+    path_text = resolve_reference_path(path_text, ref_data_root)
     if os.path.isdir(path_text):
         return sha256_of_directory(path_text)
     return sha256_of_file(path_text)
@@ -188,11 +206,16 @@ refs_doc = load_yaml_simple('${references_yaml}')
 refs = refs_doc.get('references', {})
 if not refs:
     raise RuntimeError('[PREFLIGHT_LOCK] No references block parsed from references manifest')
+yaml_ref_data_root = refs_doc.get('ref_data_root')
+if yaml_ref_data_root is None:
+    yaml_ref_data_root = FALLBACK_REF_ROOT
+yaml_ref_data_root = str(yaml_ref_data_root).strip() or FALLBACK_REF_ROOT
 assert_reference_consistency(refs)
 
 infra_doc = load_yaml_simple('${infrastructure_yaml}')
 containers_cfg = infra_doc.get('containers', {}) if isinstance(infra_doc, dict) else {}
 sample_rows = json.loads('''${sampleRowsJson}''')
+samples_manifest_source = json.loads('''${samplesManifestSourceJson}''')
 
 manifest = {
     'node': 'PREFLIGHT_INGESTION_GUARD',
@@ -214,14 +237,14 @@ manifest = {
 }
 
 for label, path_text in [
-    ('samples_yaml', '${samples_yaml}'),
+    ('samples_yaml', samples_manifest_source),
     ('references_yaml', '${references_yaml}'),
     ('thresholds_yaml', '${thresholds_yaml}'),
     ('infrastructure_yaml', '${infrastructure_yaml}'),
 ]:
     manifest['control_plane_files'][label] = {
         'path': path_text,
-        'sha256': sha256_of_path(path_text),
+        'sha256': sha256_of_file(os.path.basename(path_text)),
     }
 
 
@@ -230,7 +253,7 @@ def walk_refs(obj, prefix=''):
         for key, value in obj.items():
             walk_refs(value, f'{prefix}.{key}' if prefix else key)
     elif isinstance(obj, str) and '/' in obj:
-        manifest['reference_hashes'][prefix] = sha256_of_path(obj)
+        manifest['reference_hashes'][prefix] = sha256_of_path(obj, yaml_ref_data_root)
 
 
 walk_refs(refs)
@@ -247,7 +270,7 @@ for key, expected in expected_sha256.items():
             f"[PREFLIGHT_LOCK] Checksum mismatch for '{key}': expected {expected}, observed {actual}"
         )
 
-payload = json.dumps(manifest, indent=2) + '\n'
+payload = json.dumps(manifest, indent=2) + '\\n'
 with open('preflight_lock.json', 'w', encoding='utf-8') as handle:
     handle.write(payload)
 with open('reference_snapshot.tokens', 'w', encoding='utf-8') as handle:
@@ -255,9 +278,11 @@ with open('reference_snapshot.tokens', 'w', encoding='utf-8') as handle:
 print(json.dumps({'node': manifest['node'], 'preflight_status': manifest['preflight_status'], 'sample_count': manifest['sample_count']}), flush=True)
 PYEOF
 
+    samples_manifest_source='${samples_manifest_source}'
+
     tar -czf yaml_snapshot_bundle.tar.gz \
         "${references_yaml}" \
-        "${samples_yaml}" \
+        "\$(basename "${samples_manifest_source}")" \
         "${thresholds_yaml}" \
         "${infrastructure_yaml}"
     """

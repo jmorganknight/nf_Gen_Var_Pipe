@@ -1,120 +1,148 @@
 # Stage_5_Clinical_Annotation_PGx_Triage
 
-Production-grade standalone Stage 5 micro-pipeline for clinical annotation, Bayesian ACMG/AMP triage, gated secondary findings and PRS reporting, and independent phased PGx interpretation.
+Production Stage 5 branch engine that consumes Stage 4 phased/ancestry-ready payloads, runs parallel clinical interpretation lanes, signs the clinical bundle, and emits a Stage 6-ready banked manifest.
 
 ## Clinical Scope
 
-Stage 5 consumes Stage 4 phased outputs and executes five parallel interpretation channels before assembling and signing the clinical bundle for Stage 6.
+Stage 5 is the interpretation and packaging layer between Stage 4 phasing and Stage 6 reporting. It enforces Stage 4 token/asset preconditions, fans out into independent branch lanes, then cryptographically signs the assembled clinical bundle.
 
-## Parallel Clinical Channels
+## September 2026 Control-Plane Hardening
 
-| Channel | Core Modules | Primary Output |
+- Stage 5 now enforces fail-closed branch routing from `requested_branches` per sample.
+- Missing `requested_branches`, non-list values, blank branch identifiers, unknown branches, or duplicates fail hard with `STAGE5_CONTROL_PLANE_FAILURE`.
+- Unrequested branches do not execute branch compute; they emit explicit audited skip manifests with:
+  - `status: SKIPPED_BY_CLINICAL_DIRECTIVE`
+  - `skip_reason: branch_not_requested_in_manifest_control_plane`
+  - `audit_class: CAP_CLIA_BRANCH_BYPASS`
+- Requested branches are post-annotated with `status: COMPLETED` and `audit_class: CAP_CLIA_BRANCH_EXECUTED`.
+- Stage 5 multi-branch manifest assembly is fail-closed if any of the five branch manifest slots are missing for a sample.
+
+## Branch Topology
+
+| Branch | Core module path | Primary artifact |
 |---|---|---|
-| Germline triage | `GERMLINE_TRIAGE_ENGINE` | germline interpretation summary payload |
-| Somatic/VUS triage | `SOMATIC_ONCO_TRIAGE` + VUS upgrade logic | VUS queue + upgraded evidence payload |
-| PGx (PyPGx/PharmCAT lane) | `PGX_DIPLOTYPE_RESOLVER` (+ stage router lane) | `pgx_report.json` |
-| PRS scoring | `PRS_RISK_SCORE_ENGINE` | calibrated PRS report or governed bypass audit |
-| SF-ACMG opt-out/consent lane | `ACMG_SF73_CLASSIFIER` / opt-out branch | SF report or consent bypass audit |
+| PGx diplotype/actionability | `PGX_DIPLOTYPE_RESOLVER` | `${sample_id}.pgx_summary.json` |
+| PRS | `PRS_RISK_SCORE_ENGINE` | `${sample_id}.prs_summary.json` |
+| ACMG SF | `ACMG_SF73_CLASSIFIER` | `${sample_id}.sf_acmg_summary.json` |
+| Somatic/onco triage | `SOMATIC_ONCO_TRIAGE` | `${sample_id}.somatic_onco_summary.json` |
+| Germline triage | `GERMLINE_TRIAGE_ENGINE` | `${sample_id}.germline_variant_summary.json` |
 
-## Architecture Flow
+All five branch summaries are joined and signed by `CLINICAL_PROVENANCE_MANIFEST`.
+
+## Annotation/Bayesian/VUS Triage Deep-Dive
+
+The annotation lane is a deterministic evidence pipeline with explicit JSON trace fields:
+
+1. `VEP_CORE_ENGINE` parses per-variant evidence fields from VCF INFO.
+2. `translate_vep_to_acmg.py` converts consequence/predictor evidence into ACMG rule candidates.
+3. `CLINVAR_SYNC_ENGINE` captures ClinVar significance + review-status derived star level.
+4. `custom_freq_sieve.py` assigns frequency rules from observed `POPMAX_AF/GNOMAD_AF/AF`.
+5. `acmg_bayesian_classifier.py` computes weighted posterior score and Tier I-IV assignment.
+6. `VUS_TRIAGE_HGMD_SEARCH` keeps Tier III queue and upgrades only when explicit evidence criteria are met.
+
+No synthetic position-based (`pos % N`) scoring or upgrades are used in this branch.
+
+### Evidence Rules
+
+- Loss-of-function consequences (`frameshift`, `stop_gained`, splice donor/acceptor, `start_lost`) -> `PVS1`
+- Multi-predictor deleterious agreement -> `PP3`
+- Multi-predictor benign agreement (without deleterious conflict) -> `BP4`
+- Population frequency rules:
+  - `BA1` when AF >= ancestry BA1 cutoff
+  - `BS1` when AF >= ancestry BS1 cutoff and below BA1
+  - `PM2` when AF <= 0.0001
+  - `UNSET` when frequency is absent or non-actionable
+
+### Bayesian Weighting (Current Production Contract)
+
+`acmg_bayesian_classifier.py` uses additive evidence weights with trace output in `evidence_trace`:
+
+| Evidence | Weight |
+|---|---:|
+| `PVS1` | +2.50 |
+| `PS1` | +1.20 |
+| `PM2` | +0.70 |
+| `PP3` | +0.40 |
+| `BP4` | -0.40 |
+| `BS1` | -0.90 |
+| `BA1` | -2.20 |
+| ClinVar Pathogenic (>=2 stars) | +1.10 |
+| ClinVar Likely Pathogenic (>=2 stars) | +0.70 |
+| ClinVar Benign (>=2 stars) | -1.30 |
+| ClinVar Likely Benign (>=2 stars) | -0.80 |
+
+Tier mapping:
+
+- `Tier I`: score >= 2.40
+- `Tier II`: 1.20 <= score < 2.40
+- `Tier III`: 0.20 <= score < 1.20
+- `Tier IV`: score < 0.20
+
+### VUS Upgrade Gate
+
+`VUS_TRIAGE_HGMD_SEARCH` upgrades Tier III candidates only when all are true:
+
+- ClinVar assertion is pathogenic-direction
+- ClinVar review level is >=2 stars
+- posterior score is >=1.20
+
+Each queued/updated variant carries `upgrade_reason` for audit traceability.
+
+## Data Flow
 
 ```mermaid
 flowchart TD
-  A["Stage 4 banked manifest"] --> B["STAGE5_PRECONDITION_GUARD"]
-  B -->|invalid token or missing phased assets| Z["STAGE5_PRECONDITION_FAILURE\nstage5_rejection_audit.json"]
-  B -->|validated| R["STAGE5_ASSAY_AWARE_ROUTER"]
-
-  R --> V1["VEP_CORE_ENGINE"]
-  R --> V2["CLINVAR_SYNC_ENGINE"]
-  R --> V3["GNOMAD_AGGREGATOR_SIEVE"]
-  V1 --> C["ACMG_BAYESIAN_CLASSIFIER_STAGE5"]
-    V2 --> C
-    V3 --> C
-  C -->|Tier III only| H["VUS_TRIAGE_HGMD_SEARCH"]
-  C -->|Tier I, II, IV retained| M["ASSEMBLE_STAGE5_BANKED_MANIFEST"]
-    H -->|PS4 or PP1 upgrades| M
-
-  R -->|sf_consent valid| S["ACMG_SF_GATED_EVALUATOR"]
-  R -->|sf_consent withheld| S2["acmg_sf_bypassed_audit.json"]
-
-  R -->|prs_consent valid and coverage >= 80%| P1["PRS_SCORE_CALCULATOR"]
-  R -->|prs_consent withheld| P2["prs_bypassed_audit.json"]
-  R -->|coverage < 80%| P3["prs_insufficient_coverage_audit.json"]
-
-  B --> G["PYPGX_PHARMCAT_CALLER"]
-
-    R --> M
-    S --> M
-    S2 --> M
-    P1 --> M
-    P2 --> M
-    P3 --> M
-    G --> M
-  M --> O["tests/fixtures/banked_stage5/samples_hg002_banked_stage5.yaml"]
+    A["Stage 4 banked manifest"] --> B["Stage 5 precondition checks"]
+  B --> C["Control-plane validation\nrequested_branches required"]
+  C --> D{"Per-branch router"}
+  D -->|Requested| E["Run branch workflow\nannotate COMPLETED manifest"]
+  D -->|Not requested| F["Emit skip manifest\nSKIPPED_BY_CLINICAL_DIRECTIVE"]
+  E --> G["5-branch completeness check"]
+  F --> G
+  G --> H["STAGE5_BUILD_MULTI_BRANCH_MANIFEST"]
+  H --> I["samples_hg002_banked_stage5.yaml\nexplicit status per branch"]
+  I --> J["CLINICAL_PROVENANCE_MANIFEST\nRS256 signed clinical bundle"]
+  J --> K["Stage 6 compatibility artifacts"]
 ```
 
-## Cryptographic Integrity
+## Reference Resolution
 
-Stage 5 signs and packages the final clinical bundle through `CLINICAL_PROVENANCE_MANIFEST`:
+Stage 5 automatically resolves branch resources from `--references` and only requires manual `--refs` overrides when custom assets are needed.
 
-- bundles branch outputs into `${sample_id}.clinical_bundle.tar.gz`
-- computes SHA-256 digests for inputs/outputs and bundle payload
-- signs bundle digest with RS256 (`cryptography` primary, OpenSSL fallback)
-- emits `${sample_id}.provenance.json` with digital signature block
+Resolved by default:
 
-Signature fields include:
+- `revel`, `alphamissense`, `cadd`, `spliceai`
+- `clinvar`, `gnomad`
+- `pfam_domains`, `alphafold_annotations`
+- `acmg_schema`
+- `pgx_gene_panel`, `gene_rule_set`, `pgx_cli_script`
 
-- `signature_algorithm: RS256`
-- `signature_value`
-- `signer_id`
-- `public_key_fingerprint`
-- `signed_digest_sha256`
-
-## Module Inventory
-
-- `stage5_precondition_guard.nf`: Pass-through guard module that emits a per-sample validation audit after Stage 4 contract checks succeed.
-- `stage5_assay_aware_router.nf`: Computes SF target coverage and PRS backbone coverage and emits uniform, sample-keyed branch inputs.
-- `vep_core_engine.nf`: Stage-local VEP-core analogue that annotates all phased VCF variants and invokes `bin/translate_vep_to_acmg.py`.
-- `clinvar_sync_engine.nf`: Produces ClinVar `>= 2`-star assertion payloads for all observed variants.
-- `gnomad_aggregator_sieve.nf`: Runs ancestry-aware background frequency sieving using `bin/custom_freq_sieve.py`.
-- `vus_triage_hgmd_search.nf`: Converges the first three streams through `bin/acmg_bayesian_classifier.py`, extracts Tier III candidates, and performs HGMD-style upgrade triage.
-- `acmg_sf_gated_evaluator.nf`: Generates `sf_report.json` or `acmg_sf_bypassed_audit.json` depending on SF consent state.
-- `prs_score_calculator.nf`: Generates `prs_calibrated_report.json`, `prs_bypassed_audit.json`, or `prs_insufficient_coverage_audit.json`.
-- `pypgx_pharmcat_caller.nf`: Independent phased PGx lane for core loci including `CYP2D6`, `CYP2C19`, `CYP2C9`, `SLCO1B1`, `DPYD`, `TPMT`, and `VKORC1`.
-- `assemble_stage5_banked_manifest.nf`: Consolidates branch fragments into the banked Stage 5 handoff contract.
+If required branch references are unresolved, Stage 5 fails closed with `STAGE5_REFERENCE_FAILURE`.
 
 ## Inputs
 
-Expected input:
+Required:
 
-- `--input ../Stage_4_Ancestry_Phasing_Highway/tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml`
-
-Required per sample:
-
+- Stage 4 banked manifest (`--input`) from `Stage_4_Ancestry_Phasing_Highway`
 - `validation_token` containing `VALID_PASS|VARIANTS_HARMONIZED`
-- `phased_vcf`
-- `phased_vcf_tbi`
-- `consent_tokens` or `stage0_consent_tokens`
-- Stage 4 ancestry fields used to calibrate downstream filters
+- `phased_vcf`, `phased_vcf_tbi`, `ancestry_metrics_json`, `phasing_audit_json`
+- signer key pair (default from `thresholds.yaml` reporting section unless overridden)
 
 ## Outputs
 
-Published under `tests/fixtures/banked_stage5/`:
+Published under the selected `--outdir`:
 
-- `annotation/*.vep_core_annotations.json`
-- `annotation/*.vep_to_acmg_rules.json`
-- `annotation/*.clinvar_2star_assertions.json`
-- `annotation/*.gnomad_sieve_rules.json`
 - `annotation/*.stage5_acmg_tiered_variants.json`
+- `annotation/*.stage5_candidate_vus.json`
 - `annotation/*.stage5_vus_triage_queue.json`
 - `secondary_findings/*.sf_report.json`
 - `secondary_findings/*.acmg_sf_bypassed_audit.json`
 - `prs/*.prs_calibrated_report.json`
 - `prs/*.prs_bypassed_audit.json`
-- `prs/*.prs_insufficient_coverage_audit.json`
 - `pgx/*.pgx_report.json`
+- `pgx/*.clinical_bundle.tar.gz`
+- `pgx/*.provenance.json`
 - `audit_and_qc/stage5/*.stage5_router.json`
-- `audit_and_qc/stage5/*.stage5_precondition_guard.json`
 - `samples_hg002_banked_stage5.yaml`
 
 ## Execute
@@ -123,42 +151,28 @@ Published under `tests/fixtures/banked_stage5/`:
 cd Stage_5_Clinical_Annotation_PGx_Triage
 nextflow run main.nf \
   -profile docker \
-  --input ../Stage_4_Ancestry_Phasing_Highway/tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml \
+  --input ../Stage_4_Ancestry_Phasing_Highway/tests/mini_control/samples_hg002_banked_stage4.yaml \
   --references ../conf/references.yaml \
   --thresholds ../conf/thresholds.yaml \
-  --outdir tests/fixtures/banked_stage5/
+  --outdir tests/mini_control
 ```
 
-For signer key overrides:
+Optional signer override:
 
 ```bash
 nextflow run main.nf -profile docker \
-  --input ../Stage_4_Ancestry_Phasing_Highway/tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml \
+  --input ../Stage_4_Ancestry_Phasing_Highway/tests/mini_control/samples_hg002_banked_stage4.yaml \
   --signer_key_path ../keys/clinical_signer.pem \
   --signer_pub_path ../keys/clinical_signer.pub.pem
 ```
 
 ## FMEA
 
-Run:
-
 ```bash
 python3 tests/fmea/run_stage5_fmea_suite.py
 ```
 
-Scenarios:
-
-- `invalid_stage4_token` -> fail closed with `STAGE5_PRECONDITION_FAILURE`.
-- `unconsented_sf_access_attempt` -> bypass SF and emit audit payload.
-- `unconsented_prs_access_attempt` -> bypass PRS and emit audit payload.
-- `insufficient_prs_backbone_coverage` -> emit coverage audit without crashing.
-
 ## Notes
 
-Stage-local helper scripts are provided in `bin/`:
-
-- `translate_vep_to_acmg.py`
-- `custom_freq_sieve.py`
-- `acmg_bayesian_classifier.py`
-
-These are adapted stage-local implementations because the exact requested helper filenames are not present in the source repository `bin/` directory.
+- Stage 5 emits Stage 6-compatible annotation/PRS/SF/PGx artifact names and a complete banked manifest.
+- Signed bundle/provenance artifacts are generated per sample and referenced in `samples_hg002_banked_stage5.yaml`.

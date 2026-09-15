@@ -274,6 +274,7 @@ def buildMetaRow(Map sample, String outdir) {
         specimen_id             : sample.specimen_id,
         analysis_batch_id       : sample.analysis_batch_id,
         sample_type             : sample.sample_type,
+        run_mode                : (sample.run_mode ?: 'production').toString(),
         pathologist_tumor_burden: sample.pathologist_tumor_burden ?: 0.0,
         gender                  : sample.gender,
         prs_consent             : (consent.prs_opt_in ?: false),
@@ -329,6 +330,7 @@ workflow STAGE0_PREFLIGHT_INGEST {
     ch_thresholds_yaml
     ch_references_yaml
     ch_samples_yaml
+    ch_samples_manifest_source
     ch_infrastructure_yaml
     ch_signer_key
     ch_signer_pub
@@ -349,7 +351,7 @@ workflow STAGE0_PREFLIGHT_INGEST {
         ]
     }.collect()
 
-    PREFLIGHT_INGESTION_GUARD(ch_preflight_rows, ch_references_yaml, ch_samples_yaml, ch_thresholds_yaml, ch_infrastructure_yaml)
+    PREFLIGHT_INGESTION_GUARD(ch_preflight_rows, ch_references_yaml, ch_samples_yaml, ch_samples_manifest_source, ch_thresholds_yaml, ch_infrastructure_yaml)
 
     def ch_preflight_lock = PREFLIGHT_INGESTION_GUARD.out.preflight_lock
     def ch_snapshot_tokens = PREFLIGHT_INGESTION_GUARD.out.snapshot_tokens
@@ -504,6 +506,7 @@ workflow {
     def chThresholdsYaml = channel.value(file(thresholdsFile, checkIfExists: true))
     def chReferencesYaml = channel.value(file(referencesFile, checkIfExists: true))
     def chSamplesYaml = channel.value(file(samplesFile, checkIfExists: true))
+    def chSamplesManifestSource = channel.value(samplesFile.canonicalPath)
     def chInfrastructureYaml = channel.value(file(infrastructureFile, checkIfExists: true))
     def chSignerKey = channel.value(file(signerKeyResolved, checkIfExists: true))
     def chSignerPub = channel.value(file(signerPubResolved, checkIfExists: true))
@@ -513,6 +516,7 @@ workflow {
         chThresholdsYaml,
         chReferencesYaml,
         chSamplesYaml,
+        chSamplesManifestSource,
         chInfrastructureYaml,
         chSignerKey,
         chSignerPub

@@ -6,7 +6,7 @@ process ACMG_SF_GATED_EVALUATOR {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/secondary_findings", mode: 'rellink', overwrite: true, pattern: '*.json'
+    publishDir "${params.outdir}/secondary_findings", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(phased_vcf), path(phased_tbi), val(reference_meta), path(router_json)

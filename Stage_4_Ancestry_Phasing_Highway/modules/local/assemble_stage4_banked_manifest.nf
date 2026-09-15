@@ -4,7 +4,7 @@ process ASSEMBLE_STAGE4_BANKED_MANIFEST {
     container 'wes-onco-core:1.0.0'
     stageInMode 'symlink'
 
-    publishDir "${params.outdir}", mode: 'rellink', overwrite: true, pattern: 'samples_hg002_banked_stage4.yaml'
+    publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'samples_hg002_banked_stage4.yaml'
 
     input:
     path manifest_fragments
@@ -32,7 +32,10 @@ lines.append('# ================================================================
 lines.append('samples:')
 for rec in samples:
     lines.append(f'  - sample_id: "{rec["sample_id"]}"')
+    lines.append(f'    run_mode: "{rec.get("run_mode", "production")}"')
     lines.append(f'    validation_token: "{rec.get("validation_token", "")}"')
+    lines.append(f'    stage2_contamination_status: "{rec.get("stage2_contamination_status", "")}"')
+    lines.append(f'    stage2_contamination_policy_action: "{rec.get("stage2_contamination_policy_action", "")}"')
     lines.append('    consent_tokens:')
     for key, value in (rec.get('consent_tokens') or {}).items():
         lines.append(f'      {key}: "{value}"')

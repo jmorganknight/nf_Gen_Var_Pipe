@@ -28,6 +28,17 @@ sid = meta['sample_id']
 contamination_payload = json.loads(Path('${contamination_audit}').read_text(encoding='utf-8'))
 purity_sex_payload = json.loads(Path('${purity_sex_audit}').read_text(encoding='utf-8'))
 
+contam_status = str(contamination_payload.get('status') or '').upper()
+run_mode = str(meta.get('run_mode') or 'production').strip().lower()
+audit_mode = run_mode in ('dev', 'audit_only')
+if contam_status != 'PASS' and not audit_mode:
+    detail = contamination_payload.get('failure_detail') or contamination_payload.get('skip_reason') or 'contamination gate did not PASS'
+    raise SystemExit(
+        f"STAGE2_BANKING_PRECONDITION_FAILURE: contamination audit status={contam_status} for sample '{sid}' -> {detail}"
+    )
+
+policy_action = 'CONTINUE_FOR_AUDIT' if contam_status != 'PASS' and audit_mode else 'PASS_THROUGH'
+
 purity_block = purity_sex_payload.get('purity_validation', {})
 sex_block = purity_sex_payload.get('sex_concordance', {})
 
@@ -43,6 +54,7 @@ payload = {
     'sample_id': sid,
     'patient_id': meta.get('patient_id'),
     'case_id': meta.get('case_id'),
+    'run_mode': run_mode,
     'sample_type': meta.get('sample_type'),
     'sequencing_type': meta.get('sequencing_type'),
     'reported_sex': meta.get('reported_sex'),
@@ -72,6 +84,8 @@ payload = {
     'contamination_audit': str(Path('${contamination_audit}').resolve()),
     'purity_and_sex_validation_audit': str(Path('${purity_sex_audit}').resolve()),
     'assay_target_router_audit': str(Path('${router_audit}').resolve()),
+    'stage2_contamination_status': contam_status,
+    'stage2_contamination_policy_action': policy_action,
     'estimated_in_silico_purity': sample_qc_meta['estimated_in_silico_purity'],
     'contamination_rate': sample_qc_meta['contamination_rate'],
     'computed_sex': sample_qc_meta['computed_sex'],
@@ -90,6 +104,10 @@ payload = {
     'save_dir': meta.get('save_dir'),
     'stage2_timestamp_utc': datetime.now(timezone.utc).isoformat(),
 }
+
+if contam_status != 'PASS' and audit_mode:
+    payload['stage2_governance_note'] = 'CONTAMINATION_FAILURE_CONTINUED_FOR_AUDIT_ONLY'
+    payload['validation_token'] = meta.get('validation_token')
 
 Path(f"{sid}.stage2.contract.fragment.json").write_text(json.dumps(payload, indent=2) + '\\n', encoding='utf-8')
 PYEOF

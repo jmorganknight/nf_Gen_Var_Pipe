@@ -4,7 +4,7 @@ process ASSEMBLE_STAGE5_BANKED_MANIFEST {
     container 'wes-onco-core:1.0.0'
     stageInMode 'symlink'
 
-    publishDir "${params.outdir}", mode: 'rellink', overwrite: true, pattern: 'samples_hg002_banked_stage5.yaml'
+    publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'samples_hg002_banked_stage5.yaml'
 
     input:
     path manifest_fragments
@@ -47,6 +47,7 @@ for sid in sorted(by_sample):
     pgx = comp.get('pgx', {})
 
     lines.append(f'  - sample_id: "{sid}"')
+    lines.append(f'    run_mode: "{router.get("run_mode", "production")}"')
     lines.append('    validation_token: "VALID_PASS|VARIANTS_HARMONIZED|STAGE5_COMPLETE"')
     lines.append('    lineage:')
     lines.append('      source_stage: "Stage_4_Ancestry_Phasing_Highway"')
@@ -63,6 +64,8 @@ for sid in sorted(by_sample):
         lines.append('      []')
     lines.append('    assay_router:')
     lines.append(f'      sequencing_type: "{router.get("sequencing_type", "WES")}"')
+    lines.append(f'      stage2_contamination_status: "{router.get("stage2_contamination_status", "")}"')
+    lines.append(f'      stage2_contamination_policy_action: "{router.get("stage2_contamination_policy_action", "")}"')
     lines.append(f'      sf_mask_coverage: {router.get("sf_mask_coverage", 1.0)}')
     lines.append(f'      prs_backbone_coverage: {router.get("prs_backbone_coverage", 1.0)}')
     lines.append(f'      prs_gate_pass: {str(bool(router.get("prs_gate_pass", False))).lower()}')
@@ -87,7 +90,7 @@ for sid in sorted(by_sample):
     lines.append(f'      pgx_report_json: "{pgx.get("pgx_actionability_json", pgx.get("pgx_report", ""))}"')
     lines.append(f'      clinical_bundle_tar_gz: "{pgx.get("clinical_bundle_tar_gz", "")}"')
     lines.append(f'      provenance_json: "{pgx.get("provenance_json", "")}"')
-    lines.append('    save_dir: "tests/fixtures/banked_stage5"')
+    lines.append('    save_dir: "${params.outdir}"')
 
 Path('samples_hg002_banked_stage5.yaml').write_text("\\n".join(lines) + "\\n", encoding='utf-8')
 PYEOF

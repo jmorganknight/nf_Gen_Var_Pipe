@@ -6,6 +6,18 @@ Standalone Stage 4 micro-pipeline for ancestry projection and haplotype phasing 
 
 Stage 4 transforms Stage 3 harmonized variants into ancestry- and phasing-aware handoff artifacts required by Stage 5 clinical interpretation.
 
+Execution order is enforced as:
+
+1. two-layer PopPCA projection (Layer 1 superpopulation, Layer 2 subpopulation)
+2. read-backed phasing over the ancestry-projected payload
+3. immutable Stage 4 contract banking for Stage 5
+
+## September 2026 Update
+
+- Stage 4 handoff documentation now explicitly includes Stage 5 branch control-plane continuity.
+- `requested_branches` is a required Stage 5 control-plane directive and must be present on Stage 5 intake manifests.
+- Missing or malformed branch-control directives are now fail-closed at Stage 5 intake (`STAGE5_CONTROL_PLANE_FAILURE`), so Stage 4 contract integrity is critical.
+
 ## Architecture Flow
 
 ```mermaid
@@ -19,7 +31,8 @@ flowchart TD
     F --> G["BANK_STAGE4_CONTRACT"]
     D --> G
     G --> H["ASSEMBLE_STAGE4_BANKED_MANIFEST"]
-    H --> I["tests/fixtures/banked_stage4/samples_hg002_banked_stage4.yaml"]
+    H --> I["tests/mini_control/samples_hg002_banked_stage4.yaml"]
+    I --> J["Stage 5 intake (requires requested_branches)\nrequested-vs-skipped branch router"]
 ```
 
 ## Population Projection and Phasing Stack
@@ -33,6 +46,7 @@ Implementation notes:
 
 - Projection metadata records `projection_engine: nf_PopPCA_refgen`.
 - Projection method is tool-aware (`plink2_projection` when available, deterministic guarded fallback otherwise).
+- Layer assignment is model-structure aware (`models/layer2/<superpopulation>/...`) with deterministic selection fallback when model assets are sparse.
 - Runtime toolchain aligns with PLINK 1.9/2.0 compatible reference projection workflows.
 
 ## Module Inventory
@@ -48,7 +62,7 @@ Implementation notes:
 
 Expected input:
 
-- [Stage 3 banked manifest](../Stage_3_Variant_Discovery_Engine/tests/fixtures/banked_stage3/samples_hg002_banked_stage3.yaml)
+- [Stage 3 banked manifest](../Stage_3_Variant_Discovery_Engine/tests/mini_control/samples_hg002_banked_stage3.yaml)
 
 Required fields:
 
@@ -59,10 +73,11 @@ Required fields:
 - `sorted_bai`
 - `reference_build`
 - `consent_tokens` / `stage0_consent_tokens`
+- `requested_branches` (Stage 5 branch control-plane list; consumed fail-closed by Stage 5 intake)
 
 ## Outputs
 
-Published to `tests/fixtures/banked_stage4/`:
+Published to `tests/mini_control/`:
 
 - `phased/*.phased.vcf.gz`
 - `phased/*.phased.vcf.gz.tbi`
@@ -76,10 +91,10 @@ Published to `tests/fixtures/banked_stage4/`:
 cd Stage_4_Ancestry_Phasing_Highway
 nextflow run main.nf \
     -profile docker \
-    --input ../Stage_3_Variant_Discovery_Engine/tests/fixtures/banked_stage3/samples_hg002_banked_stage3.yaml \
+    --input ../Stage_3_Variant_Discovery_Engine/tests/mini_control/samples_hg002_banked_stage3.yaml \
     --references ../conf/references.yaml \
     --thresholds ../conf/thresholds.yaml \
-    --outdir tests/fixtures/banked_stage4
+    --outdir tests/mini_control
 ```
 
 ## FMEA

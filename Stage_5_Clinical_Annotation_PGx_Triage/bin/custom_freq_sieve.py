@@ -22,6 +22,38 @@ def open_text(path: Path):
     return path.open('r', encoding='utf-8')
 
 
+def parse_info_map(info_text: str) -> dict:
+    info = {}
+    for item in info_text.split(';'):
+        token = item.strip()
+        if not token:
+            continue
+        if '=' in token:
+            key, value = token.split('=', 1)
+            info[key] = value
+        else:
+            info[token] = True
+    return info
+
+
+def first_float(values):
+    for raw in values:
+        if raw is None:
+            continue
+        text = str(raw).strip()
+        if not text or text == '.':
+            continue
+        for piece in text.split(','):
+            piece = piece.strip()
+            if not piece or piece == '.':
+                continue
+            try:
+                return float(piece)
+            except ValueError:
+                continue
+    return None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('--vcf', required=True)
@@ -39,26 +71,44 @@ def main() -> None:
             if raw.startswith('#'):
                 continue
             parts = raw.rstrip().split('\t')
-            if len(parts) < 5:
+            if len(parts) < 8:
                 continue
-            chrom, pos, _vid, ref, alt = parts[:5]
-            pos_i = int(pos)
-            synthetic_af = (pos_i % 97) / 1000.0
-            if synthetic_af >= ba1_cutoff:
+            chrom, pos, _vid, ref, alt, _qual, _flt, info_text = parts[:8]
+            info = parse_info_map(info_text)
+            popmax_af = first_float([
+                info.get('POPMAX_AF'),
+                info.get('GNOMAD_POPMAX_AF'),
+                info.get('GNOMAD_AF'),
+                info.get('AF'),
+            ])
+
+            if popmax_af is None:
+                rule = 'UNSET'
+                source = 'NO_FREQ_DATA'
+            elif popmax_af >= ba1_cutoff:
                 rule = 'BA1'
-            elif synthetic_af >= bs1_cutoff:
+                source = 'POPMAX_AF'
+            elif popmax_af >= bs1_cutoff:
                 rule = 'BS1'
-            else:
+                source = 'POPMAX_AF'
+            elif popmax_af <= 0.0001:
                 rule = 'PM2'
+                source = 'POPMAX_AF'
+            else:
+                rule = 'UNSET'
+                source = 'POPMAX_AF'
+
             rules.append({
                 'variant': f'{chrom}:{pos}:{ref}:{alt}',
-                'synthetic_popmax_af': round(synthetic_af, 6),
+                'popmax_af': None if popmax_af is None else round(popmax_af, 6),
                 'rule': rule,
+                'frequency_source': source,
                 'ancestry_label': ancestry,
             })
 
     payload = {
         'node': 'custom_freq_sieve.py',
+        'frequency_rule_engine_version': 'stage5-frequency-evidence-v1',
         'sample_id': args.sample_id,
         'ancestry_label': ancestry,
         'rules': rules,

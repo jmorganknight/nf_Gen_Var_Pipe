@@ -144,6 +144,7 @@ for record in records:
     append_kv(lines, 4, 'specimen_id', record.get('specimen_id'), 'Physical specimen identifier from accessioning or biobank custody.')
     append_kv(lines, 4, 'analysis_batch_id', record.get('analysis_batch_id'), 'Batch or run-set identifier used for operational grouping.')
     append_kv(lines, 4, 'sample_type', record.get('sample_type'), 'Primary biological context enum such as germline or somatic.')
+    append_kv(lines, 4, 'run_mode', record.get('run_mode', 'production'), 'Sample-sheet governed run mode; production stays fail-closed while audit/dev can continue.')
     append_kv(lines, 4, 'pathologist_tumor_burden', record.get('pathologist_tumor_burden', 0.0), 'Tumor burden fraction on a 0-1 scale; 0.0 is expected for germline controls.')
     append_kv(lines, 4, 'gender', record.get('gender'), 'Declared sex/gender field required by the Stage 0 sex concordance gate.')
 

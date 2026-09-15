@@ -6,7 +6,7 @@ process GNOMAD_AGGREGATOR_SIEVE {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/annotation", mode: 'rellink', overwrite: true, pattern: '*.json'
+    publishDir "${params.outdir}/annotation", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(phased_vcf), path(phased_tbi), val(reference_meta), path(router_json), path(custom_freq_sieve_script)

@@ -1,5 +1,6 @@
 samples:
   - sample_id: "hg002_mini"
+    run_mode: "audit_only"
     sample_type: "germline"  # Allowed: germline | somatic_matched | tumor_only | liquid_biopsy
     sequencing_platform: "illumina"  # Allowed: illumina | ultima | element | ont
     library_strategy: "WGS"  # Allowed: WGS | WES
@@ -7,8 +8,8 @@ samples:
     physician_tumor_purity: 0.00
 
     read_file_paths:
-      read1: "assets/hg002_mini_R1.fastq.gz"
-      read2: "assets/hg002_mini_R2.fastq.gz"
+      read1: "assets/mini_control/hg002_mini_R1.fastq.gz"
+      read2: "assets/mini_control/hg002_mini_R2.fastq.gz"
 
     mapped_paths:
       bam: "assets/hg002_mini.bam"

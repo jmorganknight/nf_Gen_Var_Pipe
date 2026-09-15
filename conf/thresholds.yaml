@@ -40,7 +40,9 @@ clinical:
   discovery:
     manta_min_rescue_score: 20  # Minimum rescue score for structural-variant rescue logic.
     sv_reciprocal_overlap_min: 0.50  # Minimum reciprocal overlap fraction for SV consolidation.
+    large_indel_min_size_bp: 50  # Minimum absolute REF/ALT length delta treated as large-indel evidence in the SV lane.
     cnv_mapq_floor: 20  # Minimum mapping quality retained for copy-number modeling.
+    cnv_log2_abs_floor: 0.20  # Minimum absolute CNVkit log2 retained as PASS in Stage 3 CNV reporting.
     dnascope_min_mapq: 20  # Minimum mapping quality retained for DNAscope evidence.
     somatic_min_vaf_lod: 0.02  # Minimum VAF retained for somatic evidence accumulation.
     somatic_min_lod_score: 4.0  # Minimum log-odds score retained for somatic evidence.
@@ -50,6 +52,8 @@ clinical:
     snv_gc_bias_threshold: 0.8  # Platform-dependent GC bias cutoff used where a GC-bias feature exists.
     somatic_qual_floor: 20  # Minimum QUAL retained for somatic structural-variant review.
     germline_qual_floor: 10  # Minimum QUAL retained for germline structural-variant review.
+    trisomy_ratio_threshold: 1.35  # Minimum chromosome mapped-read ratio (vs autosome median) for trisomy candidate calling.
+    trisomy_z_threshold: 3.0  # Minimum autosome-normalized z-score for trisomy candidate calling.
     enable_reference_backed_norm: true  # True enables left-normalization/reference-backed decomposition.
     atomize_multiallelic: true  # True splits multiallelic sites into atomic records before annotation.
 
@@ -75,6 +79,11 @@ clinical:
     pki_key_path: "keys/clinical_signer.pem"  # Repo-governed signer private-key path used for RS256 clinical payload signatures.
     pki_pub_key_path: "keys/clinical_signer.pub.pem"  # Repo-governed signer public-key path used for audit fingerprinting.
     consent_token_namespace: "CONSENT_V1"  # Namespace label applied to derived consent-routing tokens.
+
+stage2:
+  contamination_fail_closed: true  # True enforces hard failure when contamination exceeds threshold or execution errors occur.
+  contamination_non_evaluable_fail_closed: true  # True enforces hard failure when contamination cannot be evaluated (e.g., insufficient marker overlap).
+  purity_fail_closed: false  # Current validated policy keeps purity discordance advisory unless explicitly raised.
 
 platform_specific_overrides:
   illumina:

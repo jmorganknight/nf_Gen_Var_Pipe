@@ -119,7 +119,7 @@ Stage 1 now includes explicit runtime guards before alignment execution:
 
 ## Outputs
 
-Published under `tests/fixtures/banked_stage1/`:
+Published under `tests/mini_control/`:
 
 - `aligned/*.identity_verified.bam`
 - `aligned/*.identity_verified.bam.bai`
@@ -145,8 +145,8 @@ Run Stage 1 standalone:
 cd Stage_1_Alignment_Read_Processing
 nextflow run main.nf \
     -profile docker \
-    --input tests/fixtures/banked_stage0/samples_hg002_banked_stage0.yaml \
-    --outdir tests/fixtures/banked_stage1
+    --input tests/mini_control/samples_hg002_banked_stage0.yaml \
+    --outdir tests/mini_control
 ```
 
 Dev-fast validation:

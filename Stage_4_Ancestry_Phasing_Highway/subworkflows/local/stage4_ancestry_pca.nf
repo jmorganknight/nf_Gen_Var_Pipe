@@ -42,7 +42,7 @@ payload = {
     },
     'phasing_panel_bed': '${phasing_panel_bed}'
 }
-Path(f'{sid}.ancestry_load_weights.json').write_text(json.dumps(payload, indent=2) + '\n', encoding='utf-8')
+Path(f'{sid}.ancestry_load_weights.json').write_text(json.dumps(payload, indent=2) + '\\n', encoding='utf-8')
 PYEOF
     """
 }

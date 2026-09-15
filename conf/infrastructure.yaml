@@ -16,6 +16,10 @@ containers:
     image: "wes-onco-core@sha256:d630bd5dd78ba4f469b80d7b0dbd09a5a1bd8841415ed1bbe91d8559a1ff8906"  # Primary runtime image used for intake, alignment, audit, and banking tasks.
     sif: "file://containers/wes-onco-core.sif"  # Apptainer/Singularity image URI for offline or HPC execution.
     digest: "sha256:d630bd5dd78ba4f469b80d7b0dbd09a5a1bd8841415ed1bbe91d8559a1ff8906"  # Immutable image ID captured for governed runs.
+  stage3_core:
+    image: "genvar-core:2.1.0"  # Stage 3 discovery image for active SV/CNV/STR/trisomy/homology branches.
+    sif: ""  # Optional SIF URI when Stage 3 discovery image is promoted into offline/HPC distribution.
+    digest: "sha256:446eadc13d0322b907224fbccd57914da190407b43772bf8e9753b27f9b41092"  # Local image digest for traceability pending registry push.
   annotation:
     image: "wes-onco-annotation@sha256:84ebaaaaf5512dc8398dc98a61215a5d419caf1a32bd1ef68369dbcb19d1b69c"  # Downstream annotation image tracked so preflight audits capture the whole governed stack.
     sif: "file://containers/wes-onco-annotation.sif"  # Apptainer/SIF URI for the annotation container.
@@ -38,3 +42,90 @@ process_resources:
     cpus: 16  # CPU cores reserved for alignment and other high-throughput governed tasks.
     memory_gb: 128  # Memory reservation in GB.
     time_hours: 24  # Wall-clock limit in hours.
+
+pipeline_execution:
+  # User-declared host envelope for whole-pipeline scheduling (Stages 0-6).
+  local_system:
+    total_cpus: 32
+    total_memory_gb: 512
+    reserve_cpus: 4
+    reserve_memory_gb: 32
+
+  # Profile selection policy:
+  # - auto: resolve by available CPUs after reserve subtraction.
+  # - manual: use active_profile.
+  profile_selection_mode: auto
+  active_profile: medium
+
+  auto_thresholds:
+    small_max_available_cpus: 12
+    medium_max_available_cpus: 24
+
+  profiles:
+    small:
+      max_cpus: 8
+      max_memory_gb: 64
+      notes: "Conservative mode for 8-12 core systems."
+    medium:
+      max_cpus: 16
+      max_memory_gb: 192
+      notes: "Balanced mode for 16-24 core systems."
+    large:
+      max_cpus: 32
+      max_memory_gb: 384
+      notes: "Throughput mode for 32+ core systems."
+
+  cloud:
+    enabled: false
+    execution_platform: "unset"  # Example: aws-batch, azure-batch, gcp-batch
+    notes: "Reserved for future cloud execution policy wiring."
+
+stage3_variant_discovery:
+  # User-declared system envelope. This is the governed source of truth for local sizing.
+  local_system:
+    total_cpus: 32  # Physical/logical CPU cores available for pipeline use.
+    total_memory_gb: 512  # Host memory available for pipeline scheduling.
+    reserve_cpus: 4  # CPU headroom reserved for OS/background services.
+    reserve_memory_gb: 32  # Memory headroom reserved for OS/background services.
+
+  # Resource policy:
+  # - auto: choose profile from available CPUs after reserves are applied.
+  # - manual: always use active_profile.
+  profile_selection_mode: auto
+  active_profile: medium
+
+  # Auto selection thresholds based on available CPUs (= total_cpus - reserve_cpus).
+  auto_thresholds:
+    small_max_available_cpus: 12
+    medium_max_available_cpus: 24
+
+  # Stage 3 runtime profiles.
+  profiles:
+    small:
+      variant_heavy_cpus: 4
+      process_medium_cpus: 2
+      variant_heavy_memory_gb: 16
+      process_medium_memory_gb: 16
+      max_parallel_branches: 2
+      notes: "For 8-12 core systems."
+
+    medium:
+      variant_heavy_cpus: 8
+      process_medium_cpus: 4
+      variant_heavy_memory_gb: 32
+      process_medium_memory_gb: 24
+      max_parallel_branches: 4
+      notes: "For 16-24 core systems."
+
+    large:
+      variant_heavy_cpus: 12
+      process_medium_cpus: 6
+      variant_heavy_memory_gb: 48
+      process_medium_memory_gb: 32
+      max_parallel_branches: 6
+      notes: "For 32+ core systems."
+
+  # Forward-compatible cloud shape (not activated in this change).
+  cloud:
+    enabled: false
+    execution_platform: "unset"  # Example: aws-batch, azure-batch, gcp-batch

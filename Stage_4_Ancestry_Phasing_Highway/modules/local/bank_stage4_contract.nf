@@ -6,7 +6,7 @@ process BANK_STAGE4_CONTRACT {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/audit_and_qc/stage4", mode: 'rellink', overwrite: true, pattern: '*.json'
+    publishDir "${params.outdir}/audit_and_qc/stage4", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(ancestry_metrics_json), path(phased_vcf), path(phased_tbi), path(phasing_audit)
@@ -32,7 +32,10 @@ ancestry = json.loads(Path(ancestry_path).read_text(encoding='utf-8'))
 
 fragment = {
     'sample_id': sid,
+    'run_mode': meta.get('run_mode', 'production'),
     'validation_token': meta.get('validation_token', ''),
+    'stage2_contamination_status': meta.get('stage2_contamination_status', ''),
+    'stage2_contamination_policy_action': meta.get('stage2_contamination_policy_action', ''),
     'consent_tokens': meta.get('consent_tokens', {}),
     'stage0_consent_tokens': meta.get('stage0_consent_tokens', {}),
     'variant_branches': meta.get('variant_branches', {}),

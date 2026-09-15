@@ -145,6 +145,12 @@ def hostPathForReference(String pathText, String refDir) {
     return new File(pathText)
 }
 
+def sha256Hex(File fileObj) {
+    def digest = java.security.MessageDigest.getInstance('SHA-256')
+    digest.update(fileObj.bytes)
+    digest.digest().collect { byte b -> String.format('%02x', b) }.join()
+}
+
 
 def writeStage4Rejection(String outdir, String sampleId, String reason, String detail, Map extra = [:]) {
     def auditDir = new File("${outdir}/audit_and_qc/stage4")
@@ -168,6 +174,9 @@ def buildMetaRow(Map sample, String outdir) {
         sample_id: sample.sample_id,
         patient_id: (sample.patient_id ?: sample.sample_id),
         case_id: (sample.case_id ?: sample.patient_id ?: sample.sample_id),
+        run_mode: (sample.run_mode ?: 'production').toString(),
+        stage2_contamination_status: sample.stage2_contamination_status ?: '',
+        stage2_contamination_policy_action: sample.stage2_contamination_policy_action ?: '',
         validation_token: sample.validation_token?.toString(),
         consent_tokens: consentTokens,
         stage0_consent_tokens: stage0Tokens,
@@ -294,6 +303,40 @@ workflow {
                 writeStage4Rejection(params.outdir.toString(), sid, 'STAGE3_ASSET_NOT_FOUND', "${field}=${raw}")
                 throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: stage 3 asset not found '${field}' for sample '${sid}'")
             }
+        }
+
+        def normalizedVcf = resolvePath(sample.normalized_vcf.toString(), samplesRoot)
+        def normalizedVcfShaExpected = sample.normalized_vcf_sha256?.toString()?.trim()
+        if (!normalizedVcfShaExpected) {
+            writeStage4Rejection(params.outdir.toString(), sid, 'MISSING_STAGE3_ASSET_HASH', 'normalized_vcf_sha256')
+            throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: missing 'normalized_vcf_sha256' for sample '${sid}'")
+        }
+        def normalizedVcfShaObserved = sha256Hex(normalizedVcf)
+        if (normalizedVcfShaObserved != normalizedVcfShaExpected.toLowerCase()) {
+            writeStage4Rejection(
+                params.outdir.toString(),
+                sid,
+                'STAGE3_VCF_SHA256_MISMATCH',
+                "normalized_vcf_sha256=${normalizedVcfShaExpected}; observed=${normalizedVcfShaObserved}"
+            )
+            throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: normalized VCF SHA-256 mismatch for sample '${sid}'")
+        }
+
+        def normalizedVcfTbi = resolvePath(sample.normalized_vcf_tbi.toString(), samplesRoot)
+        def normalizedVcfTbiShaExpected = sample.normalized_vcf_tbi_sha256?.toString()?.trim()
+        if (!normalizedVcfTbiShaExpected) {
+            writeStage4Rejection(params.outdir.toString(), sid, 'MISSING_STAGE3_ASSET_HASH', 'normalized_vcf_tbi_sha256')
+            throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: missing 'normalized_vcf_tbi_sha256' for sample '${sid}'")
+        }
+        def normalizedVcfTbiShaObserved = sha256Hex(normalizedVcfTbi)
+        if (normalizedVcfTbiShaObserved != normalizedVcfTbiShaExpected.toLowerCase()) {
+            writeStage4Rejection(
+                params.outdir.toString(),
+                sid,
+                'STAGE3_TBI_SHA256_MISMATCH',
+                "normalized_vcf_tbi_sha256=${normalizedVcfTbiShaExpected}; observed=${normalizedVcfTbiShaObserved}"
+            )
+            throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: normalized VCF TBI SHA-256 mismatch for sample '${sid}'")
         }
     }
 

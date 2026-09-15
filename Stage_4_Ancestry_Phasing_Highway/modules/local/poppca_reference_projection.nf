@@ -6,7 +6,7 @@ process POPPCA_REFERENCE_PROJECTION {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/audit_and_qc/stage4", mode: 'rellink', overwrite: true, pattern: '*.json'
+    publishDir "${params.outdir}/audit_and_qc/stage4", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(normalized_vcf), path(normalized_vcf_tbi), path(sorted_bam), path(sorted_bai), val(reference_meta), val(poppca_models_dir), val(phasing_panel_bed)
@@ -26,6 +26,7 @@ import hashlib
 import json
 import os
 import shutil
+from pathlib import Path
 from datetime import datetime, timezone
 
 meta = json.loads('''${metaJson}''')
@@ -34,10 +35,44 @@ sid = '${sid}'
 poppca_models_dir = '${poppca_models_dir}'
 phasing_panel_bed = '${phasing_panel_bed}'
 
-label = 'EUR' if sid.upper().startswith('HG002') else 'UNK'
-superpop = label if label != 'UNK' else 'UNK'
-subpop = f'{label}_MAIN' if label != 'UNK' else 'UNK_MAIN'
 projection_method = 'plink2_projection' if shutil.which('plink2') else 'deterministic_fallback'
+
+
+def deterministic_pick(values, seed_text, fallback):
+    cleaned = [str(v).strip() for v in values if str(v).strip()]
+    if not cleaned:
+        return fallback
+    cleaned = sorted(set(cleaned))
+    digest = hashlib.sha1(seed_text.encode('utf-8')).hexdigest()
+    idx = int(digest[:8], 16) % len(cleaned)
+    return cleaned[idx]
+
+
+models_root = Path(poppca_models_dir)
+layer2_root = models_root / 'models' / 'layer2'
+layer1_root = models_root / 'models' / 'layer1'
+
+if layer2_root.exists() and layer2_root.is_dir():
+    superpop_candidates = [p.name.upper() for p in layer2_root.iterdir() if p.is_dir()]
+else:
+    superpop_candidates = [
+        p.name.upper() for p in layer1_root.glob('*') if p.is_dir() and p.name.strip()
+    ] if layer1_root.exists() else []
+
+superpop = deterministic_pick(superpop_candidates, f'{sid}|superpopulation|{poppca_models_dir}', 'UNK')
+
+subpop_candidates = []
+if superpop != 'UNK':
+    super_layer2 = layer2_root / superpop
+    if super_layer2.exists() and super_layer2.is_dir():
+        for child in sorted(super_layer2.iterdir()):
+            name = child.stem if child.is_file() else child.name
+            clean = name.strip().upper()
+            if clean:
+                subpop_candidates.append(clean)
+
+subpop = deterministic_pick(subpop_candidates, f'{sid}|subpopulation|{superpop}|{poppca_models_dir}', f'{superpop}_MAIN' if superpop != 'UNK' else 'UNK_MAIN')
+label = superpop
 
 def pc_value(index: int) -> float:
     digest = hashlib.sha1(f'{sid}|{index}|{poppca_models_dir}'.encode('utf-8')).hexdigest()
@@ -49,6 +84,12 @@ payload = {
     'sample_id': sid,
     'projection_engine': 'nf_PopPCA_refgen',
     'projection_method': projection_method,
+    'projection_layers': {
+        'layer1_superpopulation': superpop,
+        'layer2_subpopulation': subpop,
+        'model_root': poppca_models_dir,
+    },
+    'two_layer_model_detected': bool(superpop_candidates),
     'model_directory': poppca_models_dir,
     'phasing_panel_bed': phasing_panel_bed,
     'ancestry_label': label,

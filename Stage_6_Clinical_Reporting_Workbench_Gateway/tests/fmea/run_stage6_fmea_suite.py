@@ -12,6 +12,7 @@ from typing import List
 
 ROOT = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_6_Clinical_Reporting_Workbench_Gateway')
 BASE_INPUT_CANDIDATES = [
+    Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/mini_control/samples_hg002_banked_stage5.yaml'),
     Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/banked_stage5/samples_hg002_banked_stage5.yaml'),
     Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/results/master_orchestrator/samples_hg002_banked_stage5.yaml'),
 ]
