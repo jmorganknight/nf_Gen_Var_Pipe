@@ -57,6 +57,22 @@ clinical:
     enable_reference_backed_norm: true  # True enables left-normalization/reference-backed decomposition.
     atomize_multiallelic: true  # True splits multiallelic sites into atomic records before annotation.
 
+    # Somatic VAF dynamic floor: purity-aware calculation bounds the minimum VAF applied for somatic filtering.
+    # Formula: min_vaf = max(somatic_vaf_dynamic.min_bound, min(somatic_vaf_dynamic.max_bound, somatic_vaf_dynamic.base + (1.0 - purity) * somatic_vaf_dynamic.purity_lambda))
+    somatic_vaf_dynamic:
+      base: 0.01  # Base VAF floor (fallback and lower bound component).
+      min_bound: 0.01  # Minimum allowable VAF floor.
+      max_bound: 0.08  # Maximum allowable VAF floor.
+      purity_lambda: 0.05  # Purity sensitivity coefficient: (1 - purity) * lambda added to base.
+
+    # Somatic AB floor: contamination-aware allele-balance minimum gates per-variant filtering.
+    # Formula: ab_floor = max(somatic_ab_dynamic.min_bound, min(somatic_ab_dynamic.max_bound, somatic_ab_dynamic.base + contamination_rate * somatic_ab_dynamic.contam_multiplier))
+    somatic_ab_dynamic:
+      base: 0.20  # Base allele-balance floor.
+      min_bound: 0.10  # Minimum allowable AB floor.
+      max_bound: 0.45  # Maximum allowable AB floor.
+      contam_multiplier: 2.0  # Contamination rate multiplier: contamination * 2.0 added to base.
+
   annotation:
     cadd_phred_floor: 20.0  # Minimum CADD PHRED-like score considered supportive for deleteriousness.
     revel_cutoff: 0.75  # Minimum REVEL score considered supportive for pathogenic missense interpretation.
@@ -64,6 +80,25 @@ clinical:
     clinvar_star_floor: 2  # Minimum ClinVar review-star level used for strong evidence filters.
     gnomad_ba1_cutoff: 0.05  # Population frequency cutoff supporting BA1 benign evidence.
     gnomad_bs1_cutoff: 0.01  # Population frequency cutoff supporting BS1 benign evidence.
+
+    # gnomad_popmax_cutoffs: ancestry-specific thresholds used by ACMG secondary findings (SF) and tiering logic.
+    gnomad_popmax_cutoffs:
+      EUR: 0.002  # European ancestry AF threshold.
+      AFR: 0.002  # African ancestry AF threshold.
+      AMR: 0.002  # Admixed American ancestry AF threshold.
+      EAS: 0.002  # East Asian ancestry AF threshold.
+      SAS: 0.002  # South Asian ancestry AF threshold.
+      ASJ: 0.002  # Ashkenazi Jewish ancestry AF threshold.
+      FIN: 0.002  # Finnish ancestry AF threshold.
+      OTH: 0.002  # Other/mixed ancestry AF threshold.
+      default: 0.002  # Fallback when ancestry is unknown.
+
+    # acmg_tiering_qual_thresholds: QUAL-dependent tiering gates for ACMG variant classification.
+    acmg_tiering_qual_thresholds:
+      qual_high: 80  # QUAL >= 80: Tier I classification (strongest).
+      qual_medium: 40  # QUAL >= 40: Tier II classification (moderate).
+      qual_low: 20  # QUAL >= 20: Tier III classification (minimal).
+      af_multiplier_tier2: 2.5  # Tier II AF threshold = popmax_cutoff * 2.5 (relaxed filter).
 
   prs:
     prs_min_r2_floor: 0.50  # Minimum imputation or model-fit r^2 retained for PRS marker inclusion.

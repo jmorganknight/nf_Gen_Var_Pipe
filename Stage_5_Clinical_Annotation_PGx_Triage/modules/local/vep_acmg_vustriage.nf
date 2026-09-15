@@ -32,14 +32,22 @@ router = json.loads(Path('${router_json}').read_text(encoding='utf-8'))
 phased = Path('${phased_vcf}')
 
 ancestry = str(meta.get('ancestry_label', 'UNSET')).upper()
-af_cutoff_by_ancestry = {
-    'AFR': 0.005,
-    'AMR': 0.004,
-    'EAS': 0.003,
-    'EUR': 0.002,
-    'SAS': 0.003,
-}
-af_cutoff = af_cutoff_by_ancestry.get(ancestry, 0.002)
+
+# Load gnomad popmax cutoffs from thresholds.yaml (clinical.annotation.gnomad_popmax_cutoffs)
+# and QUAL tiering thresholds (clinical.annotation.acmg_tiering_qual_thresholds)
+thresholds = json.loads('''${thresholdsJson}''')
+annotation_thresholds = thresholds.get('clinical', {}).get('annotation', {})
+af_cutoffs = annotation_thresholds.get('gnomad_popmax_cutoffs', {
+    'AFR': 0.005, 'AMR': 0.004, 'EAS': 0.003, 'EUR': 0.002, 'SAS': 0.003, 'ASJ': 0.002, 'FIN': 0.002, 'OTH': 0.002
+})
+qual_thresholds = annotation_thresholds.get('acmg_tiering_qual_thresholds', {
+    'qual_high': 80, 'qual_medium': 40, 'qual_low': 20, 'af_multiplier_tier2': 2.5
+})
+
+af_cutoff = float(af_cutoffs.get(ancestry, af_cutoffs.get('default', 0.002)))
+qual_high = int(qual_thresholds.get('qual_high', 80))
+qual_medium = int(qual_thresholds.get('qual_medium', 40))
+af_multiplier = float(qual_thresholds.get('af_multiplier_tier2', 2.5))
 
 records = []
 with gzip.open(phased, 'rt', encoding='utf-8') as handle:
@@ -55,9 +63,9 @@ with gzip.open(phased, 'rt', encoding='utf-8') as handle:
         qual_f = 0.0 if qual in ('.', '') else float(qual)
         synthetic_af = ((pos_i % 97) / 10000.0)
 
-        if qual_f >= 80 and synthetic_af <= af_cutoff:
+        if qual_f >= qual_high and synthetic_af <= af_cutoff:
             tier = 'Tier I'
-        elif qual_f >= 40 and synthetic_af <= af_cutoff * 2.5:
+        elif qual_f >= qual_medium and synthetic_af <= af_cutoff * af_multiplier:
             tier = 'Tier II'
         elif qual_f >= 20:
             tier = 'Tier III'

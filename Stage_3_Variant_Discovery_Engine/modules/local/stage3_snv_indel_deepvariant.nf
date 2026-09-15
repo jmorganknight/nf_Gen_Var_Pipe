@@ -64,12 +64,29 @@ computed_sex = str(sample_qc_meta.get('computed_sex') or 'UNKNOWN').upper()
 sample_type = str(sample_meta.get('sample_type') or 'germline').lower()
 is_somatic = sample_type in {'somatic', 'tumor', 'liquid_biopsy'}
 
+# Purity-aware VAF sensitivity floor for somatic mode.
+# thresholds.yaml: clinical.discovery.somatic_vaf_dynamic
+thresholds = sample_meta.get('stage3_discovery_thresholds', {}) if isinstance(sample_meta, dict) else {}
+vaf_dyn = thresholds.get('somatic_vaf_dynamic', {})
+vaf_base = float(vaf_dyn.get('base', 0.01))
+vaf_min = float(vaf_dyn.get('min_bound', 0.01))
+vaf_max = float(vaf_dyn.get('max_bound', 0.08))
+vaf_lambda = float(vaf_dyn.get('purity_lambda', 0.05))
+
 if is_somatic:
-    min_vaf = max(0.01, min(0.08, 0.01 + (1.0 - estimated_purity) * 0.05))
+    min_vaf = max(vaf_min, min(vaf_max, vaf_base + (1.0 - estimated_purity) * vaf_lambda))
 else:
     min_vaf = 0.05
 
-ab_floor = max(0.10, min(0.45, 0.20 + (contamination_rate * 2.0)))
+# Contamination-aware minimum allele-balance floor.
+# thresholds.yaml: clinical.discovery.somatic_ab_dynamic
+ab_dyn = thresholds.get('somatic_ab_dynamic', {})
+ab_base = float(ab_dyn.get('base', 0.20))
+ab_min = float(ab_dyn.get('min_bound', 0.10))
+ab_max = float(ab_dyn.get('max_bound', 0.45))
+ab_contam = float(ab_dyn.get('contam_multiplier', 2.0))
+
+ab_floor = max(ab_min, min(ab_max, ab_base + (contamination_rate * ab_contam)))
 
 payload = {
     'sample_id': '${sample_id}',
