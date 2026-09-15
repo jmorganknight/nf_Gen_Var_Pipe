@@ -3,16 +3,31 @@ set -euo pipefail
 
 # Whole-pipeline (Stages 0-6) infrastructure profile matrix runner.
 # Produces profile-by-profile execution evidence for audit/FMEA updates.
+#
+# YAML ROUTING: sample_id is extracted from the input manifest and used to
+# construct per-profile output directories, ensuring reproducibility across profiles.
+#
+# OUTPUT DIRECTORY STRUCTURE:
+#   <out_base>/{sample_id}/{profile}/
+#     - run.log (Nextflow execution log with infrastructure telemetry)
+#     - {sample_id}.stage6.manifest.json (if pipeline completes to stage 6)
+#     - state/ (Nextflow recovery state, for --resume mode)
+#
+# The sample_id extraction from YAML is the SINGLE SOURCE OF TRUTH for output
+# organization, eliminating manual sample naming and ensuring cross-profile consistency.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PIPELINE_MAIN="${ROOT_DIR}/main.nf"
 
 NXF_PROFILE="docker"
-INPUT_MANIFEST="${ROOT_DIR}/assets/mini_control/samples_hg002_mini.yaml"
+INPUT_MANIFEST="${ROOT_DIR}/assets/mini_control/samples_mini_control.yaml"
 OUT_BASE="${ROOT_DIR}/tests/infrastructure_profile_matrix"
 PROFILES=(small medium large)
 WITH_RESUME=false
 ALLOW_INCOMPLETE=false
+
+# Source YAML routing library
+source "${ROOT_DIR}/scripts/lib_yaml_routing.sh"
 
 usage() {
   cat <<'EOF'
@@ -85,6 +100,10 @@ if [[ ! -f "${INPUT_MANIFEST}" ]]; then
   exit 2
 fi
 
+# Extract sample_id from the input YAML manifest (SINGLE SOURCE OF TRUTH)
+INPUT_SAMPLE_ID=$(extract_sample_id "${INPUT_MANIFEST}")
+echo "[YAML-ROUTING] Extracted sample_id from input manifest: $INPUT_SAMPLE_ID"
+
 if [[ "${ALLOW_INCOMPLETE}" != "true" ]]; then
   if grep -q "No such file or directory: Can't find a matching module file for include: ./modules/local/assemble_stage6_banked_manifest.nf" "${ROOT_DIR}/tests/infrastructure_profile_matrix"/*/run.log 2>/dev/null; then
     echo "ERROR: Whole-pipeline matrix is currently blocked by incomplete downstream stage wiring." >&2
@@ -99,15 +118,18 @@ SUMMARY_TSV="${OUT_BASE}/matrix_summary.tsv"
 echo -e "profile\tstatus\tstage6_manifest\tpipeline_infra\tstage3_infra\trun_log" > "${SUMMARY_TSV}"
 
 for exec_profile in "${PROFILES[@]}"; do
-  run_dir="${OUT_BASE}/${exec_profile}"
+  # Construct per-profile outdir based on YAML-extracted sample_id
+  # Pattern: <out_base>/<sample_id>/<profile>/
+  run_dir="${OUT_BASE}/${INPUT_SAMPLE_ID}/${exec_profile}"
   run_log="${run_dir}/run.log"
 
   rm -rf "${run_dir}"
   mkdir -p "${run_dir}"
 
   echo "============================================================"
-  echo "[Pipeline Infra Matrix] Running execution_profile=${exec_profile}"
-  echo "[Pipeline Infra Matrix] Output directory=${run_dir}"
+  echo "[Pipeline Infra Matrix] YAML-Extracted Sample ID: ${INPUT_SAMPLE_ID}"
+  echo "[Pipeline Infra Matrix] Execution Profile: ${exec_profile}"
+  echo "[Pipeline Infra Matrix] Output Directory: ${run_dir}"
   echo "============================================================"
 
   resume_args=()
@@ -136,8 +158,9 @@ for exec_profile in "${PROFILES[@]}"; do
     status="RUN_OK"
   fi
 
-  stage6_manifest="$(find "${run_dir}" -type f -name '*stage6*.yaml' | head -n 1 || true)"
-  if [[ -z "${stage6_manifest}" ]]; then
+  # YAML-routed stage6 manifest name uses extracted sample_id
+  stage6_manifest="${run_dir}/${INPUT_SAMPLE_ID}.stage6.manifest.json"
+  if [[ ! -f "${stage6_manifest}" ]]; then
     stage6_manifest="NA"
   fi
 
@@ -156,6 +179,9 @@ for exec_profile in "${PROFILES[@]}"; do
   echo "[Pipeline Infra Matrix] STAGE3_INFRA=${stage3_infra}"
 done
 
-echo
-echo "Matrix complete. Summary: ${SUMMARY_TSV}"
+echo ""
+echo "============================================================"
+echo "[Matrix Complete] Output structure: ${OUT_BASE}/${INPUT_SAMPLE_ID}/{profile}/"
+echo "[Matrix Complete] Summary TSV: ${SUMMARY_TSV}"
+echo "============================================================"
 cat "${SUMMARY_TSV}"

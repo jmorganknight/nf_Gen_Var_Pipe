@@ -347,6 +347,26 @@ def applyPipelineInfrastructurePolicy(Map infrastructureParsed) {
     log.info("PIPELINE_INFRA: profile=${params.execution_profile}; available_cpus=${resolved.available_cpus}; available_memory_gb=${resolved.available_memory_gb}; max_cpus=${params.max_cpus}; max_memory_gb=${params.max_memory_gb}")
 }
 
+// === OPTION A HELPERS: GROOVY-BASED REFERENCE RESOLUTION ===
+// Helper functions (defined at module level) for parsing references.yaml and resolving paths
+// before container execution to avoid path resolution issues inside Docker.
+
+def resolveReferencePath(String relativePath, String baseRoot) {
+    if (relativePath.startsWith('/')) {
+        return relativePath
+    }
+    return new File(baseRoot, relativePath).absolutePath
+}
+
+def parseReferencesYaml(Object yamlFileObj) {
+    def yamlFile = yamlFileObj instanceof File ? yamlFileObj : new File(yamlFileObj.toString())
+    def ys = new groovy.yaml.YamlSlurper()
+    def doc = mapOrEmpty(ys.parse(yamlFile))
+    def refDataRoot = doc.ref_data_root?.toString()?.trim() ?: params.ref_data_root?.toString()?.trim() ?: '/opt/reference'
+    def refsBlock = mapOrEmpty(doc.references ?: doc)
+    return [refDataRoot: refDataRoot, refs: refsBlock]
+}
+
 def loadAtomicIntakeContract() {
     def ys = new groovy.yaml.YamlSlurper()
     def projectRoot = projectDir.toString()
@@ -476,7 +496,43 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         tuple(meta, file(fq1, checkIfExists: true), file(fq2, checkIfExists: true))
     }
 
-    def chSamplesManifestSource = channel.value(inputManifest.canonicalPath)
+    def chSamplesManifestSource = channel.value(inputManifest.toAbsolutePath().toString())
+
+    // === OPTION A: Resolve references in Groovy (before container) using helper functions defined at module level ===
+    def requiredReferenceKeys = ['reference_genome', 'reference_fai', 'reference_dict', 'bwa_index_base']
+    def resolvedRefInfo = parseReferencesYaml(referencesFile)
+    def refDataRoot = resolvedRefInfo.refDataRoot
+    def parsedRefs = resolvedRefInfo.refs
+    
+    // Validate that all 4 required keys are present
+    def missingRefKeys = requiredReferenceKeys.findAll { !parsedRefs.get(it) }
+    if (missingRefKeys) {
+        throw new IllegalArgumentException("[OPTION_A_REF_VALIDATION] Missing required reference keys in references.yaml: ${missingRefKeys.join(', ')}")
+    }
+    
+    // Resolve absolute paths for the 4 required references
+    def resolvedReferences = requiredReferenceKeys.collectEntries { key ->
+        def relPath = parsedRefs[key].toString()
+        def abspath = resolveReferencePath(relPath, refDataRoot)
+        [(key): abspath]
+    }
+    
+    // Validate that resolved reference files exist
+    resolvedReferences.each { key, abspath ->
+        def refFile = new File(abspath)
+        if (!refFile.exists()) {
+            throw new FileNotFoundException("[OPTION_A_REF_STAGING] Reference file does not exist: ${key}=${abspath}")
+        }
+    }
+    
+    // Stage the resolved reference files as Nextflow path channels for PREFLIGHT_LOCK to consume
+    def chResolvedRefGenome = channel.value(file(resolvedReferences.reference_genome, checkIfExists: true))
+    def chResolvedRefFai = channel.value(file(resolvedReferences.reference_fai, checkIfExists: true))
+    def chResolvedRefDict = channel.value(file(resolvedReferences.reference_dict, checkIfExists: true))
+    def chResolvedRefBwaBase = channel.value(file(resolvedReferences.bwa_index_base, checkIfExists: true))
+    
+    // Also pass the ref_data_root for downstream processes that need it
+    def chRefDataRoot = channel.value(refDataRoot)
 
     STAGE0_PREFLIGHT_INGEST(
         chRawReads,
@@ -486,7 +542,12 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         chSamplesManifestSource,
         channel.value(infrastructureFile),
         channel.value(file(signerKeyResolved, checkIfExists: true)),
-        channel.value(file(signerPubResolved, checkIfExists: true))
+        channel.value(file(signerPubResolved, checkIfExists: true)),
+        chResolvedRefGenome,
+        chResolvedRefFai,
+        chResolvedRefDict,
+        chResolvedRefBwaBase,
+        chRefDataRoot
     )
 
     def refGenome = (refsParsed.reference_genome ?: refsParsed.grch38_fasta).toString()
@@ -514,8 +575,8 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         def stage0Root = stage0Manifest.parent ? stage0Manifest.parent.toString() : projectRoot
         stage0Parsed.collect { sample ->
             def sid = (sample.sample_id ?: 'UNKNOWN').toString()
-            def intakeReportRaw = sample.intake_validation_report?.toString() ?: "${params.outdir}/${sid}/audit_and_qc/${sid}.intake_validation_report.json"
-            def intakeTokenRaw = sample.intake_validation_token?.toString() ?: "${params.outdir}/${sid}/intake_token/${sid}.intake_validation_token"
+            def intakeReportRaw = sample.intake_validation_report?.toString() ?: "${params.outdir}/audit_and_qc/${sid}.intake_validation_report.json"
+            def intakeTokenRaw = sample.intake_validation_token?.toString() ?: "${params.outdir}/audit_and_qc/${sid}.intake_validation_token"
             def stage0Read1Raw = (sample.fastq_forward ?: sample.read_file_paths?.read1)?.toString()
             def stage0Read2Raw = (sample.fastq_reverse ?: sample.read_file_paths?.read2)?.toString()
             def stage1Meta = (sample as Map) + [

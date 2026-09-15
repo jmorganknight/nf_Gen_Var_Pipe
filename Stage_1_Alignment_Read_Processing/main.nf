@@ -150,19 +150,19 @@ def resolveStage1ConfigPath(Object overridePath, Object configuredPath, String f
         }
     }
 
-    def primary = new File(projectDir.toString(), "conf/${fileName}")
+    def primary = new File(projectDir.toString(), "control_plane/${fileName}")
     if (primary.exists()) {
         return file(primary.path)
     }
 
-    def fallback = new File(projectDir.toString(), "../conf/${fileName}")
+    def fallback = new File(projectDir.toString(), "../control_plane/${fileName}")
     if (fallback.exists()) {
         return file(fallback.path)
     }
 
     def launchRoot = workflow.hasProperty('launchDir') ? workflow.launchDir?.toString() : null
     if (launchRoot) {
-        def launchFallback = new File(launchRoot, "conf/${fileName}")
+        def launchFallback = new File(launchRoot, "control_plane/${fileName}")
         if (launchFallback.exists()) {
             return file(launchFallback.path)
         }

@@ -154,7 +154,7 @@ Dev-fast validation:
 ```bash
 cd /media/drive_c/nf_pipes/nf_Gen_Var_Pipe
 NXF_REF_DATA_ROOT="/path/to/reference_root" \
-nextflow run main.nf -profile dev_fast,docker -stub --input assets/samples_hg002_mini.yaml -ansi-log false
+nextflow run main.nf -profile dev_fast,docker -stub --input assets/mini_control/samples_mini_control.yaml -ansi-log false
 ```
 
 ## Platform Geometry Matrix

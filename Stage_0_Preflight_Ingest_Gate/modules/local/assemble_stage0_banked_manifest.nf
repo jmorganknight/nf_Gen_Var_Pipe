@@ -9,7 +9,7 @@ process ASSEMBLE_STAGE0_BANKED_MANIFEST {
     path fragment_jsons
 
     output:
-    path 'samples_banked_stage0.yaml', emit: banked_samplesheet
+    path 'banked_stage0.yaml', emit: banked_samplesheet
 
     script:
     """
@@ -187,7 +187,7 @@ for record in records:
     append_kv(lines, 4, 'intake_route_decision', record.get('intake_route_decision'), 'JSON record showing deterministic Stage 0 routing after token evaluation.')
     append_kv(lines, 4, 'save_dir', record.get('save_dir'), 'Root banking directory in which Stage 0 published all sample-scoped outputs.')
 
-Path('samples_banked_stage0.yaml').write_text('\\n'.join(lines) + '\\n', encoding='utf-8')
+Path('banked_stage0.yaml').write_text('\n'.join(lines) + '\n', encoding='utf-8')
 PYEOF
     """
 }

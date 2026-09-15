@@ -3,14 +3,17 @@
 # ==============================================================================
 # Version: 1.0.0
 # Purpose: Single entry point for nf_Gen_Var_Pipe Stage 0-6 manual debugging
-# Usage: Modify as needed; stages auto-populate output fields during execution
+# Usage: - Modify as needed; stages auto-populate output fields during execution
+# 	 - For fast debugging stages and global
+# Note: this dataset was derived by downsampling HG002 with build_mini_control.sh
+# 
 
 manifest_schema_version: "1.0.0"
 manifest_template_variant: "mini_control_unified_automation"
 
 samples:
-  - sample_id: "mini_control_hg002"
-    patient_id: "mini_control_hg002"
+  - sample_id: "mini_control"
+    patient_id: "mini_control"
     case_id: "mini_control"
     accession_id: ""
     encounter_id: ""

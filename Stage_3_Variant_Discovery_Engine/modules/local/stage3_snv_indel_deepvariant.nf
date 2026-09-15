@@ -10,6 +10,8 @@ process STAGE3_SNV_INDEL_DEEPVARIANT {
     tuple val(sample_id), path('snv_indel.calibrated.vcf'), path('stage3.deepvariant_calibration.json'), val(stage3_refs), val(sample_meta), emit: calibrated_vcf
     path 'stage3.deepvariant_calibration.json', emit: audit
 
+    publishDir "${params.outdir}/${sample_id}/stage3_snv_indel_deepvariant", mode: 'copy', pattern: "*.vcf*|*.json", enabled: true
+
     script:
     def threads = (task.cpus ?: 1) as int
     def sampleQcJson = groovy.json.JsonOutput.toJson(sample_qc_meta).replace('\\', '\\\\').replace("'", "\\'")
@@ -263,6 +265,9 @@ audit = {
 }
 Path('stage3.deepvariant_calibration.json').write_text(json.dumps(audit, indent=2) + chr(10), encoding='utf-8')
 PYEOF
+
+    # Cleanup ephemeral files (if any remain from DeepVariant processing)
+    rm -rf deepvariant_run/ workspace/ pyflow.data/ *.pickle 2>/dev/null || true
 
     if [[ "\${CORRUPT_VCF_HEADER}" == "true" ]]; then
         echo "STAGE3_SCHEMA_VALIDATION_FAILURE: fault injection emitted malformed VCF header (intentional fail-closed path)" >&2

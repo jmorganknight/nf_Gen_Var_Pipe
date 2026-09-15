@@ -3,6 +3,10 @@ set -euo pipefail
 
 # Run Stage 3 across infrastructure profiles (small/medium/large) and capture
 # reproducible evidence artifacts for performance/FMEA comparison.
+# 
+# YAML ROUTING: sample_id is extracted from the input manifest and used to
+# construct per-profile output directories, ensuring all outputs are YAML-sourced
+# and reproducible across multiple infrastructure profiles.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STAGE3_MAIN="${ROOT_DIR}/Stage_3_Variant_Discovery_Engine/main.nf"
@@ -11,6 +15,9 @@ PROFILE="docker"
 INPUT_MANIFEST="${ROOT_DIR}/Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control/samples_hg002_banked_stage2.yaml"
 OUT_BASE="${ROOT_DIR}/Stage_3_Variant_Discovery_Engine/tests/infrastructure_profile_matrix"
 PROFILES=(small medium large)
+
+# Source YAML routing library
+source "${ROOT_DIR}/scripts/lib_yaml_routing.sh"
 
 usage() {
   cat <<'EOF'
@@ -71,20 +78,27 @@ if [[ ! -f "${INPUT_MANIFEST}" ]]; then
   exit 2
 fi
 
+# Extract sample_id from the input YAML manifest (SINGLE SOURCE OF TRUTH)
+INPUT_SAMPLE_ID=$(extract_sample_id "${INPUT_MANIFEST}")
+echo "[YAML-ROUTING] Extracted sample_id from input manifest: $INPUT_SAMPLE_ID"
+
 mkdir -p "${OUT_BASE}"
 SUMMARY_TSV="${OUT_BASE}/matrix_summary.tsv"
 
 echo -e "profile\tstatus\trecord_count\taudit_path\trun_log" > "${SUMMARY_TSV}"
 
 for infra_profile in "${PROFILES[@]}"; do
-  run_dir="${OUT_BASE}/${infra_profile}"
+  # Construct per-profile outdir based on YAML-extracted sample_id
+  # Pattern: <out_base>/<sample_id>/<profile>/
+  run_dir="${OUT_BASE}/${INPUT_SAMPLE_ID}/${infra_profile}"
   run_log="${run_dir}/run.log"
 
   rm -rf "${run_dir}"
   mkdir -p "${run_dir}"
 
   echo "============================================================"
-  echo "[Stage3 Infra Matrix] Running profile: ${infra_profile}"
+  echo "[Stage3 Infra Matrix] Infrastructure Profile: ${infra_profile}"
+  echo "[Stage3 Infra Matrix] YAML-Extracted Sample ID: ${INPUT_SAMPLE_ID}"
   echo "[Stage3 Infra Matrix] Output dir: ${run_dir}"
   echo "============================================================"
 

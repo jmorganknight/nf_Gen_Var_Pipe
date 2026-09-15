@@ -10,7 +10,7 @@ process INGEST_FAIL_REJECT {
 
     tag "${meta.sample_id}"
 
-    publishDir { "${meta.save_dir}/${meta.sample_id}/audit_and_qc" }, mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/audit_and_qc", mode: 'copy', overwrite: true
 
     input:
     tuple val(meta), path(_fastq_1), path(_fastq_2), path(intake_token), path(intake_report)

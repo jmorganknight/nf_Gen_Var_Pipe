@@ -8,7 +8,7 @@
 # ==============================================================================
 
 clinical:
-  pipeline_target: WES_Onco_Panel_v18.4  # Human-readable pipeline release identifier locked into audit artifacts.
+  pipeline_target: nf_Gen_Var_Pipe  # Human-readable pipeline release identifier locked into audit artifacts.
 
   qc_thresholds:
     chromosome_y_depth_floor: 0.15  # Minimum normalized ChrY depth expected for male/XY concordance checks.

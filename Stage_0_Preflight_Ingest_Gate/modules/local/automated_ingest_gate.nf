@@ -40,7 +40,7 @@ process AUTOMATED_INGEST_GATE {
 
     tag "${meta.sample_id}"
 
-    publishDir { "${meta.save_dir}/${meta.sample_id}/audit_and_qc" }, mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/audit_and_qc", mode: 'copy', overwrite: true
 
     input:
     tuple val(meta), path(fastq_1), path(fastq_2)

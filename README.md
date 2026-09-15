@@ -336,7 +336,7 @@ Useful options:
 
 ```bash
 scripts/run_pipeline_infrastructure_profile_matrix.sh \
-	--input assets/mini_control/samples_hg002_mini.yaml \
+	--input assets/mini_control/samples_mini_control.yaml \
 	--profiles "small medium large"
 ```
 

@@ -95,11 +95,11 @@ def resolveStageConfigPath(Object overridePath, Object configuredPath, String fi
 
     def launchRoot = workflow.hasProperty('launchDir') ? workflow.launchDir?.toString() : null
     def candidatePaths = [
-        new File(projectDir.toString(), "conf/${fileName}"),
-        new File(projectDir.toString(), "../conf/${fileName}")
+        new File(projectDir.toString(), "control_plane/${fileName}"),
+        new File(projectDir.toString(), "../control_plane/${fileName}")
     ]
     if (launchRoot) {
-        candidatePaths << new File(launchRoot, "conf/${fileName}")
+        candidatePaths << new File(launchRoot, "control_plane/${fileName}")
     }
 
     def resolved = candidatePaths.find { candidate -> candidate.exists() }
@@ -334,6 +334,11 @@ workflow STAGE0_PREFLIGHT_INGEST {
     ch_infrastructure_yaml
     ch_signer_key
     ch_signer_pub
+    ch_resolved_ref_genome
+    ch_resolved_ref_fai
+    ch_resolved_ref_dict
+    ch_resolved_ref_bwa_base
+    ch_ref_data_root
 
     main:
     def ch_preflight_rows = ch_raw_reads.map { meta, fastq1, fastq2 ->
@@ -351,7 +356,7 @@ workflow STAGE0_PREFLIGHT_INGEST {
         ]
     }.collect()
 
-    PREFLIGHT_INGESTION_GUARD(ch_preflight_rows, ch_references_yaml, ch_samples_yaml, ch_samples_manifest_source, ch_thresholds_yaml, ch_infrastructure_yaml)
+    PREFLIGHT_INGESTION_GUARD(ch_preflight_rows, ch_references_yaml, ch_samples_yaml, ch_samples_manifest_source, ch_thresholds_yaml, ch_infrastructure_yaml, ch_resolved_ref_genome, ch_resolved_ref_fai, ch_resolved_ref_dict, ch_resolved_ref_bwa_base, ch_ref_data_root)
 
     def ch_preflight_lock = PREFLIGHT_INGESTION_GUARD.out.preflight_lock
     def ch_snapshot_tokens = PREFLIGHT_INGESTION_GUARD.out.snapshot_tokens

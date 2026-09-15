@@ -29,6 +29,11 @@ process PREFLIGHT_INGESTION_GUARD {
     val samples_manifest_source
     path thresholds_yaml
     path infrastructure_yaml
+    path resolved_ref_genome
+    path resolved_ref_fai
+    path resolved_ref_dict
+    path resolved_ref_bwa_base
+    val ref_data_root
 
     output:
     path 'preflight_lock.json', emit: preflight_lock
@@ -46,6 +51,7 @@ import hashlib
 import json
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 
 FALLBACK_REF_ROOT = '/opt/reference'
 
@@ -206,11 +212,26 @@ refs_doc = load_yaml_simple('${references_yaml}')
 refs = refs_doc.get('references', {})
 if not refs:
     raise RuntimeError('[PREFLIGHT_LOCK] No references block parsed from references manifest')
-yaml_ref_data_root = refs_doc.get('ref_data_root')
-if yaml_ref_data_root is None:
-    yaml_ref_data_root = FALLBACK_REF_ROOT
-yaml_ref_data_root = str(yaml_ref_data_root).strip() or FALLBACK_REF_ROOT
-assert_reference_consistency(refs)
+
+# === OPTION A: USE GROOVY-RESOLVED REFERENCES ===
+# Instead of parsing and resolving paths in Python (which fails in containers),
+# use the reference files already staged by Nextflow from the pipeline runner.
+# Groovy has already validated these files exist before staging them as inputs.
+
+resolved_refs = {
+    'reference_genome': Path('${resolved_ref_genome}'),
+    'reference_fai': Path('${resolved_ref_fai}'),
+    'reference_dict': Path('${resolved_ref_dict}'),
+    'bwa_index_base': Path('${resolved_ref_bwa_base}'),
+}
+
+# Validate that staged reference files are accessible in the container
+for key, ref_path in resolved_refs.items():
+    if not ref_path.exists():
+        raise FileNotFoundError(f'[PREFLIGHT_LOCK] Staged reference file not found in container: {key}={ref_path}')
+
+yaml_ref_data_root = '${ref_data_root}'
+refs = resolved_refs
 
 infra_doc = load_yaml_simple('${infrastructure_yaml}')
 containers_cfg = infra_doc.get('containers', {}) if isinstance(infra_doc, dict) else {}

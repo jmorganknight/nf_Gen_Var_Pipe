@@ -65,8 +65,8 @@ def main() -> int:
     runs = fmea_root / "runs"
     runs.mkdir(parents=True, exist_ok=True)
 
-    references = Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/conf/references.yaml")
-    thresholds = Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/conf/thresholds.yaml")
+    references = Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/control_plane/references.yaml")
+    thresholds = Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/control_plane/thresholds.yaml")
     stage0_nominal_candidates = [
         Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/inputs/hg002_mini/samples_hg002_banked_stage0.yaml"),
         Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/banked_stage0/samples_hg002_banked_stage0.yaml"),

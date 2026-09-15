@@ -10,6 +10,8 @@ process STAGE3_COPY_NUMBER_CNV {
     tuple val(sample_id), path('copy_number_cnv.calibrated.vcf'), path('stage3.copy_number_cnv.audit.json'), val(stage3_refs), val(sample_meta), emit: calibrated_vcf
     path 'stage3.copy_number_cnv.audit.json', emit: audit
 
+    publishDir "${params.outdir}/${sample_id}/stage3_copy_number_cnv", mode: 'copy', pattern: "*.vcf*|*.json", enabled: true
+
     script:
     def threads = (task.cpus ?: 1) as int
     def sampleMetaJson = groovy.json.JsonOutput.toJson(sample_meta).replace('\\', '\\\\').replace("'", "\\'")
@@ -181,6 +183,9 @@ audit = {
 }
 Path('stage3.copy_number_cnv.audit.json').write_text(json.dumps(audit, indent=2) + chr(10), encoding='utf-8')
 PYEOF
+
+    # Cleanup ephemeral CNVkit output directory and other temporary artifacts
+    rm -rf cnvkit_out/ workspace/ pyflow.data/ *.pickle 2>/dev/null || true
     """
 
     stub:

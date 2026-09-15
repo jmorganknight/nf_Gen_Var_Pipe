@@ -145,7 +145,7 @@ This prevents silent success on deliberately malformed payloads.
 
 ## Inputs
 
-- Stage 2 banked manifest with `validation_token`, `sorted_bam`, `sorted_bai`, `reference_build`, and `sample_qc_meta`
+- Stage 2 banked manifest with `validation_token`, `mapped_bam`, `mapped_bai`, `reference_build`, and `sample_qc_meta`
 - branch toggles under `variant_branches`
 - Stage 3 schema path via configured refs
 
