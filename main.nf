@@ -243,6 +243,110 @@ def resolveStage5Artifact(File stage5Root, String artifactName, String fallbackN
     return artifactName ? resolvePathWithBases(artifactName, [stage5Root.toString(), projectDir.toString()]) : (fallbackName ? new File(stage5Root, fallbackName) : null)
 }
 
+def toIntSafe(Object value, int fallback) {
+    try {
+        return value == null ? fallback : Integer.parseInt(value.toString())
+    } catch (Exception _ignored) {
+        return fallback
+    }
+}
+
+def cliHasParam(String key) {
+    def commandLine = workflow.hasProperty('commandLine') ? (workflow.commandLine ?: '') : ''
+    commandLine.contains("--${key}")
+}
+
+def resolvePipelineInfrastructurePolicy(Map infrastructureParsed) {
+    def fallback = [
+        selected_profile: 'medium',
+        available_cpus: Math.max(1, toIntSafe(params.max_cpus, 32)),
+        available_memory_gb: Math.max(4, toIntSafe(params.max_memory_gb, 256)),
+        max_cpus: Math.max(1, toIntSafe(params.max_cpus, 32)),
+        max_memory_gb: Math.max(4, toIntSafe(params.max_memory_gb, 256)),
+    ]
+
+    def execution = mapOrEmpty(infrastructureParsed?.pipeline_execution)
+    def local = mapOrEmpty(execution.local_system)
+    def profiles = mapOrEmpty(execution.profiles)
+    def thresholds = mapOrEmpty(execution.auto_thresholds)
+
+    if (profiles.isEmpty()) {
+        return fallback
+    }
+
+    def detectedCpus = Runtime.runtime.availableProcessors()
+    def totalCpus = toIntSafe(local.total_cpus, detectedCpus)
+    def reserveCpus = toIntSafe(local.reserve_cpus, 0)
+    def totalMemGb = toIntSafe(local.total_memory_gb, 64)
+    def reserveMemGb = toIntSafe(local.reserve_memory_gb, 8)
+
+    def availableCpus = Math.max(1, totalCpus - reserveCpus)
+    def availableMemGb = Math.max(4, totalMemGb - reserveMemGb)
+
+    def mode = (execution.profile_selection_mode ?: 'auto').toString().trim().toLowerCase()
+    def forcedProfile = params.execution_profile?.toString()?.trim()
+    def selectedProfile = null
+
+    if (forcedProfile) {
+        if (!profiles.containsKey(forcedProfile)) {
+            throw new IllegalStateException("INFRASTRUCTURE_PROFILE_INVALID: execution_profile '${forcedProfile}' is not one of ${profiles.keySet().sort().join(', ')}")
+        }
+        selectedProfile = forcedProfile
+    } else if (mode == 'manual') {
+        selectedProfile = (execution.active_profile ?: 'medium').toString().trim()
+    } else {
+        def smallMax = toIntSafe(thresholds.small_max_available_cpus, 12)
+        def mediumMax = toIntSafe(thresholds.medium_max_available_cpus, 24)
+        if (availableCpus <= smallMax) {
+            selectedProfile = 'small'
+        } else if (availableCpus <= mediumMax) {
+            selectedProfile = 'medium'
+        } else {
+            selectedProfile = 'large'
+        }
+    }
+
+    if (!profiles.containsKey(selectedProfile)) {
+        throw new IllegalStateException("INFRASTRUCTURE_PROFILE_RESOLUTION_FAILURE: profile '${selectedProfile}' not defined under pipeline_execution.profiles")
+    }
+
+    def selected = mapOrEmpty(profiles[selectedProfile])
+    def policyCpus = Math.max(1, toIntSafe(selected.max_cpus, fallback.max_cpus))
+    def policyMemGb = Math.max(4, toIntSafe(selected.max_memory_gb, fallback.max_memory_gb))
+
+    if (policyCpus > availableCpus) {
+        policyCpus = availableCpus
+    }
+    if (policyMemGb > availableMemGb) {
+        policyMemGb = availableMemGb
+    }
+
+    return [
+        selected_profile: selectedProfile,
+        available_cpus: availableCpus,
+        available_memory_gb: availableMemGb,
+        max_cpus: policyCpus,
+        max_memory_gb: policyMemGb,
+    ]
+}
+
+def applyPipelineInfrastructurePolicy(Map infrastructureParsed) {
+    def resolved = resolvePipelineInfrastructurePolicy(infrastructureParsed)
+    params.execution_profile = params.execution_profile ?: resolved.selected_profile
+
+    if (!cliHasParam('max_cpus')) {
+        params.max_cpus = resolved.max_cpus
+    }
+    if (!cliHasParam('max_memory_gb')) {
+        params.max_memory_gb = resolved.max_memory_gb
+    }
+    if (!cliHasParam('max_memory')) {
+        params.max_memory = (params.max_memory_gb as int).GB
+    }
+
+    log.info("PIPELINE_INFRA: profile=${params.execution_profile}; available_cpus=${resolved.available_cpus}; available_memory_gb=${resolved.available_memory_gb}; max_cpus=${params.max_cpus}; max_memory_gb=${params.max_memory_gb}")
+}
+
 def loadAtomicIntakeContract() {
     def ys = new groovy.yaml.YamlSlurper()
     def projectRoot = projectDir.toString()
@@ -295,6 +399,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
     def refsParsed = intake.refsParsed as Map
     def thresholdsParsed = intake.thresholdsParsed as Map
     def infrastructureParsed = intake.infrastructureParsed as Map
+    applyPipelineInfrastructurePolicy(infrastructureParsed)
     def projectRoot = intake.projectRoot.toString()
     def inputRoot = intake.inputRoot.toString()
     def infrastructureRoot = intake.infrastructureRoot.toString()

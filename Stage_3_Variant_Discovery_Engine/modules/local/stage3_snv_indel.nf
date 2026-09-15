@@ -1,7 +1,7 @@
 process STAGE3_SNV_INDEL {
     label 'variant_heavy'
     container 'genvar-core:2.1.0'
-    cpus { (params.stage3_snv_indel_cpus ?: params.stage3_cpus ?: 1) as int }
+    cpus { (params.stage3_snv_indel_cpus ?: params.stage3_cpus ?: params.stage3_variant_heavy_default_cpus ?: 8) as int }
 
     input:
     tuple val(sample_id), path(stage2_manifest), path(sorted_bam), path(sorted_bai), val(is_wgs), val(target_bed), path(fasta), path(fasta_fai), val(sample_qc_meta), val(stage3_refs), val(sample_meta)

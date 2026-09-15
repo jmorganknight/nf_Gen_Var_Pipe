@@ -1,3 +1,0 @@
-2026-09-14 04:18:43.074281: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 FMA
-To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
-I0914 04:18:44.718723 139679931164480 run_deepvariant.py:519] Re-using the directory for intermediate results in /tmp/tmphnp09iix

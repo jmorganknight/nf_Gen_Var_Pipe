@@ -145,6 +145,131 @@ def asBool(Object value) {
     return ['1', 'true', 'yes', 'y', 'on'].contains(norm)
 }
 
+def toIntSafe(Object value, int fallback) {
+    try {
+        return value == null ? fallback : Integer.parseInt(value.toString())
+    } catch (Exception _ignored) {
+        return fallback
+    }
+}
+
+def coerceIntOrFallback(Object rawValue, int fallback) {
+    try {
+        if (rawValue == null) {
+            return fallback
+        }
+        if (rawValue instanceof Closure) {
+            return fallback
+        }
+        return Integer.parseInt(rawValue.toString())
+    } catch (Exception _ignored) {
+        return fallback
+    }
+}
+
+def resolveStage3InfrastructurePolicy(Map infrastructureParsed) {
+    def fallback = [
+        selected_profile: 'medium',
+        available_cpus: 8,
+        available_memory_gb: 32,
+        variant_heavy_cpus: 8,
+        process_medium_cpus: 4,
+        variant_heavy_memory_gb: 32,
+        process_medium_memory_gb: 24,
+        max_parallel_branches: 4,
+    ]
+
+    def stage3 = mapOrEmpty(infrastructureParsed?.stage3_variant_discovery)
+    def pipelineExecution = mapOrEmpty(infrastructureParsed?.pipeline_execution)
+    def local = mapOrEmpty(stage3.local_system)
+    if (local.isEmpty()) {
+        local = mapOrEmpty(pipelineExecution.local_system)
+    }
+    def profiles = mapOrEmpty(stage3.profiles)
+    def thresholds = mapOrEmpty(stage3.auto_thresholds)
+
+    if (profiles.isEmpty()) {
+        return fallback
+    }
+
+    def detectedCpus = Runtime.runtime.availableProcessors()
+    def totalCpus = toIntSafe(local.total_cpus, detectedCpus)
+    def reserveCpus = toIntSafe(local.reserve_cpus, 0)
+    def totalMemGb = toIntSafe(local.total_memory_gb, 64)
+    def reserveMemGb = toIntSafe(local.reserve_memory_gb, 8)
+
+    def availableCpus = Math.max(1, totalCpus - reserveCpus)
+    def availableMemGb = Math.max(4, totalMemGb - reserveMemGb)
+
+    def mode = (stage3.profile_selection_mode ?: 'auto').toString().trim().toLowerCase()
+    def forcedProfile = params.infrastructure_profile?.toString()?.trim()
+    def selectedProfile = null
+
+    if (forcedProfile) {
+        if (!profiles.containsKey(forcedProfile)) {
+            throw new IllegalStateException("STAGE3_PRECONDITION_FAILURE: invalid infrastructure_profile '${forcedProfile}'. Valid profiles: ${profiles.keySet().sort().join(', ')}")
+        }
+        selectedProfile = forcedProfile
+    } else if (mode == 'manual') {
+        selectedProfile = (stage3.active_profile ?: 'medium').toString().trim()
+    } else {
+        def smallMax = toIntSafe(thresholds.small_max_available_cpus, 12)
+        def mediumMax = toIntSafe(thresholds.medium_max_available_cpus, 24)
+        if (availableCpus <= smallMax) {
+            selectedProfile = 'small'
+        } else if (availableCpus <= mediumMax) {
+            selectedProfile = 'medium'
+        } else {
+            selectedProfile = 'large'
+        }
+    }
+
+    if (!profiles.containsKey(selectedProfile)) {
+        throw new IllegalStateException("STAGE3_PRECONDITION_FAILURE: resolved profile '${selectedProfile}' is not defined under stage3_variant_discovery.profiles")
+    }
+
+    def selected = mapOrEmpty(profiles[selectedProfile])
+    def heavyCpus = Math.max(1, toIntSafe(selected.variant_heavy_cpus, fallback.variant_heavy_cpus))
+    def mediumCpus = Math.max(1, toIntSafe(selected.process_medium_cpus, fallback.process_medium_cpus))
+    def heavyMemGb = Math.max(4, toIntSafe(selected.variant_heavy_memory_gb, fallback.variant_heavy_memory_gb))
+    def mediumMemGb = Math.max(4, toIntSafe(selected.process_medium_memory_gb, fallback.process_medium_memory_gb))
+    def maxParallel = Math.max(1, toIntSafe(selected.max_parallel_branches, fallback.max_parallel_branches))
+
+    if (heavyCpus > availableCpus) {
+        heavyCpus = availableCpus
+    }
+    if (mediumCpus > availableCpus) {
+        mediumCpus = availableCpus
+    }
+    if (maxParallel > 6) {
+        maxParallel = 6
+    }
+
+    return [
+        selected_profile: selectedProfile,
+        available_cpus: availableCpus,
+        available_memory_gb: availableMemGb,
+        variant_heavy_cpus: heavyCpus,
+        process_medium_cpus: mediumCpus,
+        variant_heavy_memory_gb: heavyMemGb,
+        process_medium_memory_gb: mediumMemGb,
+        max_parallel_branches: maxParallel,
+    ]
+}
+
+def applyStage3InfrastructurePolicy(Map infrastructureParsed) {
+    def resolved = resolveStage3InfrastructurePolicy(infrastructureParsed)
+
+    params.infrastructure_profile = params.infrastructure_profile ?: resolved.selected_profile
+    params.stage3_variant_heavy_default_cpus = coerceIntOrFallback(params.stage3_variant_heavy_default_cpus, resolved.variant_heavy_cpus as int)
+    params.stage3_process_medium_default_cpus = coerceIntOrFallback(params.stage3_process_medium_default_cpus, resolved.process_medium_cpus as int)
+    params.stage3_variant_heavy_memory_gb = coerceIntOrFallback(params.stage3_variant_heavy_memory_gb, resolved.variant_heavy_memory_gb as int)
+    params.stage3_process_medium_memory_gb = coerceIntOrFallback(params.stage3_process_medium_memory_gb, resolved.process_medium_memory_gb as int)
+    params.stage3_max_parallel_branches = coerceIntOrFallback(params.stage3_max_parallel_branches, resolved.max_parallel_branches as int)
+
+    log.info("STAGE3_INFRA: profile=${params.infrastructure_profile}; available_cpus=${resolved.available_cpus}; available_memory_gb=${resolved.available_memory_gb}; variant_heavy_cpus=${params.stage3_variant_heavy_default_cpus}; process_medium_cpus=${params.stage3_process_medium_default_cpus}; max_parallel_branches=${params.stage3_max_parallel_branches}")
+}
+
 workflow STAGE3_VARIANT_DISCOVERY_ENGINE {
     take:
     ch_snv_indel_inputs
@@ -212,6 +337,7 @@ workflow STAGE3_VARIANT_DISCOVERY {
     def clinicalThresholds = mapOrEmpty(thresholdsParsed.clinical)
     def discoveryThresholds = mapOrEmpty(clinicalThresholds.discovery)
     def infrastructureParsed = ys.parse(infrastructureFile) ?: [:]
+    applyStage3InfrastructurePolicy(mapOrEmpty(infrastructureParsed))
     def infrastructureRoot = infrastructureFile.parent ? infrastructureFile.parent.toString() : projectDir.toString()
     def refDir = null
     [params.ref_data_root, params.ref_dir, infrastructureParsed?.storage?.reference_host_root, referenceInfo.yamlRefDataRoot, '/opt/reference'].find { candidate ->

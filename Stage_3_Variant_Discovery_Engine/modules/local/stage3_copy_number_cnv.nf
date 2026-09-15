@@ -1,7 +1,7 @@
 process STAGE3_COPY_NUMBER_CNV {
     label 'variant_heavy'
     container 'genvar-core:2.1.0'
-    cpus { (params.stage3_cnv_cpus ?: params.stage3_cpus ?: 1) as int }
+    cpus { (params.stage3_cnv_cpus ?: params.stage3_cpus ?: params.stage3_variant_heavy_default_cpus ?: 8) as int }
 
     input:
     tuple val(sample_id), path(stage2_manifest), path(sorted_bam), path(sorted_bai), val(is_wgs), val(target_bed), path(fasta), path(fasta_fai), val(sample_qc_meta), val(stage3_refs), val(sample_meta)
@@ -41,11 +41,11 @@ process STAGE3_COPY_NUMBER_CNV {
 
     mkdir -p cnvkit_out
 
-    # Primary lane: CNVkit segmentation/calling.
+    # Primary lane: CNVkit segmentation/calling with parallelization.
     if [[ -n "\${CNVKIT_REF}" && -f "\${CNVKIT_REF}" ]]; then
-        cnvkit.py batch "${sorted_bam}" -m wgs -r "\${CNVKIT_REF}" -d cnvkit_out
+        cnvkit.py batch "${sorted_bam}" -m wgs -r "\${CNVKIT_REF}" -d cnvkit_out -p \${THREADS}
     else
-        cnvkit.py batch "${sorted_bam}" -m wgs -f "${fasta}" -d cnvkit_out
+        cnvkit.py batch "${sorted_bam}" -m wgs -f "${fasta}" -d cnvkit_out -p \${THREADS}
     fi
 
     cnr_file=\$(ls -1 cnvkit_out/*.cnr 2>/dev/null | head -n 1 || true)
@@ -181,5 +181,41 @@ audit = {
 }
 Path('stage3.copy_number_cnv.audit.json').write_text(json.dumps(audit, indent=2) + chr(10), encoding='utf-8')
 PYEOF
+    """
+
+    stub:
+    """
+    cat > copy_number_cnv.calibrated.vcf <<'VCF'
+##fileformat=VCFv4.2
+##source=STAGE3_COPY_NUMBER_CNV_STUB
+##INFO=<ID=BRANCH,Number=1,Type=String,Description="Stage 3 variant branch origin">
+#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO
+2\t1000000\t.\tN\t<DEL>\t60\tPASS\tSVTYPE=DEL;END=2000000;CNV_LOG2=0.5;BRANCH=copy_number_cnv
+5\t5000000\t.\tN\t<DUP>\t60\tPASS\tSVTYPE=DUP;END=6000000;CNV_LOG2=-0.5;BRANCH=copy_number_cnv
+VCF
+    cat > stage3.copy_number_cnv.audit.json <<'JSON'
+{
+  "sample_id": "${sample_id}",
+  "stage2_manifest": "stub_path",
+  "sorted_bam": "stub_path",
+  "sorted_bai": "stub_path",
+  "fasta": "stub_path",
+  "target_bed": "stub_path",
+  "is_wgs": false,
+  "cnvkit_reference": "stub_path",
+  "cnvkit_calls_cns": "stub_path",
+  "validation_depth_tsv": "stub_path",
+  "validation_depth_quantiles": [1.0, 10.0, 50.0, 100.0],
+  "validation_depth_median": 50.0,
+  "records_emitted": 2,
+  "records_pass": 2,
+  "records_low_log2": 0,
+  "log2_abs_floor": 0.3,
+  "configured_somatic_qual_floor": 20,
+  "configured_germline_qual_floor": 10,
+  "status": "PASS",
+  "stub": true
+}
+JSON
     """
 }

@@ -102,6 +102,59 @@ Key runtime conventions:
 - Resource tiers are label-driven (`process_low`, `process_medium`, `process_high`, `process_high_memory`).
 - Fail-closed process policy defaults to retry only for selected infrastructure exits.
 
+## Whole-Pipeline Infrastructure Allocation
+
+Infrastructure-aware allocation now applies at the orchestrator level (Stages 0-6), not only within Stage 3.
+
+Primary control surface:
+- `conf/infrastructure.yaml` -> `pipeline_execution`
+
+Key fields:
+- `local_system.total_cpus`, `local_system.total_memory_gb`
+- `local_system.reserve_cpus`, `local_system.reserve_memory_gb`
+- `profile_selection_mode` (`auto` or `manual`)
+- `active_profile` (used in manual mode)
+- `auto_thresholds.small_max_available_cpus`, `auto_thresholds.medium_max_available_cpus`
+- `profiles.small|medium|large` (`max_cpus`, `max_memory_gb`)
+
+Resolution behavior:
+- `auto` mode computes available resources (`total - reserve`) and selects `small`/`medium`/`large` by thresholds.
+- `manual` mode uses `active_profile`.
+- CLI `--execution_profile <profile>` overrides policy selection.
+- CLI `--max_cpus`, `--max_memory_gb`, `--max_memory` override resolved values.
+
+Operational outcome:
+- Low-core systems naturally reduce global task parallelism.
+- High-core systems scale throughput while remaining bounded by policy.
+- Resolved policy is emitted in orchestrator logs (`PIPELINE_INFRA: ...`) for audit traceability.
+
+## Stage 3 Infrastructure Allocation
+
+Stage 3 now resolves branch allocation from the governed infrastructure contract rather than fixed host assumptions.
+
+Primary control surface:
+- `conf/infrastructure.yaml` -> `stage3_variant_discovery`
+- If `stage3_variant_discovery.local_system` is omitted, Stage 3 inherits `pipeline_execution.local_system`.
+
+Key fields:
+- `local_system.total_cpus`, `local_system.total_memory_gb`
+- `local_system.reserve_cpus`, `local_system.reserve_memory_gb`
+- `profile_selection_mode` (`auto` or `manual`)
+- `active_profile` (used in manual mode)
+- `auto_thresholds.small_max_available_cpus`, `auto_thresholds.medium_max_available_cpus`
+- `profiles.small|medium|large` (`variant_heavy_cpus`, `process_medium_cpus`, memory envelopes, `max_parallel_branches`)
+
+Resolution behavior:
+- `auto` mode computes available resources (`total - reserve`) and selects `small`/`medium`/`large` by thresholds.
+- `manual` mode uses `active_profile`.
+- CLI `--infrastructure_profile <profile>` overrides both.
+- Branch-specific CPU flags (for example `--stage3_cnv_cpus`) still override profile defaults.
+
+Operational outcome:
+- Low-core systems naturally downshift branch concurrency.
+- High-core systems scale to broader parallel execution.
+- Resolved policy is emitted in Stage 3 logs (`STAGE3_INFRA: ...`) for audit traceability.
+
 ## Cryptographic Integrity and Telemetry
 
 Stage 5 and Stage 6 implement signed artifact lineage and telemetry sinks.
@@ -177,6 +230,52 @@ python3 Stage_4_Ancestry_Phasing_Highway/tests/fmea/run_stage4_fmea_suite.py
 python3 Stage_5_Clinical_Annotation_PGx_Triage/tests/fmea/run_stage5_fmea_suite.py
 python3 Stage_6_Clinical_Reporting_Workbench_Gateway/tests/fmea/run_stage6_fmea_suite.py
 ```
+
+### Stage 3 Infrastructure Profile Matrix
+
+Use this runner to generate profile-evidence across `small`, `medium`, and `large` Stage 3 infrastructure policies:
+
+```bash
+scripts/run_stage3_infrastructure_profile_matrix.sh
+```
+
+Useful options:
+
+```bash
+scripts/run_stage3_infrastructure_profile_matrix.sh \
+	--input Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control/samples_hg002_banked_stage2_snv_only.yaml \
+	--profiles "small medium large"
+```
+
+Outputs:
+- Per-profile run directories under `Stage_3_Variant_Discovery_Engine/tests/infrastructure_profile_matrix/`
+- Run logs containing the resolved `STAGE3_INFRA` line
+- Summary table `matrix_summary.tsv` for comparative review
+
+### Whole-Pipeline Infrastructure Profile Matrix
+
+Use this runner to generate orchestrator-level (`Stages 0-6`) profile evidence for `small`, `medium`, and `large` execution policies:
+
+```bash
+scripts/run_pipeline_infrastructure_profile_matrix.sh
+```
+
+Prerequisite:
+- Use this only after Stages 4-6 are production-ready for your target validation path.
+- If downstream stages are still under active debugging, use the Stage 3 matrix as the interim infrastructure evidence set.
+
+Useful options:
+
+```bash
+scripts/run_pipeline_infrastructure_profile_matrix.sh \
+	--input assets/mini_control/samples_hg002_mini.yaml \
+	--profiles "small medium large"
+```
+
+Outputs:
+- Per-profile run directories under `tests/infrastructure_profile_matrix/`
+- Run logs with resolved `PIPELINE_INFRA` and `STAGE3_INFRA` lines
+- Summary table `tests/infrastructure_profile_matrix/matrix_summary.tsv`
 
 ## Development Notes
 

@@ -146,6 +146,17 @@ This prevents silent success on deliberately malformed payloads.
 
 - `tests/mini_control/samples_hg002_banked_stage3.yaml`
 
+## Audit Hygiene
+
+- Production evidence directories: `tests/mini_control/snv`, `tests/mini_control/sv`, `tests/mini_control/cnv`, `tests/mini_control/str`
+- `tests/mini_control/` is production-only. Do not keep smoke/stub outputs under this path.
+
+Run the production evidence verifier before audit/regulatory packaging:
+
+```bash
+./scripts/verify_stage3_production_evidence.sh
+```
+
 ## Execute
 
 ```bash

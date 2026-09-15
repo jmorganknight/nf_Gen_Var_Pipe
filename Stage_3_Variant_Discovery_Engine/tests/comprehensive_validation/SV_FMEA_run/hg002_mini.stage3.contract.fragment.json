@@ -1,0 +1,11 @@
+{
+  "sample_id": "hg002_mini",
+  "validation_token": "VALID_PASS|SAMPLE_VALIDATED",
+    "run_mode": "audit_only",
+  "variant_branches": {"snv_indel":false,"structural_variants":true,"copy_number_cnv":false,"str_expansions":false,"trisomy_aneuploidy":false,"homologous_pseudogenes":false},
+  "active_branches": ["snv_indel"],
+    "normalized_vcf": "hg002_mini.normalized.vcf.gz",
+    "normalized_vcf_tbi": "hg002_mini.normalized.vcf.gz.tbi",
+    "harmonization_audit": "hg002_mini.harmonization_audit.json",
+  "stage4_handoff_note": "Normalized, atomized, schema-validated VCF ready for annotation."
+}

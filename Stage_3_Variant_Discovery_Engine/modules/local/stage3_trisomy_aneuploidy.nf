@@ -1,7 +1,7 @@
 process STAGE3_TRISOMY_ANEUPLOIDY {
     label 'process_medium'
     container 'genvar-core:2.1.0'
-    cpus { (params.stage3_trisomy_cpus ?: params.stage3_cpus ?: 1) as int }
+    cpus { (params.stage3_trisomy_cpus ?: params.stage3_cpus ?: params.stage3_process_medium_default_cpus ?: 4) as int }
 
     input:
     tuple val(sample_id), path(stage2_manifest), path(sorted_bam), path(sorted_bai), val(is_wgs), val(target_bed), path(fasta), path(fasta_fai), val(sample_qc_meta), val(stage3_refs), val(sample_meta)
@@ -107,5 +107,35 @@ audit = {
 }
 Path('stage3.trisomy_aneuploidy.audit.json').write_text(json.dumps(audit, indent=2) + chr(10), encoding='utf-8')
 PYEOF
+    """
+
+    stub:
+    """
+    cat > trisomy_aneuploidy.calibrated.vcf <<'VCF'
+##fileformat=VCFv4.2
+##source=STAGE3_TRISOMY_ANEUPLOIDY_STUB
+##INFO=<ID=BRANCH,Number=1,Type=String,Description="Stage 3 variant branch origin">
+#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO
+21\t1000000\t.\tN\t<TRISOMY>\t60\tPASS\tSVTYPE=ANEUPLOIDY;CHROM=21;ZSCORE=3.5;BRANCH=trisomy_aneuploidy
+VCF
+    cat > stage3.trisomy_aneuploidy.audit.json <<'JSON'
+{
+  "sample_id": "${sample_id}",
+  "stage2_manifest": "stub_path",
+  "sorted_bam": "stub_path",
+  "sorted_bai": "stub_path",
+  "idxstats_tsv": "stub_path",
+  "autosome_median_mapped": 50000000,
+  "autosome_mean_mapped": 50000000,
+  "autosome_stdev_mapped": 5000000,
+  "trisomy_ratio_threshold": 1.3,
+  "trisomy_z_threshold": 2.5,
+  "candidates": [{"chrom": "21", "mapped": 75000000, "ratio": 1.5, "zscore": 3.5}],
+  "calls": [{"chrom": "21", "mapped": 75000000, "ratio": 1.5, "zscore": 3.5}],
+  "records_emitted": 1,
+  "status": "PASS",
+  "stub": true
+}
+JSON
     """
 }
