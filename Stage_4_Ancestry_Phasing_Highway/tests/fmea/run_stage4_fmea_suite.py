@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 ROOT = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_4_Ancestry_Phasing_Highway')
-STAGE3_FIXTURE = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/mini_control/samples_hg002_banked_stage3.yaml')
-REFS = Path('/media/drive_c/nf_pipes/nf_WES_Onco_Risk/references.yaml')
-THRESHOLDS = Path('/media/drive_c/nf_pipes/nf_WES_Onco_Risk/thresholds.yaml')
+STAGE3_FIXTURE = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/banked_stage3/samples_hg002_banked_stage3.yaml')
+REFS = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/conf/references.yaml')
+THRESHOLDS = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/conf/thresholds.yaml')
 SUMMARY = ROOT / 'tests/fmea/stage4_fmea_summary.tsv'
 
 

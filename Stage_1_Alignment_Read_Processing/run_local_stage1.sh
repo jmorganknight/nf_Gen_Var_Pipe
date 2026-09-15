@@ -4,9 +4,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK_ROOT="${WORK_ROOT:-/scratch/nextflow_work}"
 TMP_DIR="${TMP_DIR:-/scratch/tmp}"
-REF_DIR="${REF_DIR:-/media/jmk/Extreme Pro/WES_Onco_References}"
-INPUT="${1:-$SCRIPT_DIR/../Stage_0_Preflight_Ingest_Gate/tests/mini_control/samples_hg002_banked_stage0.yaml}"
-OUTDIR="${2:-tests/mini_control}"
+REF_DIR="${REF_DIR:-/media/jmk/Extreme Pro/pipeline_references}"
+INPUT="${1:-../Stage_0_Preflight_Ingest_Gate/tests/inputs/hg002_mini/samples_hg002_banked_stage0.yaml}"
+OUTDIR="${2:-tests/banked_stage1}"
 
 echo "Clearing Stage 1 scratch directories: ${WORK_ROOT} and ${TMP_DIR}"
 mkdir -p "$WORK_ROOT" "$TMP_DIR"

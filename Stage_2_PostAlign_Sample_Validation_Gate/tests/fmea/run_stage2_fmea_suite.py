@@ -17,14 +17,13 @@ PIPELINE_ROOT = ROOT.parent
 MAIN_NF = ROOT / "main.nf"
 STAGE1_ROOT = PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing"
 BASE_MANIFEST_CANDIDATES = [
-    STAGE1_ROOT / "tests" / "mini_control" / "samples_hg002_banked_stage1.yaml",
-    STAGE1_ROOT / "tests" / "fixtures" / "banked_stage1" / "samples_hg002_banked_stage1.yaml",
+    STAGE1_ROOT / "tests" / "banked_stage1" / "samples_hg002_banked_stage1.yaml",
     STAGE1_ROOT / "tests" / "fmea" / "runs" / "nominal_hg002" / "out" / "samples_hg002_banked_stage1.yaml",
 ]
 REFERENCES = PIPELINE_ROOT / "conf" / "references.yaml"
 THRESHOLDS = PIPELINE_ROOT / "conf" / "thresholds.yaml"
-SEX_CASE_BAM = STAGE1_ROOT / "tests" / "mini_control" / "HG002_ILLUMINA" / "audit_and_qc" / "identity" / "HG002_ILLUMINA.identity_verified.bam"
-SEX_CASE_BAI = STAGE1_ROOT / "tests" / "mini_control" / "HG002_ILLUMINA" / "audit_and_qc" / "identity" / "HG002_ILLUMINA.identity_verified.bam.bai"
+SEX_CASE_BAM = STAGE1_ROOT / "tests" / "banked_stage1" / "HG002_ILLUMINA" / "audit_and_qc" / "identity" / "HG002_ILLUMINA.identity_verified.bam"
+SEX_CASE_BAI = STAGE1_ROOT / "tests" / "banked_stage1" / "HG002_ILLUMINA" / "audit_and_qc" / "identity" / "HG002_ILLUMINA.identity_verified.bam.bai"
 SEX_CASE_INTAKE_TOKEN = STAGE1_ROOT / "tests" / "fmea" / "inputs" / "valid_stage0_token.txt"
 
 

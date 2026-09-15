@@ -83,8 +83,6 @@ def resolveHostPath(def rawPath, String refDir) {
     def baseName = new File(p).name
     def stageLocalCandidates = [
         new File(projectDir.toString(), "tests/schemas/${baseName}"),
-        new File(projectDir.toString(), "tests/mini_control/${baseName}"),
-        new File(projectDir.toString(), "tests/fixtures/${baseName}"),
         new File(projectDir.toString(), "tests/${baseName}"),
         new File(projectDir.toString(), "../Stage_3_Variant_Discovery_Engine/tests/schemas/${baseName}"),
         new File(projectDir.toString(), "../Stage_3_Variant_Discovery_Engine/tests/${baseName}"),
