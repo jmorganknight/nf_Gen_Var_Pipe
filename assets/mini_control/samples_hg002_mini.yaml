@@ -1,6 +1,6 @@
 samples:
   - sample_id: "hg002_mini"
-    run_mode: "audit_only"
+    run_mode: "dev"  # dev mode allows audit continuation for controlled mini-control validation
     sample_type: "germline"  # Allowed: germline | somatic_matched | tumor_only | liquid_biopsy
     sequencing_platform: "illumina"  # Allowed: illumina | ultima | element | ont
     library_strategy: "WGS"  # Allowed: WGS | WES

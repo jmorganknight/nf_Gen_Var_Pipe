@@ -30,6 +30,8 @@ purity_sex_payload = json.loads(Path('${purity_sex_audit}').read_text(encoding='
 
 contam_status = str(contamination_payload.get('status') or '').upper()
 run_mode = str(meta.get('run_mode') or 'production').strip().lower()
+if run_mode == 'audit_only':
+    run_mode = 'dev'
 audit_mode = run_mode in ('dev', 'audit_only')
 if contam_status != 'PASS' and not audit_mode:
     detail = contamination_payload.get('failure_detail') or contamination_payload.get('skip_reason') or 'contamination gate did not PASS'
@@ -106,7 +108,7 @@ payload = {
 }
 
 if contam_status != 'PASS' and audit_mode:
-    payload['stage2_governance_note'] = 'CONTAMINATION_FAILURE_CONTINUED_FOR_AUDIT_ONLY'
+    payload['stage2_governance_note'] = 'CONTAMINATION_FAILURE_CONTINUED_FOR_DEV_MODE'
     payload['validation_token'] = meta.get('validation_token')
 
 Path(f"{sid}.stage2.contract.fragment.json").write_text(json.dumps(payload, indent=2) + '\\n', encoding='utf-8')

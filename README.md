@@ -200,6 +200,15 @@ Stage 5 and Stage 6 implement signed artifact lineage and telemetry sinks.
 
 ## Execution Modes
 
+### Sample Run Mode Toggle
+
+Run mode is declared in the sample manifest with `run_mode` and controls fail-closed versus dev continuation semantics.
+
+- `production` (default when omitted): fail closed on QC failures.
+- `dev`: allows controlled continuation for mini-control and audit validation paths (for example contamination `CONTINUE_FOR_AUDIT` policy annotations).
+
+`audit_only` is still accepted for backward compatibility, but `dev` is now the canonical label.
+
 ### Development Run (fast profile)
 
 ```bash

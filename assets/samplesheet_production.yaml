@@ -1,5 +1,6 @@
 samples:
   - sample_id: "HG002_FULL_CONTROL_WES"
+    # run_mode defaults to "production" when omitted (fail-closed QC behavior)
     sample_type: "germline"
     sequencing_platform: "illumina"
     library_strategy: "WGS"

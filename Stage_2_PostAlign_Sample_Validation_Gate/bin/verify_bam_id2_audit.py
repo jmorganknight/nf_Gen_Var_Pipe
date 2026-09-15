@@ -149,6 +149,8 @@ def main():
     fail_closed = str(args.fail_closed).lower() in ('true', '1', 'yes')
     non_evaluable_fail_closed = str(args.non_evaluable_fail_closed).lower() in ('true', '1', 'yes')
     run_mode = str(args.run_mode or 'production').strip().lower()
+    if run_mode == 'audit_only':
+        run_mode = 'dev'
     audit_mode = run_mode in ('dev', 'audit_only')
 
     resources = {
@@ -260,7 +262,7 @@ def main():
         'fail_closed_enabled': fail_closed,
         'contamination_non_evaluable_fail_closed': non_evaluable_fail_closed,
         'fail_closed_rule': f'STAGE2_CONTAMINATION_FAILURE when contamination_rate > {limit:.6f}',
-        'governance_mode': 'AUDIT_ONLY' if audit_mode else 'PRODUCTION',
+        'governance_mode': 'DEV' if audit_mode else 'PRODUCTION',
         'verifybamid2_references': resources,
         'precondition_audit': args.precondition_audit,
     }

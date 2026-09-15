@@ -25,6 +25,15 @@ This stage validates that Stage 1 contract prerequisites are present and clinica
 | Purity concordance | `SPECIMEN_PARADIGM_PURITY_RESOLVER` | configurable fail-closed on excessive purity delta. |
 | Assay target routing | `ASSAY_TARGET_ROUTER` | fail closed when branch/target catalogs are invalid or missing. |
 
+## Run Mode Toggle
+
+Stage 2 reads `run_mode` from the sample contract to control contamination-gate continuation policy.
+
+- `production` (default): contamination failure is fail-closed.
+- `dev`: contamination failures are annotated with `stage2_contamination_policy_action=CONTINUE_FOR_AUDIT` for controlled mini-control validation.
+
+Legacy `audit_only` inputs remain accepted for backward compatibility and are normalized to `dev` in Stage 2 annotations.
+
 ## Architecture Flow
 
 ```mermaid
