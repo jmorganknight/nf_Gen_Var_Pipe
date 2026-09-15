@@ -69,8 +69,8 @@ Required fields:
 - `validation_token` containing `VALID_PASS|VARIANTS_HARMONIZED`
 - `normalized_vcf`
 - `normalized_vcf_tbi`
-- `sorted_bam`
-- `sorted_bai`
+- `mapped_bam`
+- `mapped_bai`
 - `reference_build`
 - `consent_tokens` / `stage0_consent_tokens`
 - `requested_branches` (Stage 5 branch control-plane list; consumed fail-closed by Stage 5 intake)
@@ -92,8 +92,8 @@ cd Stage_4_Ancestry_Phasing_Highway
 nextflow run main.nf \
     -profile docker \
     --input ../Stage_3_Variant_Discovery_Engine/tests/mini_control/samples_hg002_banked_stage3.yaml \
-    --references ../conf/references.yaml \
-    --thresholds ../conf/thresholds.yaml \
+    --references ../control_plane/references.yaml \
+    --thresholds ../control_plane/thresholds.yaml \
     --outdir tests/mini_control
 ```
 

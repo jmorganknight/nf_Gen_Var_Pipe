@@ -2,8 +2,11 @@
 
 This directory contains a governed mini-control dataset used to exercise branch routing and core clinical logic with a compact HG002 read subset.
 
+It now pairs with the unified samples_mini_control.yaml manifest, which uses the canonical schema standard and supports stage-skipping lookahead blocks for manual debugging.
+
 ## Files
 
+- `samples_mini_control.yaml`: Unified canonical mini-control manifest for Stage 0-6 debugging.
 - `build_mini_control.sh`: Generates the mini-control FASTQ pair from a BAM/CRAM source.
 - `hg002_mini_R1.fastq.gz`: Mini-control R1 FASTQ fixture.
 - `hg002_mini_R2.fastq.gz`: Mini-control R2 FASTQ fixture.

@@ -7,7 +7,7 @@
 This stage validates that Stage 1 contract prerequisites are present and clinically acceptable before Stage 3 compute-heavy callers begin:
 
 - Stage 1 contract/token enforcement (`VALID_PASS|INTAKE_VALIDATED`)
-- Sorted BAM/BAI availability validation
+- Mapped BAM/BAI availability validation
 - Chromosomal sex concordance validation (GRCh38 non-PAR `chrY/chrX` ratio)
 - In-silico purity cross-check for somatic and liquid biopsy paradigms
 - VerifyBamID2 contamination thresholding (default `< 1.0%`)
@@ -115,8 +115,8 @@ cd Stage_2_PostAlign_Sample_Validation_Gate
 nextflow run main.nf \
   -profile docker \
   --input ../Stage_1_Alignment_Read_Processing/tests/mini_control/samples_hg002_banked_stage1.yaml \
-  --references ../conf/references.yaml \
-  --thresholds ../conf/thresholds.yaml \
+  --references ../control_plane/references.yaml \
+  --thresholds ../control_plane/thresholds.yaml \
   --outdir tests/mini_control/
 ```
 

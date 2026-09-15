@@ -7,6 +7,21 @@
 
 This repository contains a production-grade, stage-scoped Nextflow DSL2 clinical WES pipeline with fail-closed governance, externalized control planes, and signed downstream reporting artifacts.
 
+## Governance & Control Plane
+
+This repository now uses a centralized control plane under control_plane/ for immutable clinical policy and reference contracts.
+
+- control_plane/references.yaml defines governed reference assets and index paths.
+- control_plane/thresholds.yaml defines clinical thresholds and stage-specific operating limits.
+- control_plane/infrastructure.yaml defines resource policy and execution profiles.
+
+The execution model is hub-and-spoke:
+
+- The root pipeline orchestrates multi-stage clinical flow.
+- Each stage can also run independently from its own directory.
+- Spoke stages resolve shared governance via ${projectDir}/../control_plane/.
+- This preserves a single source of truth for clinical rules while supporting stage-local debugging.
+
 ## What This Repository Contains
 
 `nf_Gen_Var_Pipe` is a staged WES processing framework organized into independent gates from intake through reporting.
@@ -36,6 +51,21 @@ The production clinical execution path is:
 
 Stage 0 remains the intake/preflight control gate that validates incoming manifests and route decisions before Stage 1.
 
+## Clinical Passport & Schema Standardization
+
+Sample manifests now follow a single canonical schema standard:
+
+- Semantic versioning: 1.0.0
+- Canonical field names: reported_sex, sequencing_platform, read_file_paths.read1/2, mapped_bam
+- Pure YAML only; no JSON-in-YAML manifests
+- Centralized manifest templates live under control_plane/manifest_templates/
+
+Master templates:
+
+- intake_template.yaml: Stage 0 fresh FASTQ intake contract
+- banked_template_stage1_plus.yaml: cumulative aligned/variant handoff
+- mini_control_template.yaml: unified manual debugging manifest with stage-skipping lookahead blocks
+
 ## September 2026 Compliance Update
 
 Stage 5 now enforces immutable, fail-closed branch routing from the sample manifest control plane.
@@ -51,9 +81,9 @@ Stage 5 now enforces immutable, fail-closed branch routing from the sample manif
 ```mermaid
 flowchart LR
 	Y1["samples.yaml"] --> P0["Stage 0 PREFLIGHT_INGESTION_GUARD\nUnified intake audit and contract lock"]
-	Y2["references.yaml"] --> P0
-	Y3["thresholds.yaml"] --> P0
-	Y4["infrastructure.yaml"] --> P0
+	Y2["control_plane/references.yaml"] --> P0
+	Y3["control_plane/thresholds.yaml"] --> P0
+	Y4["control_plane/infrastructure.yaml"] --> P0
 	P0 --> S0["Stage 0 Intake Gate\nAUTOMATED_INGEST_GATE + route audit"]
 	S0 --> S1["Stage 1 Alignment"]
 	S1 --> S2["Stage 2 Identity and QC Gate"]
@@ -117,8 +147,14 @@ Pipeline control is intentionally externalized and environment-driven.
 | Reference root | `params.ref_data_root` / `params.ref_dir` | Defaults to `NXF_REF_DATA_ROOT` then local assets fallback. |
 | PKI key directory | `params.pki_key_dir` | Defaults to `NXF_PKI_KEY_DIR` then `${projectDir}/keys`. |
 | Resources and retry policy | `nextflow.config` `process {}` | Label-based CPU/memory scaling with bounded retries on OOM-like exits. |
-| Parameter contracts | `conf/` and `assets/` | References, thresholds, schema paths, and sample manifests are declarative artifacts. |
+| Parameter contracts | `control_plane/` and `assets/` | Immutable references, thresholds, schemas, and sample manifests are declarative artifacts. |
 | Work/temp roots | `params.work_root`, `params.tmp_dir` | Defaulted to scratch paths for high-throughput execution. |
+
+Audit and LIMS readiness:
+
+- Runtime outputs are routed into flat sample-specific directories such as tests/<sample_id>/.
+- Compliance evidence is consolidated under audit_and_qc/ for stage-local and downstream audit replay.
+- This layout keeps artifacts separable by sample while preserving deterministic lineage.
 
 Key runtime conventions:
 - Reference data is mounted through Docker/Apptainer profile mount options.
@@ -130,7 +166,7 @@ Key runtime conventions:
 Infrastructure-aware allocation now applies at the orchestrator level (Stages 0-6), not only within Stage 3.
 
 Primary control surface:
-- `conf/infrastructure.yaml` -> `pipeline_execution`
+- `control_plane/infrastructure.yaml` -> `pipeline_execution`
 
 Key fields:
 - `local_system.total_cpus`, `local_system.total_memory_gb`
@@ -156,7 +192,7 @@ Operational outcome:
 Stage 3 now resolves branch allocation from the governed infrastructure contract rather than fixed host assumptions.
 
 Primary control surface:
-- `conf/infrastructure.yaml` -> `stage3_variant_discovery`
+- `control_plane/infrastructure.yaml` -> `stage3_variant_discovery`
 - If `stage3_variant_discovery.local_system` is omitted, Stage 3 inherits `pipeline_execution.local_system`.
 
 Key fields:
@@ -215,7 +251,7 @@ Run mode is declared in the sample manifest with `run_mode` and controls fail-cl
 NXF_REF_DATA_ROOT="/path/to/reference_root" \
 nextflow run main.nf \
 	-profile dev_fast,docker \
-	--input assets/samples_hg002_mini.yaml \
+	--input assets/mini_control/samples_mini_control.yaml \
 	--outdir results/master_orchestrator \
 	-ansi-log false
 ```
@@ -227,7 +263,7 @@ NXF_REF_DATA_ROOT="/path/to/reference_root" \
 nextflow run main.nf \
 	-profile dev_fast,docker \
 	-stub \
-	--input assets/samples_hg002_mini.yaml \
+	--input assets/mini_control/samples_mini_control.yaml \
 	-ansi-log false
 ```
 
@@ -237,7 +273,7 @@ nextflow run main.nf \
 NXF_REF_DATA_ROOT="/path/to/reference_root" \
 nextflow run main.nf \
 	-profile docker \
-	--input assets/samples_hg002_mini.yaml \
+	--input assets/mini_control/samples_mini_control.yaml \
 	--outdir results/master_orchestrator \
 	-resume
 ```

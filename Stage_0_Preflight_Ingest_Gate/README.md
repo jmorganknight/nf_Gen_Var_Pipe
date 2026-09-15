@@ -2,12 +2,14 @@
 
 Standalone Stage 0 micro-pipeline for preflight intake validation, reference snapshot locking, and mini-control banking.
 
+Stage 0 now consumes governed contracts from the centralized control_plane/ directory and banks audit evidence into tests/<sample_id>/audit_and_qc/ for downstream LIMS readiness.
+
 ## Architecture Flow
 
 ```mermaid
 flowchart TD
     A["Raw FASTQ R1/R2 + samplesheet.yaml"] --> B["PREFLIGHT_INGESTION_GUARD"]
-    C["references.yaml + thresholds.yaml + infrastructure.yaml"] --> B
+    C["control_plane/references.yaml + thresholds.yaml + infrastructure.yaml"] --> B
     B -->|preflight_lock + snapshot_tokens + yaml_bundle| D["AUTOMATED_INGEST_GATE"]
     D --> E["EVALUATE_INTAKE_STATUS"]
     E --> F{"intake token"}
@@ -25,7 +27,7 @@ flowchart TD
 
 ```text
 FASTQ + sample metadata -------------------------------> PREFLIGHT_INGESTION_GUARD
-references.yaml + thresholds.yaml + infrastructure.yaml ----^         |
+control_plane/references.yaml + thresholds.yaml + infrastructure.yaml ----^         |
                                     preflight_lock + snapshot tokens + yaml bundle
                                         |
                                         v
@@ -42,7 +44,7 @@ references.yaml + thresholds.yaml + infrastructure.yaml ----^         |
 
 | Module | Inputs | Outputs | Failure Behavior |
 |---|---|---|---|
-| `PREFLIGHT_INGESTION_GUARD` | preflight sample rows, `references.yaml`, `samplesheet`, `samples manifest source`, `thresholds.yaml`, `infrastructure.yaml` | `preflight.lock`, `reference_snapshot.tokens`, `yaml_snapshot_bundle.tar.gz` | Hard fail on missing reference assets, checksum inconsistency, malformed contracts, or guard violations. |
+| `PREFLIGHT_INGESTION_GUARD` | preflight sample rows, `control_plane/references.yaml`, `samplesheet`, `samples manifest source`, `control_plane/thresholds.yaml`, `control_plane/infrastructure.yaml` | `preflight.lock`, `reference_snapshot.tokens`, `yaml_snapshot_bundle.tar.gz` | Hard fail on missing reference assets, checksum inconsistency, malformed contracts, or guard violations. |
 | `AUTOMATED_INGEST_GATE` | `tuple(meta, fastq_r1, fastq_r2)`, `thresholds.yaml` | validated FASTQ symlinks, `intake_validation_token`, `*.intake_validation_report.json` | Hard fail for missing mandatory sample fields or missing files. Emits `INVALID_REJECT|...` for controlled rejection conditions including optional strict gzip/pair-count checks. |
 | `EVALUATE_INTAKE_STATUS` | intake payload tuple | route decision JSON + payload passthrough | No direct halt; route decision is deterministic from token prefix. |
 | `INGEST_FAIL_REJECT` | invalid intake payload, signer keypair | `*.ingest_rejection_audit.json` | Emits signed RS256 rejection audit; falls back to SHA256 signature payload only if key usage fails. |
@@ -74,6 +76,6 @@ Stage 0 publishes to `tests/mini_control/` with the following contract:
 
 `reference_snapshot.tokens` includes:
 
-- SHA256 hashes for active YAML contracts (`references.yaml`, `thresholds.yaml`, `infrastructure.yaml`, plus sample manifest path used in run)
+- SHA256 hashes for active YAML contracts (`control_plane/references.yaml`, `control_plane/thresholds.yaml`, `control_plane/infrastructure.yaml`, plus sample manifest path used in run)
 - Reference asset hash map
 - Governed container digest entries for `core`, `annotation`, and `multiomics` with `BUILD_PENDING` fallback

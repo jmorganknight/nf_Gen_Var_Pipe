@@ -1,0 +1,111 @@
+# ==============================================================================
+# UNIFIED MINI-CONTROL MANIFEST FOR CONTINUOUS DEBUGGING WORKFLOW
+# ==============================================================================
+# Version: 1.0.0
+# Purpose: Single entry point for nf_Gen_Var_Pipe Stage 0-6 manual debugging
+# Usage: Modify as needed; stages auto-populate output fields during execution
+
+manifest_schema_version: "1.0.0"
+manifest_template_variant: "mini_control_unified_automation"
+
+samples:
+  - sample_id: "mini_control_hg002"
+    patient_id: "mini_control_hg002"
+    case_id: "mini_control"
+    accession_id: ""
+    encounter_id: ""
+    specimen_id: ""
+    analysis_batch_id: ""
+
+    # Pipeline execution mode
+    run_mode: "dev"
+    sample_type: "germline"
+    pathologist_tumor_burden: 0.0
+    physician_tumor_purity: 0.0
+    reported_sex: "XY"
+
+    # Sequencing metadata (canonical naming convention)
+    sequencing_platform: "illumina"
+    sequencer_model: "NovaSeq"
+    flowcell_geometry: "native"
+    library_strategy: "WGS"
+    target_bed: ""
+
+    # Consent configuration (canonical structures)
+    consent:
+      prs_opt_in: true
+      sf_opt_in: true
+      research_opt_in: false
+      data_sharing_opt_in: false
+      recontact_opt_in: false
+      consent_version: "MINI_CONTROL_DEV"
+      consent_signed_utc: null
+      consent_source: "DECLARED_IN_SAMPLESHEET"
+
+    # Base path for asset resolution
+    asset_base_uri: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe"
+
+    # ========================================================================
+    # STAGE 0: FRESH FASTQ INPUT
+    # ========================================================================
+    read_file_paths:
+      read1: "assets/mini_control/mini_control_R1.fastq.gz"
+      read2: "assets/mini_control/mini_control_R2.fastq.gz"
+
+    # ========================================================================
+    # OPTIONAL: STAGE 1 LOOKAHEAD ASSETS (for stage-skipping workflow)
+    # ========================================================================
+    # Uncomment if pre-banked Stage 1 assets available
+    #stage1_assets:
+    #  mapped_bam: "assets/mini_control/mini_control.markdup.bam"
+    #  mapped_bai: "assets/mini_control/mini_control.markdup.bam.bai"
+
+    # ========================================================================
+    # OPTIONAL: STAGE 3 LOOKAHEAD ASSETS (skip to Stage 4)
+    # ========================================================================
+    # Uncomment if pre-banked Stage 3 variant outputs available
+    #stage3_assets:
+    #  normalized_vcf: "assets/mini_control/mini_control.normalized.vcf.gz"
+    #  normalized_vcf_tbi: "assets/mini_control/mini_control.normalized.vcf.gz.tbi"
+
+    # ========================================================================
+    # REFERENCE DATA (resolved from control_plane at runtime)
+    # ========================================================================
+    reference_build:
+      reference_genome: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+      reference_fai: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
+      reference_dict: "reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
+      bwa_index_base: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+      clinvar_db: "reference/clinvar_20260601.vcf.gz"
+      onco_target_bed: "reference/OncoPanel_v4.2.bed"
+      sf_bed: "reference/ACMG_SF_v3.2.bed"
+
+    # ========================================================================
+    # VARIANT BRANCH ROUTING
+    # ========================================================================
+    variant_branches:
+      snv_indel: true
+      structural_variants: true
+      copy_number_cnv: true
+      str_expansions: false
+      trisomy_aneuploidy: true
+      homologous_pseudogenes: false
+
+    # ========================================================================
+    # AUTO-POPULATED BY PIPELINE (DO NOT EDIT MANUALLY)
+    # ========================================================================
+    validation_token: ""
+    preflight_lock_status: ""
+    preflight_lock_token: ""
+
+    # Stage 1 output
+    mapped_bam: ""
+    mapped_bai: ""
+
+    # Stage 2 validation
+    stage2_contamination_status: ""
+    stage2_contamination_policy_action: ""
+
+    # Stage 3 variants
+    normalized_vcf: ""
+    normalized_vcf_tbi: ""

@@ -137,8 +137,8 @@ cd Stage_6_Clinical_Reporting_Workbench_Gateway
 nextflow run main.nf \
   -profile docker \
   --input ../Stage_5_Clinical_Annotation_PGx_Triage/tests/mini_control/samples_hg002_banked_stage5.yaml \
-  --references ../conf/references.yaml \
-  --thresholds ../conf/thresholds.yaml \
+  --references ../control_plane/references.yaml \
+  --thresholds ../control_plane/thresholds.yaml \
   --outdir tests/mini_control
 ```
 

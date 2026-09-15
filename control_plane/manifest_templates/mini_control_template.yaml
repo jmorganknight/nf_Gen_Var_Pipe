@@ -1,0 +1,124 @@
+# ==============================================================================
+# UNIFIED MINI-CONTROL TESTING MANIFEST TEMPLATE v1.0.0
+# ==============================================================================
+# Purpose: Single YAML for end-to-end Stage 0-6 continuous validation
+# Usage: Populate intake fields for Stage 0 entry; stages auto-populate output fields
+# Uniqueness: Supports multi-stage asset lookahead for rapid modular testing
+# Naming Convention: Option A canonical field names (same as other templates)
+# Schema: Cumulative with lookahead asset blocks for stage-skipping workflows
+
+manifest_schema_version: "1.0.0"
+manifest_template_variant: "mini_control_unified_automation"
+manifest_description: "Automated testing manifest for end-to-end Stage 0-6 validation"
+
+samples:
+  - sample_id: "mini_control_hg002"
+    patient_id: "mini_control_hg002"
+    case_id: "mini_control"
+
+    # Pipeline execution mode and asset resolution
+    run_mode: "dev"                                                       # REQUIRED enum: dev|audit_only|production
+    asset_base_uri: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe"           # Base for resolving asset paths
+
+    # Minimal intake metadata
+    sample_type: "germline"
+    reported_sex: "XY"
+    pathologist_tumor_burden: 0.0
+    physician_tumor_purity: 0.0
+
+    # Sequencing metadata (canonical naming)
+    sequencing_platform: "illumina"
+    sequencer_model: "NovaSeq"
+    flowcell_geometry: "native"
+    library_strategy: "WGS"
+
+    # Compact consent (pre-set for testing)
+    consent:
+      prs_opt_in: true
+      sf_opt_in: true
+      research_opt_in: false
+      data_sharing_opt_in: false
+      recontact_opt_in: false
+
+    # ========================================================================
+    # STAGE 0: FRESH FASTQ INPUT
+    # ========================================================================
+    # Actual fresh reads for Stage 0 entry point
+    read_file_paths:
+      read1: "assets/mini_control/hg002_mini_R1.fastq.gz"
+      read2: "assets/mini_control/hg002_mini_R2.fastq.gz"
+
+    # ========================================================================
+    # STAGE 1: PRE-BANKED ALIGNED ASSETS (Optional Lookahead)
+    # ========================================================================
+    # If these exist in assets/, Stage 0-1 can be skipped; used for rapid testing
+    # Uncomment and populate to enable stage-skipping for this mini-control
+    stage1_assets:
+      mapped_bam: "assets/mini_control/hg002_mini.markdup.bam"
+      mapped_bai: "assets/mini_control/hg002_mini.markdup.bam.bai"
+      identity_audit: "assets/mini_control/hg002_mini.identity_audit.json"
+
+    # ========================================================================
+    # STAGE 3: PRE-BANKED VARIANT DISCOVERY ASSETS (Optional Lookahead)
+    # ========================================================================
+    # If these exist in assets/, Stages 1-3 can be skipped
+    # Uncomment and populate to enable stage-skipping to Stage 4
+    stage3_assets:
+      normalized_vcf: "assets/mini_control/hg002_mini.normalized.vcf.gz"
+      normalized_vcf_tbi: "assets/mini_control/hg002_mini.normalized.vcf.gz.tbi"
+      harmonization_audit: "assets/mini_control/hg002_mini.harmonization_audit.json"
+
+    # ========================================================================
+    # STAGE 4: PRE-BANKED PHASING ASSETS (Optional Lookahead)
+    # ========================================================================
+    # If these exist in assets/, Stages 1-4 can be skipped; go directly to Stage 5
+    stage4_assets:
+      phased_vcf: "assets/mini_control/hg002_mini.phased.vcf.gz"
+      phased_vcf_tbi: "assets/mini_control/hg002_mini.phased.vcf.gz.tbi"
+      ancestry_metrics_json: "assets/mini_control/hg002_mini.ancestry.json"
+      phasing_audit_json: "assets/mini_control/hg002_mini.phasing_audit.json"
+
+    # ========================================================================
+    # REFERENCE DATA (resolved at runtime from control_plane)
+    # ========================================================================
+    reference_build:
+      reference_genome: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+      reference_fai: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
+      reference_dict: "reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
+      bwa_index_base: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+      clinvar_db: "reference/clinvar_20260601.vcf.gz"
+      onco_target_bed: "reference/OncoPanel_v4.2.bed"
+      sf_bed: "reference/ACMG_SF_v3.2.bed"
+
+    # ========================================================================
+    # RUNTIME: Auto-populated by stages during execution
+    # ========================================================================
+    # Stages will fill these during run; do not edit manually between stages
+
+    # Stage 0→1 handoff
+    preflight_lock_status: ""
+    preflight_lock_token: ""
+
+    # Stage 1 output
+    mapped_bam: ""
+    mapped_bai: ""
+    identity_audit: ""
+
+    # Stage 2 validation
+    validation_token: ""
+    stage2_contamination_status: ""
+    stage2_contamination_policy_action: ""
+
+    # Stage 3 variant discovery output
+    normalized_vcf: ""
+    normalized_vcf_tbi: ""
+    harmonization_audit: ""
+
+    # Branch routing
+    variant_branches:
+      snv_indel: true
+      structural_variants: true
+      copy_number_cnv: true
+      str_expansions: false
+      trisomy_aneuploidy: true
+      homologous_pseudogenes: false

@@ -152,8 +152,8 @@ cd Stage_5_Clinical_Annotation_PGx_Triage
 nextflow run main.nf \
   -profile docker \
   --input ../Stage_4_Ancestry_Phasing_Highway/tests/mini_control/samples_hg002_banked_stage4.yaml \
-  --references ../conf/references.yaml \
-  --thresholds ../conf/thresholds.yaml \
+  --references ../control_plane/references.yaml \
+  --thresholds ../control_plane/thresholds.yaml \
   --outdir tests/mini_control
 ```
 

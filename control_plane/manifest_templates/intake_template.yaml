@@ -1,0 +1,62 @@
+# ==============================================================================
+# MASTER INTAKE MANIFEST TEMPLATE v1.0.0
+# ==============================================================================
+# Purpose: Standardized Stage 0 intake contract for fresh FASTQ sequencing data
+# Compliance: All REQUIRED fields must be populated; OPTIONAL fields may be null
+# Schema: This is a rigid template guide; no deviations without schema version bump
+# Reference: Use asset_base_uri for resolving relative paths
+
+manifest_schema_version: "1.0.0"
+manifest_template_variant: "intake"
+manifest_description: "Fresh FASTQ sequencing data intake for Stage 0 processing"
+
+samples:
+  - sample_id: "SAMPLE_001"                                               # REQUIRED: Unique stable identifier
+    patient_id: "PATIENT_001"                                             # REQUIRED: Clinical patient ID (may equal sample_id)
+    case_id: "CASE_001"                                                   # REQUIRED: Case/family/accession grouping
+    accession_id: "ACC_20260915_001"                                      # OPTIONAL: Lab accession number
+    encounter_id: ""                                                       # OPTIONAL: Clinical encounter ID
+    specimen_id: "SPEC_20260915_001"                                      # OPTIONAL: Physical specimen ID from biobank
+    analysis_batch_id: "BATCH_SEQ_20260915"                               # OPTIONAL: Operational run/batch grouping
+
+    # Biological and clinical context
+    sample_type: "germline"                                               # REQUIRED enum: germline|somatic_matched|tumor_only|liquid_biopsy
+    pathologist_tumor_burden: 0.0                                         # REQUIRED float [0.0-1.0]: tumor fraction estimate
+    physician_tumor_purity: 0.0                                           # REQUIRED float [0.0-1.0]: clinically assessed purity
+    reported_sex: "XY"                                                    # REQUIRED enum: XX|XY|UNKNOWN
+
+    # Sequencing metadata (canonical naming convention)
+    sequencing_platform: "illumina"                                       # REQUIRED enum: illumina|ultima|element|ont|complete_genomics
+    sequencer_model: "NovaSeqX"                                           # REQUIRED: Sequencer model/chemistry
+    flowcell_geometry: "native"                                           # OPTIONAL: Flow cell geometry enum
+    library_strategy: "WES"                                               # REQUIRED enum: WES|WGS|TARGETED|AMPLICON
+    target_bed: ""                                                         # OPTIONAL: Target regions if TARGETED strategy
+
+    # Consent and routing decisions
+    consent:
+      prs_opt_in: true                                                    # REQUIRED bool: Polygenic risk scoring permission
+      sf_opt_in: true                                                     # REQUIRED bool: ACMG secondary findings permission
+      research_opt_in: false                                              # OPTIONAL bool: Research use permission
+      data_sharing_opt_in: false                                          # OPTIONAL bool: Controlled data sharing permission
+      recontact_opt_in: false                                             # OPTIONAL bool: Future clinical recontact permission
+      consent_version: "CONSENT_FORM_v2.1"                               # OPTIONAL: Consent form/policy version ID
+      consent_signed_utc: "2026-09-15T08:00:00Z"                         # OPTIONAL ISO 8601: Consent signature timestamp
+      consent_source: "DECLARED_IN_SAMPLESHEET"                          # OPTIONAL enum: DECLARED_IN_SAMPLESHEET|LIS|EXTERNAL_API
+
+    # FASTQ read data locations (uses canonical read_file_paths naming)
+    read_file_paths:
+      read1: "reads/SAMPLE_001_R1.fastq.gz"                              # REQUIRED: Read 1 file path (relative to asset_base_uri)
+      read2: "reads/SAMPLE_001_R2.fastq.gz"                              # REQUIRED: Read 2 file path (relative to asset_base_uri)
+      read1_sha256: ""                                                     # OPTIONAL: Read 1 cryptographic digest
+      read2_sha256: ""                                                     # OPTIONAL: Read 2 cryptographic digest
+
+    # Asset resolution hints for path lookup
+    asset_base_uri: "/media/drive_c/nf_pipes"                            # OPTIONAL: Root directory for resolving relative paths
+
+    # Output specification
+    save_dir: "results/intake"                                            # OPTIONAL: Where to save outputs; defaults to pipeline root
+
+    # Internal use - populated by PREFLIGHT_LOCK stage
+    preflight_lock_token: ""                                              # INTERNAL: Set by Stage 0 validation gate
+    preflight_lock_path: ""                                               # INTERNAL: Path to atomized lock document
+    intake_validation_report: ""                                          # INTERNAL: Stage 0 audit JSON path
