@@ -1,0 +1,486 @@
+{
+  "node": "STAGE5_COMPAT_EXPORT",
+  "sample_id": "HG002_STUB",
+  "source": "pgx_summary",
+  "summary": {
+    "computed_utc": "2026-09-15T02:18:36.062938+00:00",
+    "genes": {
+      "CYP2C19": {
+        "activity_score": 0.0,
+        "call_status": "INCOMPLETE",
+        "diplotype": "*2/UNRESOLVED",
+        "evidence_level": "A",
+        "gene": "CYP2C19",
+        "guidance": "Avoid clopidogrel; use alternative antiplatelet.",
+        "haplotypes": {
+          "1": {
+            "activity_score": 0.0,
+            "allele": "*2",
+            "evidence_level": "A",
+            "matched_variants": [
+              "10:96541616:G:A"
+            ],
+            "source": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/gene_rule_set.tsv"
+          },
+          "2": {
+            "activity_score": null,
+            "allele": "UNRESOLVED",
+            "evidence_level": null,
+            "matched_variants": [],
+            "source": null
+          }
+        },
+        "masked_variants_removed": [],
+        "matched_variants": [
+          {
+            "alts": [
+              "A"
+            ],
+            "chrom": "10",
+            "gt": "1|0",
+            "id": "rs4244285",
+            "phased": true,
+            "pos": 96541616,
+            "ref": "G",
+            "tokens": [
+              "10:96541616:G:A",
+              "10:96541616:G>A",
+              "chr10:96541616:G:A",
+              "chr10:96541616:G>A",
+              "rs4244285"
+            ]
+          },
+          {
+            "alts": [
+              "T"
+            ],
+            "chrom": "22",
+            "gt": "0|1",
+            "id": "rs3892097",
+            "phased": true,
+            "pos": 42128945,
+            "ref": "C",
+            "tokens": [
+              "22:42128945:C:T",
+              "22:42128945:C>T",
+              "chr22:42128945:C:T",
+              "chr22:42128945:C>T",
+              "rs3892097"
+            ]
+          },
+          {
+            "alts": [
+              "T"
+            ],
+            "chrom": "1",
+            "gt": "0|1",
+            "id": "rs1801133",
+            "phased": true,
+            "pos": 114716160,
+            "ref": "C",
+            "tokens": [
+              "1:114716160:C:T",
+              "1:114716160:C>T",
+              "chr1:114716160:C:T",
+              "chr1:114716160:C>T",
+              "rs1801133"
+            ]
+          }
+        ],
+        "phenotype": "Poor Metabolizer",
+        "rule_source_tables": [
+          "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/gene_rule_set.tsv"
+        ],
+        "source_tables": [
+          "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/gene_rule_set.tsv"
+        ],
+        "therapeutic_risk_tier": "HIGH"
+      },
+      "CYP2D6": {
+        "activity_score": 0.0,
+        "call_status": "INCOMPLETE",
+        "diplotype": "UNRESOLVED/*4",
+        "evidence_level": "A",
+        "gene": "CYP2D6",
+        "guidance": "Avoid codeine/tramadol due to reduced activation.",
+        "haplotypes": {
+          "1": {
+            "activity_score": null,
+            "allele": "UNRESOLVED",
+            "evidence_level": null,
+            "matched_variants": [],
+            "source": null
+          },
+          "2": {
+            "activity_score": 0.0,
+            "allele": "*4",
+            "evidence_level": "A",
+            "matched_variants": [
+              "22:42128945:C:T"
+            ],
+            "source": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/gene_rule_set.tsv"
+          }
+        },
+        "masked_variants_removed": [],
+        "matched_variants": [
+          {
+            "alts": [
+              "A"
+            ],
+            "chrom": "10",
+            "gt": "1|0",
+            "id": "rs4244285",
+            "phased": true,
+            "pos": 96541616,
+            "ref": "G",
+            "tokens": [
+              "10:96541616:G:A",
+              "10:96541616:G>A",
+              "chr10:96541616:G:A",
+              "chr10:96541616:G>A",
+              "rs4244285"
+            ]
+          },
+          {
+            "alts": [
+              "T"
+            ],
+            "chrom": "22",
+            "gt": "0|1",
+            "id": "rs3892097",
+            "phased": true,
+            "pos": 42128945,
+            "ref": "C",
+            "tokens": [
+              "22:42128945:C:T",
+              "22:42128945:C>T",
+              "chr22:42128945:C:T",
+              "chr22:42128945:C>T",
+              "rs3892097"
+            ]
+          },
+          {
+            "alts": [
+              "T"
+            ],
+            "chrom": "1",
+            "gt": "0|1",
+            "id": "rs1801133",
+            "phased": true,
+            "pos": 114716160,
+            "ref": "C",
+            "tokens": [
+              "1:114716160:C:T",
+              "1:114716160:C>T",
+              "chr1:114716160:C:T",
+              "chr1:114716160:C>T",
+              "rs1801133"
+            ]
+          }
+        ],
+        "phenotype": "Poor Metabolizer",
+        "rule_source_tables": [
+          "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/gene_rule_set.tsv"
+        ],
+        "source_tables": [
+          "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/gene_rule_set.tsv"
+        ],
+        "therapeutic_risk_tier": "HIGH"
+      },
+      "DPYD": {
+        "activity_score": null,
+        "call_status": "INCOMPLETE",
+        "diplotype": "UNRESOLVED/UNRESOLVED",
+        "evidence_level": null,
+        "gene": "DPYD",
+        "haplotypes": {
+          "1": {
+            "activity_score": null,
+            "allele": "UNRESOLVED",
+            "evidence_level": null,
+            "matched_variants": [],
+            "source": null
+          },
+          "2": {
+            "activity_score": null,
+            "allele": "UNRESOLVED",
+            "evidence_level": null,
+            "matched_variants": [],
+            "source": null
+          }
+        },
+        "masked_variants_removed": [],
+        "matched_variants": [
+          {
+            "alts": [
+              "A"
+            ],
+            "chrom": "10",
+            "gt": "1|0",
+            "id": "rs4244285",
+            "phased": true,
+            "pos": 96541616,
+            "ref": "G",
+            "tokens": [
+              "10:96541616:G:A",
+              "10:96541616:G>A",
+              "chr10:96541616:G:A",
+              "chr10:96541616:G>A",
+              "rs4244285"
+            ]
+          },
+          {
+            "alts": [
+              "T"
+            ],
+            "chrom": "22",
+            "gt": "0|1",
+            "id": "rs3892097",
+            "phased": true,
+            "pos": 42128945,
+            "ref": "C",
+            "tokens": [
+              "22:42128945:C:T",
+              "22:42128945:C>T",
+              "chr22:42128945:C:T",
+              "chr22:42128945:C>T",
+              "rs3892097"
+            ]
+          },
+          {
+            "alts": [
+              "T"
+            ],
+            "chrom": "1",
+            "gt": "0|1",
+            "id": "rs1801133",
+            "phased": true,
+            "pos": 114716160,
+            "ref": "C",
+            "tokens": [
+              "1:114716160:C:T",
+              "1:114716160:C>T",
+              "chr1:114716160:C:T",
+              "chr1:114716160:C>T",
+              "rs1801133"
+            ]
+          }
+        ],
+        "phenotype": "INDETERMINATE",
+        "rule_source_tables": [
+          "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/gene_rule_set.tsv"
+        ],
+        "source_tables": [
+          "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/gene_rule_set.tsv"
+        ],
+        "therapeutic_risk_tier": "UNKNOWN"
+      }
+    },
+    "input_tbi": "stub.vcf.tbi",
+    "input_vcf": "stub.vcf",
+    "node": "PGX_DIPLOTYPE_RESOLVER",
+    "observed_variants": [
+      {
+        "alts": [
+          "A"
+        ],
+        "chrom": "10",
+        "gt": "1|0",
+        "id": "rs4244285",
+        "phased": true,
+        "pos": 96541616,
+        "ref": "G",
+        "tokens": [
+          "10:96541616:G:A",
+          "10:96541616:G>A",
+          "chr10:96541616:G:A",
+          "chr10:96541616:G>A",
+          "rs4244285"
+        ]
+      },
+      {
+        "alts": [
+          "T"
+        ],
+        "chrom": "22",
+        "gt": "0|1",
+        "id": "rs3892097",
+        "phased": true,
+        "pos": 42128945,
+        "ref": "C",
+        "tokens": [
+          "22:42128945:C:T",
+          "22:42128945:C>T",
+          "chr22:42128945:C:T",
+          "chr22:42128945:C>T",
+          "rs3892097"
+        ]
+      },
+      {
+        "alts": [
+          "T"
+        ],
+        "chrom": "1",
+        "gt": "0|1",
+        "id": "rs1801133",
+        "phased": true,
+        "pos": 114716160,
+        "ref": "C",
+        "tokens": [
+          "1:114716160:C:T",
+          "1:114716160:C>T",
+          "chr1:114716160:C:T",
+          "chr1:114716160:C>T",
+          "rs1801133"
+        ]
+      }
+    ],
+    "overall_call_status": "HIGH",
+    "reference_manifest": {
+      "acmg_schema": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/acmg_schema.tsv",
+        "sha256": "dce4aa94f4ebaa501126beb9946d2e4867763766e398e171f4c4d67b785cf50f",
+        "type": "file"
+      },
+      "alphafold_annotations": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/alphafold_annotations.tsv",
+        "sha256": "1e3f62c0f082712f3c2201367f47a2c98828ceb436718b84504a5863eed5f9c5",
+        "type": "file"
+      },
+      "alphamissense": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/alphamissense.tsv",
+        "sha256": "f1c8af2e71f199f119ccb3e3b07e9631bc8ed80a09f9948354121805079bdf56",
+        "type": "file"
+      },
+      "ancestry_metrics_json": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/work/ea/81ffa098421ed329b9da0baa6f9ec3/stub.ancestry_metrics.json",
+        "sha256": "55945a9a36d0f41580146df130922051ea940e555df627fbdde278cb849e0d6f",
+        "type": "file"
+      },
+      "cadd": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/cadd.tsv",
+        "sha256": "f1fe37d816a9b9498607b3b743bdbd567f2dccb1bb69af8cc4588824c6cfceca",
+        "type": "file"
+      },
+      "clinvar": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/clinvar.tsv",
+        "sha256": "c2ef4a7ab8ca3b08150a924967d10cc0fe673d554436cbdb7d54dedeef457fd3",
+        "type": "file"
+      },
+      "cpic_allele_table": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/gene_rule_set.tsv",
+        "sha256": "fce414e7adbf6a4c8646a8d0787a24481bd4cb6c8cb9a0a06c24505bf2a36889",
+        "type": "file"
+      },
+      "cyp2d6_mask_bed": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/pgx_gene_panel.tsv",
+        "sha256": "f96b6ed989a2263995ba9b530c7ac3ef284b406dac40395ecc8e6004ce08eeb2",
+        "type": "file"
+      },
+      "gene_rule_set": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/gene_rule_set.tsv",
+        "sha256": "fce414e7adbf6a4c8646a8d0787a24481bd4cb6c8cb9a0a06c24505bf2a36889",
+        "type": "file"
+      },
+      "gnomad": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/gnomad.tsv",
+        "sha256": "0a1efbec02310024684b3c6933349729159c3a4b4803c98e3fa29024f4ade620",
+        "type": "file"
+      },
+      "litvar": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/litvar.txt",
+        "sha256": "9d8c313c7e337fdca785124ea0a253a1c3339b0c4c2fa5bfd929242364acdcc5",
+        "type": "file"
+      },
+      "mane_transcripts": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/pgx_gene_panel.tsv",
+        "sha256": "f96b6ed989a2263995ba9b530c7ac3ef284b406dac40395ecc8e6004ce08eeb2",
+        "type": "file"
+      },
+      "mastermind": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/mastermind.txt",
+        "sha256": "efcaf22687b16a47a45661951dd86093f44b44245275d256e2b0203d57095ad3",
+        "type": "file"
+      },
+      "paralog_safe_regions": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/pgx_gene_panel.tsv",
+        "sha256": "f96b6ed989a2263995ba9b530c7ac3ef284b406dac40395ecc8e6004ce08eeb2",
+        "type": "file"
+      },
+      "pfam_domains": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/pfam_domains.tsv",
+        "sha256": "c109900baf9ecc66c39e6faac60ee2459b7a81710c31c2f326f9e40ed65a1d2f",
+        "type": "file"
+      },
+      "pgx_cli_script": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/bin/pgx_cli.py",
+        "sha256": "9f534eea595a03e814b4ac7015e505e9a69d338796f2308085dfad58d1d0c1cb",
+        "type": "file"
+      },
+      "pgx_gene_panel": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/pgx_gene_panel.tsv",
+        "sha256": "f96b6ed989a2263995ba9b530c7ac3ef284b406dac40395ecc8e6004ce08eeb2",
+        "type": "file"
+      },
+      "pharmvar_star_alleles": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/gene_rule_set.tsv",
+        "sha256": "fce414e7adbf6a4c8646a8d0787a24481bd4cb6c8cb9a0a06c24505bf2a36889",
+        "type": "file"
+      },
+      "phased_vcf": {
+        "path": "stub.vcf",
+        "sha256": "8a314186888759e6e00a1659567e669fbfde5eb9023f06e693db6946b3b218fe",
+        "type": "file"
+      },
+      "phased_vcf_tbi": {
+        "path": "stub.vcf.tbi",
+        "sha256": "3da67b0ffe34816cf8938869316c7f388672cd3cf00ce2662e2145d94e64beee",
+        "type": "file"
+      },
+      "phasing_audit_json": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/work/ea/81ffa098421ed329b9da0baa6f9ec3/stub.phasing_audit.json",
+        "sha256": "3a70ccf03c80902c8b9fb5fe1f2ea4ae210f2a8b8528062de85650b378cf2962",
+        "type": "file"
+      },
+      "pmc": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/pmc.txt",
+        "sha256": "70f9d5bb30de03d9fac191c7a0ebf39e281d425b3c1c48b08697ad27bdf6d00a",
+        "type": "file"
+      },
+      "revel": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/revel.tsv",
+        "sha256": "8f28accfd6d298956e4d8b099a13550c0751226627a96effca9cb30e8f565ef2",
+        "type": "file"
+      },
+      "run_id": {
+        "path": "intergalactic_mclean",
+        "sha256": null,
+        "type": "missing"
+      },
+      "sample_id": {
+        "path": "HG002_STUB",
+        "sha256": null,
+        "type": "missing"
+      },
+      "spliceai": {
+        "path": "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/stub_assets/spliceai.tsv",
+        "sha256": "8eed7310bf75831f401286485d533eb4a4640bdedc5b19e22b7017bd7751968e",
+        "type": "file"
+      },
+      "validation_token": {
+        "path": "VALID_PASS|VARIANTS_HARMONIZED",
+        "sha256": null,
+        "type": "missing"
+      },
+      "workflow_version": {
+        "path": "unspecified",
+        "sha256": null,
+        "type": "missing"
+      }
+    },
+    "run_id": "HG002_STUB",
+    "sample_id": "HG002_STUB",
+    "source": "observed_phased_variants_and_reference_lookup_tables",
+    "workflow_version": null
+  }
+}

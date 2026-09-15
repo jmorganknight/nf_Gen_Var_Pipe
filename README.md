@@ -1,3 +1,6 @@
+⚠️ **CLINICAL PIPELINE UNDER CONSTRUCTION & ACTIVE REFACTORING** ⚠️
+*Notice: This pipeline is currently undergoing a major architectural refactor to enforce CAP/CLIA zero-loss data provenance and strict branch isolation. Upstream stages (1-3) are being cryptographically locked, and Stage 5 is being severed into isolated clinical domains (Germline, PGx, SF, PRS, Somatic). Do not use for production runs until this notice is removed.*
+
 # nf_Gen_Var_Pipe
 
 ## Status

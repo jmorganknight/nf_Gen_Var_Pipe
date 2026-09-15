@@ -6,7 +6,7 @@ process BANK_STAGE4_CONTRACT {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/audit_and_qc/stage4", mode: 'rellink', overwrite: true, pattern: '*.json'
+    publishDir "${params.outdir}/audit_and_qc/stage4", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(ancestry_metrics_json), path(phased_vcf), path(phased_tbi), path(phasing_audit)

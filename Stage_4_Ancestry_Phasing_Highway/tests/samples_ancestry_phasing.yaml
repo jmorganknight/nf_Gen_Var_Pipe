@@ -1,5 +1,22 @@
 samples:
   - sample_id: "HG002_ANCESTRY_PHASING"
     validation_token: "VALID_PASS|VARIANTS_HARMONIZED"
-    phased_vcf: "../Stage_3_Variant_Discovery_Engine/tests/mini_control/snv_indel.vcf"
-    phased_vcf_tbi: "../Stage_3_Variant_Discovery_Engine/tests/mini_control/snv_indel.vcf.tbi"
+    normalized_vcf: "../../Stage_3_Variant_Discovery_Engine/tests/mini_control/snv/hg002_mini.normalized.vcf.gz"
+    normalized_vcf_tbi: "../../Stage_3_Variant_Discovery_Engine/tests/mini_control/snv/hg002_mini.normalized.vcf.gz.tbi"
+    sorted_bam: "../../Stage_1_Alignment_Read_Processing/tests/mini_control/hg002_mini/aligned/hg002_mini.markdup.bam"
+    sorted_bai: "../../Stage_1_Alignment_Read_Processing/tests/mini_control/hg002_mini/aligned/hg002_mini.markdup.bam.bai"
+    consent_tokens:
+      secondary_findings: "CONSENTED|SF_ENABLED"
+      prs_reporting: "CONSENTED|PRS_ENABLED"
+    stage0_consent_tokens:
+      secondary_findings: "CONSENTED|SF_ENABLED"
+      prs_reporting: "CONSENTED|PRS_ENABLED"
+    variant_branches:
+      snv_indel: true
+      structural_variants: false
+      copy_number_cnv: false
+      str_expansions: false
+      trisomy_aneuploidy: false
+      homologous_pseudogenes: false
+    active_branches:
+      - "snv_indel"

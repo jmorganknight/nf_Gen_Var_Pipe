@@ -11,7 +11,8 @@ workflow STAGE4_ANCESTRY_PGX {
 
     main:
     ch_ancestry = STAGE4_ANCESTRY_PCA(ch_stage4_inputs)
-    ch_phasing = STAGE4_PHASING(ch_stage4_inputs)
+    // Stage 4 contract: two-layer PopPCA projection must complete before phasing starts.
+    ch_phasing = STAGE4_PHASING(ch_ancestry.ancestry_ready)
 
     BANK_STAGE4_CONTRACT(ch_phasing.banking_bundle)
     ASSEMBLE_STAGE4_BANKED_MANIFEST(BANK_STAGE4_CONTRACT.out.manifest_fragment.collect())

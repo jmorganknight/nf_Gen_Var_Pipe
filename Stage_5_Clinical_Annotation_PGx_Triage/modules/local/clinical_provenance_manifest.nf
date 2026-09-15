@@ -200,8 +200,8 @@ from pathlib import Path
 sid = '${sample_id}'
 bundle_path = Path(f'{sid}.clinical_bundle.tar.gz')
 provenance_path = Path(f'{sid}.provenance.json')
-Path(f'{sid}.joined_branch_summaries.json').write_text(json.dumps({'sample_id': sid, 'stub': True}, indent=2) + '\n', encoding='utf-8')
-bundle_path.write_bytes(b'STUB_BUNDLE\n')
+Path(f'{sid}.joined_branch_summaries.json').write_text(json.dumps({'sample_id': sid, 'stub': True}, indent=2) + '\\n', encoding='utf-8')
+bundle_path.write_bytes(b'STUB_BUNDLE\\n')
 provenance = {
     'sample_id': sid,
     'workflow_name': 'CLINICAL_PROVENANCE_MANIFEST',
@@ -215,7 +215,7 @@ provenance = {
         'signed_digest_sha256': 'stub',
     },
 }
-provenance_path.write_text(json.dumps(provenance, indent=2) + '\n', encoding='utf-8')
+provenance_path.write_text(json.dumps(provenance, indent=2) + '\\n', encoding='utf-8')
 fragment = {
     'sample_id': sid,
     'component': 'pgx',
@@ -225,7 +225,7 @@ fragment = {
     'signature_algorithm': 'RS256',
     'public_key_fingerprint': 'STUB',
 }
-Path(f'{sid}.pgx.fragment.json').write_text(json.dumps(fragment, indent=2) + '\n', encoding='utf-8')
+Path(f'{sid}.pgx.fragment.json').write_text(json.dumps(fragment, indent=2) + '\\n', encoding='utf-8')
 PYEOF
     """
 }

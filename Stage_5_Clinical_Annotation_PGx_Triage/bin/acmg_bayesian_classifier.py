@@ -6,6 +6,42 @@ import json
 from pathlib import Path
 
 
+RULE_WEIGHTS = {
+    'PVS1': 2.50,
+    'PS1': 1.20,
+    'PM2': 0.70,
+    'PP3': 0.40,
+    'BP4': -0.40,
+    'BS1': -0.90,
+    'BA1': -2.20,
+}
+
+
+def clinvar_weight(assertion: str, stars: int) -> float:
+    text = (assertion or '').lower()
+    if stars < 2:
+        return 0.0
+    if 'pathogenic' in text and 'likely' not in text:
+        return 1.10
+    if 'likely_pathogenic' in text or 'likely pathogenic' in text:
+        return 0.70
+    if 'benign' in text and 'likely' not in text:
+        return -1.30
+    if 'likely_benign' in text or 'likely benign' in text:
+        return -0.80
+    return 0.0
+
+
+def tier_from_score(score: float) -> str:
+    if score >= 2.40:
+        return 'Tier I'
+    if score >= 1.20:
+        return 'Tier II'
+    if score >= 0.20:
+        return 'Tier III'
+    return 'Tier IV'
+
+
 def load_json(path_text: str):
     return json.loads(Path(path_text).read_text(encoding='utf-8'))
 
@@ -34,30 +70,29 @@ def main() -> None:
         rules = set(record.get('assigned_rules', []))
         freq_row = freq_index.get(variant, {})
         clinvar_row = clinvar_index.get(variant, {})
+        evidence_trace = []
         score = 0.0
-        if 'PVS1' in rules:
-            score += 1.6
-        if 'PP3' in rules:
-            score += 0.7
-        if 'BP4' in rules:
-            score -= 0.6
-        if freq_row.get('rule') == 'PM2':
-            score += 0.4
-        if freq_row.get('rule') == 'BS1':
-            score -= 0.4
-        if freq_row.get('rule') == 'BA1':
-            score -= 1.2
-        if int(clinvar_row.get('stars', 0) or 0) >= 2:
-            score += 0.5
 
-        if score >= 1.8:
-            tier = 'Tier I'
-        elif score >= 1.0:
-            tier = 'Tier II'
-        elif score >= 0.0:
-            tier = 'Tier III'
-        else:
-            tier = 'Tier IV'
+        for rule in sorted(rules):
+            delta = RULE_WEIGHTS.get(rule, 0.0)
+            if delta != 0.0:
+                score += delta
+                evidence_trace.append({'source': 'acmg_rule', 'rule': rule, 'delta': round(delta, 3)})
+
+        freq_rule = str(freq_row.get('rule') or '').upper()
+        if freq_rule in RULE_WEIGHTS:
+            delta = RULE_WEIGHTS[freq_rule]
+            score += delta
+            evidence_trace.append({'source': 'frequency_rule', 'rule': freq_rule, 'delta': round(delta, 3)})
+
+        stars = int(clinvar_row.get('stars', 0) or 0)
+        clinvar_assertion = clinvar_row.get('assertion', 'NONE')
+        cdelta = clinvar_weight(clinvar_assertion, stars)
+        if cdelta != 0.0:
+            score += cdelta
+            evidence_trace.append({'source': 'clinvar', 'assertion': clinvar_assertion, 'stars': stars, 'delta': round(cdelta, 3)})
+
+        tier = tier_from_score(score)
 
         out_row = {
             'variant': variant,
@@ -65,8 +100,9 @@ def main() -> None:
             'tier': tier,
             'vep_rules': sorted(rules),
             'freq_rule': freq_row.get('rule'),
-            'clinvar_stars': clinvar_row.get('stars', 0),
-            'clinvar_assertion': clinvar_row.get('assertion', 'NONE'),
+            'clinvar_stars': stars,
+            'clinvar_assertion': clinvar_assertion,
+            'evidence_trace': evidence_trace,
         }
         tiers[tier].append(out_row)
         if tier == 'Tier III':
@@ -74,7 +110,9 @@ def main() -> None:
 
     payload = {
         'node': 'acmg_bayesian_classifier.py',
+        'classifier_version': 'stage5_bayes_evidence_v1',
         'sample_id': args.sample_id,
+        'rule_weights': RULE_WEIGHTS,
         'tiers': tiers,
         'candidate_vus': candidate_vus,
     }

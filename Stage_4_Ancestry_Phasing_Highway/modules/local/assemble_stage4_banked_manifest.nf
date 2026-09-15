@@ -4,7 +4,7 @@ process ASSEMBLE_STAGE4_BANKED_MANIFEST {
     container 'wes-onco-core:1.0.0'
     stageInMode 'symlink'
 
-    publishDir "${params.outdir}", mode: 'rellink', overwrite: true, pattern: 'samples_hg002_banked_stage4.yaml'
+    publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'samples_hg002_banked_stage4.yaml'
 
     input:
     path manifest_fragments

@@ -6,7 +6,7 @@ process ACMG_BAYESIAN_CLASSIFIER_STAGE5 {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/annotation", mode: 'rellink', overwrite: true, pattern: '*.json'
+    publishDir "${params.outdir}/annotation", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(vep_annotations_json), path(vep_rules_json), path(clinvar_json), path(freq_rules_json), path(acmg_bayesian_classifier_script)
@@ -49,7 +49,7 @@ process VUS_TRIAGE_HGMD_SEARCH {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/annotation", mode: 'rellink', overwrite: true, pattern: '*.json'
+    publishDir "${params.outdir}/annotation", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(candidate_vus_json)
@@ -71,15 +71,19 @@ candidate = json.loads(Path('${candidate_vus_json}').read_text(encoding='utf-8')
 upgraded = []
 remaining = []
 for row in candidate:
-    variant = row.get('variant')
-    pos = int(str(variant).split(':')[1]) if variant and ':' in str(variant) else 0
-    if pos % 19 == 0:
+    clinvar_assertion = str(row.get('clinvar_assertion', '')).lower()
+    clinvar_stars = int(row.get('clinvar_stars', 0) or 0)
+    posterior = float(row.get('posterior_score', 0.0) or 0.0)
+    has_pathogenic_clinvar = ('pathogenic' in clinvar_assertion and 'benign' not in clinvar_assertion)
+    has_strong_score = posterior >= 1.20
+    if has_pathogenic_clinvar and clinvar_stars >= 2 and has_strong_score:
         upgraded.append({
             **row,
-            'hgmd_dm_only': True,
-            'pmids': [f'PMID{100000 + pos}'],
+            'hgmd_dm_only': False,
+            'pmids': [],
             'upgrade_rule': 'PS4',
             'upgraded_tier': 'Tier II',
+            'upgrade_reason': 'clinvar_pathogenic_2plus_with_supportive_posterior',
         })
     else:
         remaining.append({
@@ -88,6 +92,7 @@ for row in candidate:
             'pmids': [],
             'upgrade_rule': None,
             'upgraded_tier': 'Tier III',
+            'upgrade_reason': 'insufficient_support_for_upgrade',
         })
 
 queue_payload = {

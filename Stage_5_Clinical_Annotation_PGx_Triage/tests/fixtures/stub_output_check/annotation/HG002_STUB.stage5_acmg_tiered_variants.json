@@ -1,0 +1,287 @@
+{
+  "node": "STAGE5_COMPAT_EXPORT",
+  "sample_id": "HG002_STUB",
+  "tiers": {
+    "Tier I": [],
+    "Tier II": [
+      {
+        "alts": [
+          "A"
+        ],
+        "chrom": "10",
+        "gene": "CYP2C19",
+        "gt": "1|0",
+        "id": "rs4244285",
+        "phase_set": "PS1",
+        "phased": true,
+        "pos": 96541616,
+        "posterior_probability": 0.867144,
+        "ref": "G",
+        "stream_meta": {
+          "clinvar_assertions": {
+            "assertions": [
+              "pathogenic   reviewed_by_expert_panel 3  false"
+            ],
+            "source": "clinvar_lookup"
+          },
+          "gnomad_frequency": {
+            "frequencies": [
+              2e-05
+            ],
+            "popmax": 2e-05,
+            "source": "gnomad_lookup"
+          },
+          "vep_ensemble": {
+            "scores": [
+              0.6866666666666666,
+              0.88,
+              0.9466666666666667,
+              0.01
+            ],
+            "source": "reference_lookup"
+          }
+        },
+        "stream_scores": {
+          "clinvar_assertions": 0.96,
+          "gnomad_frequency": 0.9,
+          "vep_ensemble": 0.630833
+        },
+        "tier": "Likely Pathogenic",
+        "vus_triage": null
+      },
+      {
+        "alts": [
+          "T"
+        ],
+        "chrom": "22",
+        "gene": "CYP2D6",
+        "gt": "0|1",
+        "id": "rs3892097",
+        "phase_set": "PS2",
+        "phased": true,
+        "pos": 42128945,
+        "posterior_probability": 0.853561,
+        "ref": "C",
+        "stream_meta": {
+          "clinvar_assertions": {
+            "assertions": [
+              "likely pathogenic   criteria_provided 2  false"
+            ],
+            "source": "clinvar_lookup"
+          },
+          "gnomad_frequency": {
+            "frequencies": [
+              1e-05
+            ],
+            "popmax": 1e-05,
+            "source": "gnomad_lookup"
+          },
+          "vep_ensemble": {
+            "scores": [
+              0.7274999999999999,
+              0.94,
+              1.0,
+              0.02
+            ],
+            "source": "reference_lookup"
+          }
+        },
+        "stream_scores": {
+          "clinvar_assertions": 0.85,
+          "gnomad_frequency": 0.97,
+          "vep_ensemble": 0.671875
+        },
+        "tier": "Likely Pathogenic",
+        "vus_triage": null
+      },
+      {
+        "alts": [
+          "A"
+        ],
+        "chrom": "10",
+        "gene": "CYP2C19",
+        "gt": "1|0",
+        "id": "rs4244285",
+        "phase_set": "PS1",
+        "phased": true,
+        "pos": 96541616,
+        "posterior_probability": 0.831423,
+        "ref": "G",
+        "stream_meta": {
+          "clinvar_assertions": {
+            "assertions": [
+              "pathogenic   reviewed_by_expert_panel 3  false"
+            ],
+            "source": "clinvar_lookup"
+          },
+          "gnomad_frequency": {
+            "frequencies": [
+              2e-05
+            ],
+            "popmax": 2e-05,
+            "source": "gnomad_lookup"
+          },
+          "vep_ensemble": {
+            "scores": [
+              0.6866666666666666,
+              0.88,
+              0.9466666666666667,
+              0.01
+            ],
+            "source": "reference_lookup"
+          }
+        },
+        "stream_scores": {
+          "clinvar_assertions": 0.96,
+          "gnomad_frequency": 0.9,
+          "vep_ensemble": 0.630833
+        },
+        "tier": "Likely Pathogenic",
+        "vus_triage": null
+      },
+      {
+        "alts": [
+          "T"
+        ],
+        "chrom": "22",
+        "gene": "CYP2D6",
+        "gt": "0|1",
+        "id": "rs3892097",
+        "phase_set": "PS2",
+        "phased": true,
+        "pos": 42128945,
+        "posterior_probability": 0.862482,
+        "ref": "C",
+        "stream_meta": {
+          "clinvar_assertions": {
+            "assertions": [
+              "likely pathogenic   criteria_provided 2  false"
+            ],
+            "source": "clinvar_lookup"
+          },
+          "gnomad_frequency": {
+            "frequencies": [
+              1e-05
+            ],
+            "popmax": 1e-05,
+            "source": "gnomad_lookup"
+          },
+          "vep_ensemble": {
+            "scores": [
+              0.7274999999999999,
+              0.94,
+              1.0,
+              0.02
+            ],
+            "source": "reference_lookup"
+          }
+        },
+        "stream_scores": {
+          "clinvar_assertions": 0.85,
+          "gnomad_frequency": 0.97,
+          "vep_ensemble": 0.671875
+        },
+        "tier": "Likely Pathogenic",
+        "vus_triage": null
+      }
+    ],
+    "Tier III": [],
+    "Tier IV": [
+      {
+        "alts": [
+          "T"
+        ],
+        "chrom": "1",
+        "gene": "MTHFR",
+        "gt": "0|1",
+        "id": "rs1801133",
+        "phase_set": "PS3",
+        "phased": true,
+        "pos": 114716160,
+        "posterior_probability": 0.267401,
+        "ref": "C",
+        "stream_meta": {
+          "clinvar_assertions": {
+            "assertions": [
+              "vus   criteria_provided 1  true"
+            ],
+            "source": "clinvar_lookup"
+          },
+          "gnomad_frequency": {
+            "frequencies": [
+              0.012
+            ],
+            "popmax": 0.012,
+            "source": "gnomad_lookup"
+          },
+          "vep_ensemble": {
+            "scores": [
+              0.2516666666666667,
+              0.22,
+              0.4766666666666667,
+              0.0
+            ],
+            "source": "reference_lookup"
+          }
+        },
+        "stream_scores": {
+          "clinvar_assertions": 0.55,
+          "gnomad_frequency": 0.08,
+          "vep_ensemble": 0.237083
+        },
+        "tier": "Likely Benign",
+        "vus_triage": null
+      },
+      {
+        "alts": [
+          "T"
+        ],
+        "chrom": "1",
+        "gene": "MTHFR",
+        "gt": "0|1",
+        "id": "rs1801133",
+        "phase_set": "PS3",
+        "phased": true,
+        "pos": 114716160,
+        "posterior_probability": 0.199309,
+        "ref": "C",
+        "stream_meta": {
+          "clinvar_assertions": {
+            "assertions": [
+              "vus   criteria_provided 1  true"
+            ],
+            "source": "clinvar_lookup"
+          },
+          "gnomad_frequency": {
+            "frequencies": [
+              0.012
+            ],
+            "popmax": 0.012,
+            "source": "gnomad_lookup"
+          },
+          "vep_ensemble": {
+            "scores": [
+              0.2516666666666667,
+              0.22,
+              0.4766666666666667,
+              0.0
+            ],
+            "source": "reference_lookup"
+          }
+        },
+        "stream_scores": {
+          "clinvar_assertions": 0.55,
+          "gnomad_frequency": 0.08,
+          "vep_ensemble": 0.237083
+        },
+        "tier": "Likely Benign",
+        "vus_triage": null
+      }
+    ]
+  },
+  "candidate_vus": [],
+  "source": {
+    "germline_summary_json": "HG002_STUB.germline_variant_summary.json",
+    "somatic_summary_json": "HG002_STUB.somatic_onco_summary.json"
+  }
+}

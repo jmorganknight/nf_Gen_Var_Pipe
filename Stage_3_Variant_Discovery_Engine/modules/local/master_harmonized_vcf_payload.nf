@@ -10,7 +10,7 @@ process MASTER_HARMONIZED_VCF_PAYLOAD {
 
     output:
     tuple val(sample_id), path("${sample_id}.normalized.vcf.gz"), path("${sample_id}.harmonization_audit.json"), path("${sample_id}.stage3.contract.fragment.json"), emit: harmonized
-    path "${sample_id}.normalized.vcf.gz.tbi", emit: normalized_tbi
+    tuple val(sample_id), path("${sample_id}.normalized.vcf.gz.tbi"), emit: normalized_tbi
 
     script:
     def refsJson = groovy.json.JsonOutput.toJson(stage3_refs).replace('\\', '\\\\').replace("'", "\\'")
@@ -26,6 +26,10 @@ from pathlib import Path
 
 refs = json.loads('${refsJson}')
 meta = json.loads('${metaJson}')
+upstream_token = (meta.get('validation_token') or '').strip()
+if 'VALID_PASS' not in upstream_token:
+    raise SystemExit('STAGE3_PRECONDITION_FAILURE: invalid upstream validation token')
+stage3_token = 'VALID_PASS|VARIANTS_HARMONIZED'
 declared_schema_path = refs.get('stage3_vcf_schema')
 if not declared_schema_path:
     raise SystemExit('STAGE3_SCHEMA_VALIDATION_FAILURE: missing params.refs.stage3_vcf_schema')
@@ -131,7 +135,7 @@ schema_validation_audit = {
 
 harmonization_audit = {
     'sample_id': '${sample_id}',
-    'validation_token': meta.get('validation_token', ''),
+    'validation_token': stage3_token,
     'sorted_bam': meta.get('sorted_bam', ''),
     'sorted_bai': meta.get('sorted_bai', ''),
     'variant_branches': meta.get('variant_branches', {}),
@@ -150,7 +154,7 @@ Path('${sample_id}.harmonization_audit.json').write_text(json.dumps(harmonizatio
 
 fragment = {
     'sample_id': '${sample_id}',
-    'validation_token': meta.get('validation_token', ''),
+    'validation_token': stage3_token,
     'run_mode': meta.get('run_mode', 'production'),
     'sorted_bam': meta.get('sorted_bam', ''),
     'sorted_bai': meta.get('sorted_bai', ''),
@@ -184,10 +188,10 @@ JSON
     cat > "${sample_id}.stage3.contract.fragment.json" <<'JSON'
 {
   "sample_id": "${sample_id}",
-  "validation_token": "${sample_meta.validation_token ?: ''}",
+    "validation_token": "VALID_PASS|VARIANTS_HARMONIZED",
     "run_mode": "${sample_meta.run_mode ?: 'production'}",
   "variant_branches": ${groovy.json.JsonOutput.toJson(sample_meta.variant_branches ?: [:])},
-  "active_branches": ["snv_indel"],
+    "active_branches": ${groovy.json.JsonOutput.toJson(((sample_meta.variant_branches ?: [:]).findAll { _key, enabled -> enabled as boolean }.collect { key, _enabled -> key }))},
     "normalized_vcf": "${sample_id}.normalized.vcf.gz",
     "normalized_vcf_tbi": "${sample_id}.normalized.vcf.gz.tbi",
     "harmonization_audit": "${sample_id}.harmonization_audit.json",

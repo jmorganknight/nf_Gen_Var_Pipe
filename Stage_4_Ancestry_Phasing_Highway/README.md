@@ -6,6 +6,12 @@ Standalone Stage 4 micro-pipeline for ancestry projection and haplotype phasing 
 
 Stage 4 transforms Stage 3 harmonized variants into ancestry- and phasing-aware handoff artifacts required by Stage 5 clinical interpretation.
 
+Execution order is enforced as:
+
+1. two-layer PopPCA projection (Layer 1 superpopulation, Layer 2 subpopulation)
+2. read-backed phasing over the ancestry-projected payload
+3. immutable Stage 4 contract banking for Stage 5
+
 ## Architecture Flow
 
 ```mermaid
@@ -33,6 +39,7 @@ Implementation notes:
 
 - Projection metadata records `projection_engine: nf_PopPCA_refgen`.
 - Projection method is tool-aware (`plink2_projection` when available, deterministic guarded fallback otherwise).
+- Layer assignment is model-structure aware (`models/layer2/<superpopulation>/...`) with deterministic selection fallback when model assets are sparse.
 - Runtime toolchain aligns with PLINK 1.9/2.0 compatible reference projection workflows.
 
 ## Module Inventory

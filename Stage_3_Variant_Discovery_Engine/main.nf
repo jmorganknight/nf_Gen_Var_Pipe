@@ -9,7 +9,9 @@ include { STAGE3_STR_EXPANSIONS } from './modules/local/stage3_str_expansions.nf
 include { STAGE3_TRISOMY_ANEUPLOIDY } from './modules/local/stage3_trisomy_aneuploidy.nf'
 include { STAGE3_HOMOLOGOUS_PSEUDOGENES } from './modules/local/stage3_homologous_pseudogenes.nf'
 include { MANE_TRANSCRIPT_SELECTOR } from './modules/local/mane_transcript_selector.nf'
+include { MERGE_STAGE3_BRANCH_VCFS } from './modules/local/merge_stage3_branch_vcfs.nf'
 include { MASTER_HARMONIZED_VCF_PAYLOAD } from './modules/local/master_harmonized_vcf_payload.nf'
+include { STAGE3_ZERO_LOSS_GATE_MANIFEST } from './modules/local/stage3_zero_loss_gate_manifest.nf'
 
 def mapOrEmpty(Object value) {
     value instanceof Map ? (value as Map) : [:]
@@ -301,22 +303,63 @@ workflow STAGE3_VARIANT_DISCOVERY_ENGINE {
     STAGE3_HOMOLOGOUS_PSEUDOGENES(ch_homologous_pseudogene_inputs)
 
     def ch_discovery_outputs = ch_snv_outputs
-        .mix(STAGE3_STRUCTURAL_VARIANTS.out.calibrated_vcf)
-        .mix(STAGE3_COPY_NUMBER_CNV.out.calibrated_vcf)
-        .mix(STAGE3_STR_EXPANSIONS.out.calibrated_vcf)
-        .mix(STAGE3_TRISOMY_ANEUPLOIDY.out.calibrated_vcf)
-        .mix(STAGE3_HOMOLOGOUS_PSEUDOGENES.out.calibrated_vcf)
+        .map { sid, vcf, calibrationAudit, refs, meta -> tuple(sid, 'snv_indel', vcf, calibrationAudit, refs, meta) }
+        .mix(STAGE3_STRUCTURAL_VARIANTS.out.calibrated_vcf.map { sid, vcf, calibrationAudit, refs, meta -> tuple(sid, 'structural_variants', vcf, calibrationAudit, refs, meta) })
+        .mix(STAGE3_COPY_NUMBER_CNV.out.calibrated_vcf.map { sid, vcf, calibrationAudit, refs, meta -> tuple(sid, 'copy_number_cnv', vcf, calibrationAudit, refs, meta) })
+        .mix(STAGE3_STR_EXPANSIONS.out.calibrated_vcf.map { sid, vcf, calibrationAudit, refs, meta -> tuple(sid, 'str_expansions', vcf, calibrationAudit, refs, meta) })
+        .mix(STAGE3_TRISOMY_ANEUPLOIDY.out.calibrated_vcf.map { sid, vcf, calibrationAudit, refs, meta -> tuple(sid, 'trisomy_aneuploidy', vcf, calibrationAudit, refs, meta) })
+        .mix(STAGE3_HOMOLOGOUS_PSEUDOGENES.out.calibrated_vcf.map { sid, vcf, calibrationAudit, refs, meta -> tuple(sid, 'homologous_pseudogenes', vcf, calibrationAudit, refs, meta) })
 
-    def ch_mane_inputs = ch_discovery_outputs.map { sid, vcf, calibrationAudit, refs, meta ->
-        tuple(sid, vcf, calibrationAudit, file(refs.mane_transcripts.toString()), file(refs.stage3_vcf_schema.toString()), refs, meta)
+    def ch_mane_inputs = ch_discovery_outputs.map { sid, branchName, vcf, calibrationAudit, refs, meta ->
+        tuple(sid, branchName, vcf, calibrationAudit, file(refs.mane_transcripts.toString()), file(refs.stage3_vcf_schema.toString()), refs, meta)
     }
     MANE_TRANSCRIPT_SELECTOR(ch_mane_inputs)
-    MASTER_HARMONIZED_VCF_PAYLOAD(MANE_TRANSCRIPT_SELECTOR.out.selected_vcf)
+
+    def ch_merge_inputs = MANE_TRANSCRIPT_SELECTOR.out.selected_vcf
+        .map { sid, branchName, selectedVcf, maneAudit, vcfSchema, refs, meta, calibrationAudit ->
+            tuple(sid, branchName, vcfSchema, refs, meta, selectedVcf, maneAudit, calibrationAudit)
+        }
+        .groupTuple()
+        .map { sid, branchNames, schemas, refsList, metas, selectedVcfs, maneAudits, calibrationAudits ->
+            def schemaPath = schemas[0]
+            def refsValue = refsList[0]
+            def metaValue = metas[0]
+            tuple(sid, branchNames, selectedVcfs, maneAudits, calibrationAudits, schemaPath, refsValue, metaValue)
+        }
+
+    MERGE_STAGE3_BRANCH_VCFS(ch_merge_inputs)
+    MASTER_HARMONIZED_VCF_PAYLOAD(MERGE_STAGE3_BRANCH_VCFS.out.merged_vcf_bundle)
+
+    def ch_branch_matrix = ch_merge_inputs.map { sid, branchNames, selectedVcfs, _maneAudits, _calibrationAudits, _schemaPath, _refsValue, _metaValue ->
+        tuple(sid, branchNames, selectedVcfs)
+    }
+
+    def ch_merge_payload = MERGE_STAGE3_BRANCH_VCFS.out.merged_vcf_bundle
+        .map { sid, mergedVcf, _mergedManeAudit, _vcfSchema, _refsValue, _metaValue, _mergedCalibrationAudit ->
+            tuple(sid, mergedVcf)
+        }
+
+    def ch_master_payload = MASTER_HARMONIZED_VCF_PAYLOAD.out.harmonized
+        .map { sid, normalizedVcf, harmonizationAudit, fragment ->
+            tuple(sid, normalizedVcf, harmonizationAudit, fragment)
+        }
+
+    def ch_master_tbi = MASTER_HARMONIZED_VCF_PAYLOAD.out.normalized_tbi
+
+    def ch_zero_loss_inputs = ch_branch_matrix
+        .join(ch_merge_payload)
+        .join(ch_master_payload)
+        .join(ch_master_tbi)
+        .map { sid, branchNames, selectedVcfs, mergedVcf, normalizedVcf, harmonizationAudit, fragment, normalizedTbi ->
+            tuple(sid, branchNames, selectedVcfs, mergedVcf, normalizedVcf, normalizedTbi, harmonizationAudit, fragment)
+        }
+
+    STAGE3_ZERO_LOSS_GATE_MANIFEST(ch_zero_loss_inputs)
 
     emit:
     snv_indel_vcf = MASTER_HARMONIZED_VCF_PAYLOAD.out.harmonized.map { sid, vcf, _audit, _fragment -> tuple(sid, vcf) }
     snv_indel_audit = MASTER_HARMONIZED_VCF_PAYLOAD.out.harmonized.map { sid, _vcf, audit, _fragment -> tuple(sid, audit) }
-    stage3_manifest = MASTER_HARMONIZED_VCF_PAYLOAD.out.harmonized.map { _sid, _vcf, _audit, fragment -> fragment }
+    stage3_manifest = STAGE3_ZERO_LOSS_GATE_MANIFEST.out.banked_manifest
 }
 
 workflow STAGE3_VARIANT_DISCOVERY {
@@ -434,11 +477,7 @@ workflow STAGE3_VARIANT_DISCOVERY {
                 targetBed = resolveHostPath(targetBed, refDir)
             }
 
-            def variantBranches = (sample.variant_branches instanceof Map) ? (sample.variant_branches as Map) : [:]
-            def activeBranches = variantBranches.findAll { _key, enabled -> enabled as boolean }.keySet() as List
-            if (activeBranches.isEmpty()) {
-                throw new IllegalStateException("STAGE3_BRANCH_DISABLED: no active Stage 3 branches enabled for sample '${sampleId}'")
-            }
+            def rawVariantBranches = (sample.variant_branches instanceof Map) ? (sample.variant_branches as Map) : [:]
             def supportedBranches = [
                 'snv_indel',
                 'structural_variants',
@@ -446,10 +485,24 @@ workflow STAGE3_VARIANT_DISCOVERY {
                 'str_expansions',
                 'trisomy_aneuploidy',
                 'homologous_pseudogenes'
-            ] as Set
-            def unsupportedBranches = activeBranches.findAll { branch -> !supportedBranches.contains(branch) }
+            ]
+            def variantBranches = supportedBranches.collectEntries { branch ->
+                [(branch): (rawVariantBranches[branch] ? true : false)]
+            }
+            def activeBranches = supportedBranches.findAll { branch -> variantBranches[branch] as boolean }
+            if (activeBranches.isEmpty()) {
+                throw new IllegalStateException("STAGE3_BRANCH_DISABLED: no active Stage 3 branches enabled for sample '${sampleId}'")
+            }
+            def unsupportedBranches = rawVariantBranches.keySet().findAll { branch -> !supportedBranches.contains(branch.toString()) }
             if (!unsupportedBranches.isEmpty()) {
-                throw new IllegalStateException("STAGE3_BRANCH_NOT_IMPLEMENTED: sample '${sampleId}' requested unsupported branches ${unsupportedBranches}; currently supported branches: ${supportedBranches.toList()}")
+                throw new IllegalStateException("STAGE3_BRANCH_NOT_IMPLEMENTED: sample '${sampleId}' requested unsupported branches ${unsupportedBranches}; currently supported branches: ${supportedBranches}")
+            }
+            def stage3BranchPlan = supportedBranches.collectEntries { branch ->
+                def enabled = variantBranches[branch] as boolean
+                [(branch): [
+                    requested: enabled,
+                    dispatch_token: enabled ? 'DISPATCH_REQUIRED' : 'SKIPPED_BY_MANIFEST'
+                ]]
             }
             def requestedFaults = ((sample.stage3_faults instanceof Map) ? (sample.stage3_faults as Map) : [:])
             if (!stage3TestMode && !requestedFaults.isEmpty()) {
@@ -457,12 +510,17 @@ workflow STAGE3_VARIANT_DISCOVERY {
             }
             def effectiveFaults = stage3TestMode ? requestedFaults : [:]
 
+            def upstreamToken = (sample.validation_token ?: sample.intake_validation_token_value ?: '').toString()
+            if (!upstreamToken || !upstreamToken.contains('VALID_PASS')) {
+                throw new IllegalStateException("STAGE3_PRECONDITION_FAILURE: invalid Stage 2 validation token for sample '${sampleId}'")
+            }
+
             def sampleMeta = [
                 sample_id       : sampleId,
                 sample_type     : sampleType,
                 sequencing_type : sequencingType,
                 run_mode        : (sample.run_mode ?: 'production').toString(),
-                validation_token: (sample.validation_token ?: sample.intake_validation_token_value ?: '').toString(),
+                validation_token: upstreamToken,
                 stage2_contamination_status: (sample.stage2_contamination_status ?: '').toString(),
                 stage2_contamination_policy_action: (sample.stage2_contamination_policy_action ?: '').toString(),
                 stage3_discovery_thresholds: [
@@ -477,6 +535,8 @@ workflow STAGE3_VARIANT_DISCOVERY {
                 sorted_bam      : sortedBam,
                 sorted_bai      : sortedBai,
                 variant_branches: variantBranches,
+                stage3_branch_plan: stage3BranchPlan,
+                expected_active_branch_count: activeBranches.size(),
                 reference_build : refBuild,
                 stage3_faults   : effectiveFaults,
                 stage3_test_mode: stage3TestMode,

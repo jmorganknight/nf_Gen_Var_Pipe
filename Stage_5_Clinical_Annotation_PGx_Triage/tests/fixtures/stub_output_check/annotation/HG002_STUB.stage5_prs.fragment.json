@@ -1,0 +1,7 @@
+{
+  "sample_id": "HG002_STUB",
+  "component": "prs",
+  "prs_report": "",
+  "prs_bypass_audit": "HG002_STUB.prs_bypassed_audit.json",
+  "prs_coverage_audit": ""
+}
