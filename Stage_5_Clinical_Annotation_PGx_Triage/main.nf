@@ -157,6 +157,7 @@ def resolveStage5RefPath(Object rawValue, List<String> roots) {
 
 workflow {
     def ys = new groovy.yaml.YamlSlurper()
+    def stage5BranchNames = ['germline', 'pgx', 'sf', 'prs', 'somatic']
 
     def stage4InputPath = (params.input ?: params.samples)?.toString()
     if (!stage4InputPath) {
@@ -245,6 +246,38 @@ workflow {
                 throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: stage 4 asset not found '${field}' for sample '${sid}'")
             }
         }
+
+        if (!(sample as Map).containsKey('requested_branches')) {
+            throw new IllegalStateException(
+                "STAGE5_CONTROL_PLANE_FAILURE: missing required 'requested_branches' for sample '${sid}'"
+            )
+        }
+        if (!(sample.requested_branches instanceof List)) {
+            throw new IllegalStateException(
+                "STAGE5_CONTROL_PLANE_FAILURE: 'requested_branches' must be a list for sample '${sid}'"
+            )
+        }
+        def requestedSeen = [] as Set
+        (sample.requested_branches as List).each { rawBranch ->
+            def normalized = rawBranch?.toString()?.trim()?.toLowerCase()
+            if (!normalized) {
+                throw new IllegalStateException(
+                    "STAGE5_CONTROL_PLANE_FAILURE: blank branch identifier in 'requested_branches' for sample '${sid}'"
+                )
+            }
+            if (!stage5BranchNames.contains(normalized)) {
+                throw new IllegalStateException(
+                    "STAGE5_CONTROL_PLANE_FAILURE: unrecognized branch identifier '${normalized}' in 'requested_branches' for sample '${sid}'. " +
+                    "Allowed values: ${stage5BranchNames}"
+                )
+            }
+            if (requestedSeen.contains(normalized)) {
+                throw new IllegalStateException(
+                    "STAGE5_CONTROL_PLANE_FAILURE: duplicate branch identifier '${normalized}' in 'requested_branches' for sample '${sid}'"
+                )
+            }
+            requestedSeen << normalized
+        }
     }
 
     def chStage5Inputs = channel.fromList(samples).map { sample ->
@@ -253,13 +286,19 @@ workflow {
         def phasedVcfTbi = resolveStage4Asset(sample.phased_vcf_tbi.toString(), stage4ManifestFile.parent?.toString() ?: projectRoot)
         def ancestryMetrics = resolveStage4Asset(sample.ancestry_metrics_json?.toString() ?: '', stage4ManifestFile.parent?.toString() ?: projectRoot)
         def phasingAudit = resolveStage4Asset(sample.phasing_audit_json?.toString() ?: '', stage4ManifestFile.parent?.toString() ?: projectRoot)
+        def requestedRaw = sample.requested_branches as List
+        def requestedNormalized = requestedRaw.collect { item ->
+            item?.toString()?.trim()?.toLowerCase()
+        }.findAll { item -> item && stage5BranchNames.contains(item) }.unique()
+        def requestedBranches = requestedNormalized
         tuple(
             sid,
             file(phasedVcf, checkIfExists: true),
             file(phasedVcfTbi, checkIfExists: true),
             file(ancestryMetrics, checkIfExists: true),
             file(phasingAudit, checkIfExists: true),
-            stage5BranchRefs
+            stage5BranchRefs,
+            requestedBranches
         )
     }
 

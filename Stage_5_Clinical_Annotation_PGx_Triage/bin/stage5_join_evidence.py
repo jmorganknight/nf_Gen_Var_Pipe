@@ -6,6 +6,7 @@ from pathlib import Path
 
 def read_tsv(path, expected_cols):
     rows = {}
+    duplicates = []
     for raw in Path(path).read_text(encoding="utf-8", errors="replace").splitlines():
         if not raw.strip():
             continue
@@ -13,7 +14,16 @@ def read_tsv(path, expected_cols):
         if len(cols) < expected_cols:
             raise SystemExit(f"STAGE5_JOIN_FAILURE: malformed line in {path}: {raw}")
         key = cols[0]
+        if key in rows:
+            duplicates.append(key)
+            continue
         rows[key] = cols[1:]
+    if duplicates:
+        preview = sorted(set(duplicates))[:20]
+        raise SystemExit(
+            "STAGE5_ZERO_LOSS_FAILURE: duplicate variant keys detected in evidence stream; "
+            f"file={path} duplicate_count={len(duplicates)} preview={preview}"
+        )
     return rows
 
 

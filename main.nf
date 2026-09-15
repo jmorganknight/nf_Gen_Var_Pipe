@@ -6,7 +6,7 @@ include { STAGE2_SAMPLE_VALIDATION as STAGE2_POSTALIGN_SAMPLE_VALIDATION_GATE } 
 include { STAGE3_VARIANT_DISCOVERY_ENGINE } from './Stage_3_Variant_Discovery_Engine/main'
 include { ASSEMBLE_STAGE3_BANKED_MANIFEST } from './Stage_3_Variant_Discovery_Engine/modules/local/assemble_stage3_banked_manifest.nf'
 include { STAGE4_ANCESTRY_PHASING as STAGE4_ANCESTRY_PHASING_HIGHWAY } from './Stage_4_Ancestry_Phasing_Highway/main'
-include { STAGE5_ANNOTATION_PGX_TRIAGE as STAGE5_CLINICAL_ANNOTATION_PGX_TRIAGE } from './Stage_5_Clinical_Annotation_PGx_Triage/main'
+include { STAGE5_ISOLATED_BRANCH_ARCHITECTURE } from './Stage_5_Clinical_Annotation_PGx_Triage/workflows/stage5_isolated.nf'
 include { STAGE6_CLINICAL_REPORTING_WORKBENCH_GATEWAY as STAGE6_CLINICAL_REPORTING_WORKBENCH_GATE } from './Stage_6_Clinical_Reporting_Workbench_Gateway/main'
 
 def mapOrEmpty(Object value) {
@@ -655,7 +655,14 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         }
     }
 
-    STAGE3_VARIANT_DISCOVERY_ENGINE(chStage3Input)
+    STAGE3_VARIANT_DISCOVERY_ENGINE(
+        chStage3Input,
+        chStage3Input,
+        chStage3Input,
+        chStage3Input,
+        chStage3Input,
+        chStage3Input
+    )
 
     ASSEMBLE_STAGE3_BANKED_MANIFEST(STAGE3_VARIANT_DISCOVERY_ENGINE.out.stage3_manifest.collect())
 
@@ -730,7 +737,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
         tuple(meta.sample_id.toString(), phasedVcf, phasedTbi, ancestryMetrics, _phasingAudit, stage5ReferencesMeta)
     }
 
-    STAGE5_CLINICAL_ANNOTATION_PGX_TRIAGE(chStage5Input)
+    STAGE5_ISOLATED_BRANCH_ARCHITECTURE(chStage5Input)
 
     def stage6ReferencesMeta = [
         reference_genome : refGenome,
@@ -754,7 +761,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
     def stage6NoFileBundle = file('NO_FILE', checkIfExists: false)
     def stage6NoFileProvenance = file('NO_FILE', checkIfExists: false)
 
-    def chStage6Input = STAGE5_CLINICAL_ANNOTATION_PGX_TRIAGE.out.banked_manifest.flatMap { stage5Manifest ->
+    def chStage6Input = STAGE5_ISOLATED_BRANCH_ARCHITECTURE.out.banked_manifest.flatMap { stage5Manifest ->
         def rows = ys.parse(stage5Manifest)?.samples ?: []
         def stage5Root = stage5Manifest.parent ? stage5Manifest.parent.toFile() : new File(projectRoot)
         def stage5OutRoot = new File(params.outdir.toString())
@@ -820,7 +827,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
     stage2_manifest = STAGE2_POSTALIGN_SAMPLE_VALIDATION_GATE.out.stage2_contract
     stage3_manifest = STAGE3_VARIANT_DISCOVERY_ENGINE.out.stage3_manifest
     stage4_manifest = STAGE4_ANCESTRY_PHASING_HIGHWAY.out.banked_manifest
-    stage5_manifest = STAGE5_CLINICAL_ANNOTATION_PGX_TRIAGE.out.banked_manifest
+    stage5_manifest = STAGE5_ISOLATED_BRANCH_ARCHITECTURE.out.banked_manifest
     stage6_manifest = STAGE6_CLINICAL_REPORTING_WORKBENCH_GATE.out.banked_manifest
 }
 

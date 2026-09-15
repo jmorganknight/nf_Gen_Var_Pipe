@@ -7,7 +7,11 @@ workflow STAGE5_GERMLINE {
     ch_stage5_inputs
 
     main:
-    def (ch_vep, ch_clin, ch_gno, ch_anchor, ch_join_anchor) = ch_stage5_inputs.into(5)
+    def ch_vep = ch_stage5_inputs
+    def ch_clin = ch_stage5_inputs
+    def ch_gno = ch_stage5_inputs
+    def ch_anchor = ch_stage5_inputs
+    def ch_join_anchor = ch_stage5_inputs
 
     STAGE5_GERMLINE_VEP_STREAM(ch_vep.map { sid, phasedVcf, _phasedTbi, _ancestryJson, _phasingAuditJson, refs -> tuple(sid, [:], phasedVcf, refs) })
     STAGE5_GERMLINE_CLINVAR_STREAM(ch_clin.map { sid, phasedVcf, _phasedTbi, _ancestryJson, _phasingAuditJson, refs -> tuple(sid, [:], phasedVcf, refs) })

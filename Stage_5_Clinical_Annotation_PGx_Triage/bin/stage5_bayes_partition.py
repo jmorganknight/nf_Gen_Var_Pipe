@@ -65,11 +65,22 @@ def main():
     freq = parse_rules(args.freq_rules)
 
     joined = {}
+    joined_duplicates = []
     for raw in Path(args.joined_tsv).read_text(encoding="utf-8", errors="replace").splitlines():
         if not raw.strip():
             continue
         key, _cons, _cadd, _revel, _alpha, _splice, cln, stars, _af = raw.split("\t")
+        if key in joined:
+            joined_duplicates.append(key)
+            continue
         joined[key] = {"clinvar": cln, "stars": to_int(stars)}
+
+    if joined_duplicates:
+        preview = sorted(set(joined_duplicates))[:20]
+        raise SystemExit(
+            "STAGE5_ZERO_LOSS_FAILURE: duplicate variant keys detected in joined evidence TSV; "
+            f"duplicate_count={len(joined_duplicates)} preview={preview}"
+        )
 
     invcf = pysam.VariantFile(args.in_vcf)
     bcf = pysam.VariantFile(args.out_benign_vcf, "wz", header=invcf.header)
@@ -82,6 +93,11 @@ def main():
     for rec in invcf:
         counts["input"] += 1
         key = key_for_record(rec)
+        if key in scored:
+            raise SystemExit(
+                "STAGE5_ZERO_LOSS_FAILURE: duplicate variant keys detected in input VCF; "
+                f"variant={key}"
+            )
         evidence = []
         score = 0.0
 

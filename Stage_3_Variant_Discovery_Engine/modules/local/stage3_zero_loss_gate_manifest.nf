@@ -136,8 +136,8 @@ lines = [
     f'    run_mode: {json.dumps(contract_fragment.get("run_mode", "production"))}',
     f'    stage2_contamination_status: {json.dumps(contract_fragment.get("stage2_contamination_status", ""))}',
     f'    stage2_contamination_policy_action: {json.dumps(contract_fragment.get("stage2_contamination_policy_action", ""))}',
-    f'    sorted_bam: {json.dumps(contract_fragment.get("sorted_bam", ""))}',
-    f'    sorted_bai: {json.dumps(contract_fragment.get("sorted_bai", ""))}',
+    f'    sorted_bam: {json.dumps(portable_name(contract_fragment.get("sorted_bam", "")))}',
+    f'    sorted_bai: {json.dumps(portable_name(contract_fragment.get("sorted_bai", "")))}',
 ]
 
 variant_branches = contract_fragment.get('variant_branches') or {}
