@@ -1,7 +1,0 @@
-{
-  "sample_id": "HG002_STUB",
-  "component": "annotation",
-  "acmg_tiered_table": "HG002_STUB.stage5_acmg_tiered_variants.json",
-  "vus_queue": "HG002_STUB.stage5_vus_triage_queue.json",
-  "vus_upgraded_count": 0
-}

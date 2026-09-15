@@ -1,9 +1,0 @@
-{
-  "sample_id": "HG002_STUB",
-  "component": "pgx",
-  "pgx_diplotype_json": "HG002_STUB.pgx_report.json",
-  "pgx_actionability_json": "HG002_STUB.pgx_report.json",
-  "pgx_report": "HG002_STUB.pgx_report.json",
-  "clinical_bundle_tar_gz": "HG002_STUB.clinical_bundle.tar.gz",
-  "provenance_json": "HG002_STUB.provenance.json"
-}
