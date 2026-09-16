@@ -49,7 +49,7 @@ flowchart TD
   C --> C1["purity_and_sex_validation_audit.json"]
     D --> C1
   E --> E1["assay_target_router_audit.json"]
-  F --> G1["samples_hg002_banked_stage2.yaml"]
+  F --> G1["samples_<sample_id>_banked_stage2.yaml"]
 ```
 
 ## Module Inventory
@@ -106,7 +106,7 @@ Stage 2 emits a compact scalar block for Stage 3 calibration:
 - `audit_and_qc/stage2/*.stage2_precondition_audit.json`
 - `audit_and_qc/stage2/*.purity_and_sex_validation_audit.json`
 - `audit_and_qc/stage2/*.assay_target_router_audit.json`
-- `samples_hg002_banked_stage2.yaml`
+- `samples_<sample_id>_banked_stage2.yaml`
 
 ## Execute
 
@@ -114,7 +114,7 @@ Stage 2 emits a compact scalar block for Stage 3 calibration:
 cd Stage_2_PostAlign_Sample_Validation_Gate
 nextflow run main.nf \
   -profile docker \
-  --input ../Stage_1_Alignment_Read_Processing/tests/mini_control/samples_hg002_banked_stage1.yaml \
+  --input ../Stage_1_Alignment_Read_Processing/tests/mini_control/samples_<sample_id>_banked_stage1.yaml \
   --references ../control_plane/references.yaml \
   --thresholds ../control_plane/thresholds.yaml \
   --outdir tests/mini_control/

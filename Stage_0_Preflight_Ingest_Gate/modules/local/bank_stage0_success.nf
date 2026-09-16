@@ -1,7 +1,7 @@
 process BANK_STAGE0_SUCCESS {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
     stageInMode 'symlink'
 
     tag "${meta.sample_id}"
@@ -51,13 +51,17 @@ process BANK_STAGE0_SUCCESS {
     set -euo pipefail
 
     cp "${intake_token_file}" "${sid}.intake_validation_token"
-    tar -czf "${sid}.stage0.audit_bundle.tar.gz" \
-        "${intake_report}" \
-        "${route_audit}" \
-        "${preflight_lock}" \
-        "${snapshot_tokens}" \
-        "${yaml_bundle}" \
-        "${infrastructure_yaml}"
+
+    mkdir -p "audit_bundle"
+    cp -L "${intake_report}" "audit_bundle/${sid}.intake_validation_report.json"
+    cp -L "${route_audit}" "audit_bundle/${sid}.intake_route_decision.json"
+    cp -L "${sid}.intake_validation_token" "audit_bundle/${sid}.intake_validation_token"
+    cp -L "${preflight_lock}" "audit_bundle/preflight_lock.json"
+    cp -L "${snapshot_tokens}" "audit_bundle/reference_snapshot.tokens"
+    cp -L "${yaml_bundle}" "audit_bundle/yaml_snapshot_bundle.tar.gz"
+    cp -L "${infrastructure_yaml}" "audit_bundle/infrastructure.yaml"
+
+    tar -czf "${sid}.stage0.audit_bundle.tar.gz" -C "audit_bundle" .
 
     python3 - <<'PYEOF'
 import json

@@ -1,7 +1,7 @@
 process VERIFYBAMID2 {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
 
     publishDir "${params.outdir}/audit_and_qc/stage2", mode: 'copy', overwrite: true, pattern: '*.contamination_audit.json'
 

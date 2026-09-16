@@ -1,6 +1,6 @@
 process STAGE5_BUILD_MULTI_BRANCH_MANIFEST {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'samples_*_banked_stage5.yaml'

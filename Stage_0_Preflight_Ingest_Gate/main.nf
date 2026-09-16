@@ -515,6 +515,11 @@ workflow {
     def chInfrastructureYaml = channel.value(file(infrastructureFile, checkIfExists: true))
     def chSignerKey = channel.value(file(signerKeyResolved, checkIfExists: true))
     def chSignerPub = channel.value(file(signerPubResolved, checkIfExists: true))
+    def chResolvedRefGenome = channel.value(file((refsParsed.reference_genome ?: refsParsed.grch38_fasta).toString(), checkIfExists: true))
+    def chResolvedRefFai = channel.value(file((refsParsed.reference_fai ?: refsParsed.grch38_fai).toString(), checkIfExists: true))
+    def chResolvedRefDict = channel.value(file((refsParsed.reference_dict ?: refsParsed.grch38_dict).toString(), checkIfExists: true))
+    def chResolvedRefBwaBase = channel.value(file((refsParsed.bwa_index_base ?: refsParsed.bwa_index).toString(), checkIfExists: true))
+    def chRefDataRoot = channel.value((referenceInfo.yamlRefDataRoot ?: refDir ?: '/opt/reference').toString())
 
     STAGE0_PREFLIGHT_INGEST(
         chRawReads,
@@ -524,6 +529,11 @@ workflow {
         chSamplesManifestSource,
         chInfrastructureYaml,
         chSignerKey,
-        chSignerPub
+        chSignerPub,
+        chResolvedRefGenome,
+        chResolvedRefFai,
+        chResolvedRefDict,
+        chResolvedRefBwaBase,
+        chRefDataRoot
     )
 }

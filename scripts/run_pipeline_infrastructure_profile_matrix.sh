@@ -36,7 +36,7 @@ Usage:
 
 Options:
   --profile <nextflow_profile>      Nextflow profile (default: docker)
-  --input <manifest.yaml>           Root pipeline sample manifest (default: assets/mini_control/samples_hg002_mini.yaml)
+  --input <manifest.yaml>           Root pipeline sample manifest (default: assets/mini_control/samples_mini_control.yaml)
   --outdir <output_base_dir>        Output base directory (default: tests/infrastructure_profile_matrix)
   --profiles "a b c"                Space-separated profile list (default: "small medium large")
   --resume                          Add -resume to each matrix run
@@ -47,7 +47,7 @@ Examples:
   scripts/run_pipeline_infrastructure_profile_matrix.sh
 
   scripts/run_pipeline_infrastructure_profile_matrix.sh \
-    --input assets/mini_control/samples_hg002_mini.yaml \
+    --input assets/mini_control/samples_mini_control.yaml \
     --profiles "small medium large"
 EOF
 }

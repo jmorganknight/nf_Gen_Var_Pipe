@@ -68,7 +68,7 @@ Core SNV/indel lane behavior:
 - Post-atomization `AD`/`DP` normalization per record
 - Contamination-aware binomial-style allele-balance filtering (`LOW_AB`) and purity-aware VAF filtering (`LOW_VAF`) with audit counters
 
-Core structural-variant lane behavior (modeled on WES-Onco SV lane design):
+Core structural-variant lane behavior (modeled on the earlier SV lane design):
 
 - `configManta.py` + `runWorkflow.py` for discovery
 - target-region intersection using `bcftools view -R` for non-WGS inputs
@@ -151,7 +151,7 @@ This prevents silent success on deliberately malformed payloads.
 
 ## Outputs
 
-- `tests/mini_control/samples_hg002_banked_stage3.yaml`
+- `tests/mini_control/samples_<sample_id>_banked_stage3.yaml`
 
 ## Audit Hygiene
 
@@ -170,7 +170,7 @@ Run the production evidence verifier before audit/regulatory packaging:
 cd Stage_3_Variant_Discovery_Engine
 nextflow run main.nf \
     -profile docker \
-    --input ../Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control/samples_hg002_banked_stage2.yaml \
+    --input ../Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control/samples_<sample_id>_banked_stage2.yaml \
     --outdir tests/mini_control
 ```
 

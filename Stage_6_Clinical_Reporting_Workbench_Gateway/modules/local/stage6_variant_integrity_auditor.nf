@@ -1,7 +1,7 @@
 process STAGE6_VARIANT_INTEGRITY_AUDITOR {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-reporting:2.1.0'
     stageInMode 'symlink'
 
     tag "${meta.sample_id}"

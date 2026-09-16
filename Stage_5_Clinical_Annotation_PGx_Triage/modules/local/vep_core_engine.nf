@@ -1,7 +1,7 @@
 process VEP_CORE_ENGINE {
 
     label 'process_medium'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
 
     tag "${meta.sample_id}"

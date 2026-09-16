@@ -13,21 +13,21 @@ storage:
 
 containers:
   core:
-    image: "wes-onco-core@sha256:d630bd5dd78ba4f469b80d7b0dbd09a5a1bd8841415ed1bbe91d8559a1ff8906"  # Primary runtime image used for intake, alignment, audit, and banking tasks.
-    sif: "file://containers/wes-onco-core.sif"  # Apptainer/Singularity image URI for offline or HPC execution.
-    digest: "sha256:d630bd5dd78ba4f469b80d7b0dbd09a5a1bd8841415ed1bbe91d8559a1ff8906"  # Immutable image ID captured for governed runs.
+    image: "genvar-core:2.1.0"  # Primary runtime image used for intake, alignment, validation, discovery, and banking tasks.
+    sif: "file://containers/genvar-core.sif"  # Apptainer/Singularity image URI for offline or HPC execution.
+    digest: "sha256:d78297806ae75767f4865e649f58222df1fca52befcd0e5a755d88017c7d4317"  # Local image ID captured from the root containers build on 2026-09-15.
   stage3_core:
     image: "genvar-core:2.1.0"  # Stage 3 discovery image for active SV/CNV/STR/trisomy/homology branches.
-    sif: ""  # Optional SIF URI when Stage 3 discovery image is promoted into offline/HPC distribution.
-    digest: "sha256:446eadc13d0322b907224fbccd57914da190407b43772bf8e9753b27f9b41092"  # Local image digest for traceability pending registry push.
+    sif: "file://containers/genvar-core.sif"  # Apptainer/Singularity image URI shared with the governed core runtime.
+    digest: "sha256:d78297806ae75767f4865e649f58222df1fca52befcd0e5a755d88017c7d4317"  # Local image ID captured from the root containers build on 2026-09-15.
   annotation:
-    image: "wes-onco-annotation@sha256:84ebaaaaf5512dc8398dc98a61215a5d419caf1a32bd1ef68369dbcb19d1b69c"  # Downstream annotation image tracked so preflight audits capture the whole governed stack.
-    sif: "file://containers/wes-onco-annotation.sif"  # Apptainer/SIF URI for the annotation container.
-    digest: "sha256:84ebaaaaf5512dc8398dc98a61215a5d419caf1a32bd1ef68369dbcb19d1b69c"  # Immutable image ID captured for governed runs.
-  multiomics:
-    image: "wes-onco-multiomics@sha256:42315555d3fef25d9369af6d8b3bd34f465f94661ca161d49bb70f8d3c394b35"  # Downstream multiomics image tracked for end-to-end governance.
-    sif: "file://containers/wes-onco-multiomics.sif"  # Apptainer/SIF URI for the multiomics container.
-    digest: "sha256:42315555d3fef25d9369af6d8b3bd34f465f94661ca161d49bb70f8d3c394b35"  # Immutable image ID captured for governed runs.
+    image: "genvar-annotation:2.1.0"  # Stage 5 annotation and PGx runtime tracked so preflight audits capture the governed clinical stack.
+    sif: "file://containers/genvar-annotation.sif"  # Apptainer/SIF URI for the annotation container.
+    digest: "sha256:e06f55fc4a3e1387716085007e06cd892c4a179d405827314320724d972e5b89"  # Local image ID captured from the root containers build on 2026-09-15.
+  reporting:
+    image: "genvar-reporting:2.1.0"  # Stage 6 reporting and workbench runtime tracked for end-to-end governance.
+    sif: "file://containers/genvar-reporting.sif"  # Apptainer/SIF URI for the reporting container.
+    digest: "sha256:9e6ad11810f711340dc70a13127c1fb681fdf478756743137245e0d1f9848d08"  # Local image ID captured from the root containers build on 2026-09-15.
 
 process_resources:
   process_low:

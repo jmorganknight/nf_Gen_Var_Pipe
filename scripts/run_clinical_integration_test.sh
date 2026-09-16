@@ -36,7 +36,7 @@ Usage:
 
 Options:
   --profile <nextflow_profile>      Nextflow profile (default: docker)
-  --input <manifest.yaml>           Sample manifest (default: assets/mini_control/samples_hg002_mini.yaml)
+  --input <manifest.yaml>           Sample manifest (default: assets/mini_control/samples_mini_control.yaml)
   --outbase <directory>             Base output directory (default: tests/)
   --resume                          Enable Nextflow resume mode
   --help                            Show this help message

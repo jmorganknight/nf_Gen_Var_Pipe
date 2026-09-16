@@ -14,7 +14,7 @@ def branchRequested(List requestedBranches, String branchName) {
 
 process STAGE5_EMIT_BRANCH_SKIP_MANIFEST {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}:${branch_name}"
 
@@ -50,7 +50,7 @@ JSON
 
 process STAGE5_ANNOTATE_REQUESTED_BRANCH_MANIFEST {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}:${branch_name}"
 

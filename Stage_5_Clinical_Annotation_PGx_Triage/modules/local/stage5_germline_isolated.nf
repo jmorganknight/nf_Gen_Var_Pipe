@@ -1,6 +1,6 @@
 process STAGE5_GERMLINE_VEP_STREAM {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/germline", mode: 'copy', overwrite: true, pattern: '*.vep.*'
@@ -25,7 +25,7 @@ process STAGE5_GERMLINE_VEP_STREAM {
 
 process STAGE5_GERMLINE_CLINVAR_STREAM {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/germline", mode: 'copy', overwrite: true, pattern: '*.clinvar.*'
@@ -50,7 +50,7 @@ process STAGE5_GERMLINE_CLINVAR_STREAM {
 
 process STAGE5_GERMLINE_GNOMAD_STREAM {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/germline", mode: 'copy', overwrite: true, pattern: '*.gnomad.*'
@@ -75,7 +75,7 @@ process STAGE5_GERMLINE_GNOMAD_STREAM {
 
 process STAGE5_GERMLINE_JOIN_EVIDENCE {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/germline", mode: 'copy', overwrite: true, pattern: '*.joined.*'
@@ -101,7 +101,7 @@ process STAGE5_GERMLINE_JOIN_EVIDENCE {
 
 process RULE_COMP_SYNTHESIS {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/germline", mode: 'copy', overwrite: true, pattern: '*.comp_rules.json'
@@ -124,7 +124,7 @@ process RULE_COMP_SYNTHESIS {
 
 process RULE_LOSS_TRUNCATION {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/germline", mode: 'copy', overwrite: true, pattern: '*.loss_rules.json'
@@ -147,7 +147,7 @@ process RULE_LOSS_TRUNCATION {
 
 process RULE_FREQ_CHECK {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/germline", mode: 'copy', overwrite: true, pattern: '*.freq_rules.json'
@@ -172,7 +172,7 @@ process RULE_FREQ_CHECK {
 
 process STAGE5_GERMLINE_BAYES_PARTITION {
     label 'process_medium'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/germline", mode: 'copy', overwrite: true, pattern: '*.germline.*'
@@ -207,7 +207,7 @@ process STAGE5_GERMLINE_BAYES_PARTITION {
 
 process STAGE5_GERMLINE_ZERO_LOSS_GATE {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/germline", mode: 'copy', overwrite: true, pattern: '*.germline.zero_loss.audit.json'
@@ -230,7 +230,7 @@ process STAGE5_GERMLINE_ZERO_LOSS_GATE {
 
 process STAGE5_VUS_HGMD_TRIAGE {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/germline", mode: 'copy', overwrite: true, pattern: '*.germline.vus_triaged.*'
@@ -257,7 +257,7 @@ process STAGE5_VUS_HGMD_TRIAGE {
 
 process STAGE5_GERMLINE_BRANCH_MANIFEST {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/germline", mode: 'copy', overwrite: true, pattern: '*.stage5_germline.branch_manifest.json'

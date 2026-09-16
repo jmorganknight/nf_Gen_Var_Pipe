@@ -5,7 +5,7 @@ include { POPPCA_REFERENCE_PROJECTION } from '../../modules/local/poppca_referen
 process STAGE4_ANCESTRY_LOAD_WEIGHTS {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
     tag "${meta.sample_id}"
 
     input:

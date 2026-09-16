@@ -389,6 +389,50 @@ workflow STAGE1_ALIGNMENT {
     }
     def preflightLockPublishedPath = "${params.outdir}/audit_and_qc/preflight_lock/preflight_lock.json"
 
+    def refsDynamic = (params.refs instanceof Map) ? (params.refs as Map) : [:]
+    def refGenome = refsDynamic.reference_genome ?: refsDynamic.fasta ?: refsParsed.reference_genome ?: refsParsed.grch38_fasta
+    def refFai = refsDynamic.reference_fai ?: refsDynamic.fai ?: refsParsed.reference_fai ?: refsParsed.grch38_fai ?: (refGenome ? "${refGenome}.fai" : null)
+    def refDict = refsDynamic.reference_dict ?: refsDynamic.dict ?: refsParsed.reference_dict ?: refsParsed.grch38_dict
+    def bwaBase = refsDynamic.bwa_index_base ?: refsDynamic.bwa_index ?: refsParsed.bwa_index_base ?: refsParsed.bwa_index
+    def branchTargetCatalogDefault = (refsParsed.capture_wes_bed ?: refsParsed.onco_target_bed)?.toString()
+    def elprepIntervals = refsParsed.elprep_intervals ?: refsParsed.onco_target_intervals ?: branchTargetCatalogDefault
+
+    def requiredRefMap = [
+        reference_genome: refGenome,
+        reference_fai: refFai,
+        reference_dict: refDict,
+        bwa_index_base: bwaBase,
+        onco_target_bed: refsParsed.onco_target_bed,
+        capture_wes_bed: refsParsed.capture_wes_bed ?: refsParsed.onco_target_bed,
+        sf_bed: refsParsed.sf_bed,
+        elprep_intervals: elprepIntervals
+    ]
+    requiredRefMap.each { key, value ->
+        if (!value) {
+            writeStage1Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', key)
+            throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}'")
+        }
+    }
+
+    ['reference_genome', 'reference_fai', 'reference_dict', 'onco_target_bed', 'capture_wes_bed', 'sf_bed', 'elprep_intervals'].each { key ->
+        def p = requiredRefMap[key].toString()
+        def f = hostPathForReference(p, refDir)
+        if (f == null || !f.exists()) {
+            writeStage1Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', "${key}=${p}")
+            throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}=${p}'")
+        }
+    }
+
+    def hostBwaBase = hostPathForReference(bwaBase.toString(), refDir)
+    def indexSuffixes = ['.0123', '.amb', '.ann', '.bwt.2bit.64', '.pac']
+    indexSuffixes.each { suffix ->
+        def idxFile = new File("${hostBwaBase}${suffix}")
+        if (!idxFile.exists()) {
+            writeStage1Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', idxFile.toString())
+            throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${idxFile}'")
+        }
+    }
+
     def chPreflightRows = channel.fromList(samplesParsed).map { sample ->
         [
             sample_id: (sample.sample_id ?: 'UNKNOWN').toString(),
@@ -411,7 +455,12 @@ workflow STAGE1_ALIGNMENT {
         channel.value(samplesFile),
         channel.value(samplesFile),
         channel.value(thresholdsFile),
-        channel.value(infrastructureFile)
+        channel.value(infrastructureFile),
+        channel.value(refGenome.toString()),
+        channel.value(refFai.toString()),
+        channel.value(refDict.toString()),
+        channel.value(bwaBase.toString()),
+        channel.value(refDir?.toString() ?: intake.yamlRefDataRoot ?: '/opt/reference')
     )
 
     samplesParsed.each { sample ->
@@ -514,50 +563,6 @@ workflow STAGE1_ALIGNMENT {
         }
     }
 
-    def refsDynamic = (params.refs instanceof Map) ? (params.refs as Map) : [:]
-    def refGenome = refsDynamic.reference_genome ?: refsDynamic.fasta ?: refsParsed.reference_genome ?: refsParsed.grch38_fasta
-    def refFai = refsDynamic.reference_fai ?: refsDynamic.fai ?: refsParsed.reference_fai ?: refsParsed.grch38_fai ?: (refGenome ? "${refGenome}.fai" : null)
-    def refDict = refsDynamic.reference_dict ?: refsDynamic.dict ?: refsParsed.reference_dict ?: refsParsed.grch38_dict
-    def bwaBase = refsDynamic.bwa_index_base ?: refsDynamic.bwa_index ?: refsParsed.bwa_index_base ?: refsParsed.bwa_index
-    def branchTargetCatalogDefault = (refsParsed.capture_wes_bed ?: refsParsed.onco_target_bed)?.toString()
-    def elprepIntervals = refsParsed.elprep_intervals ?: refsParsed.onco_target_intervals ?: branchTargetCatalogDefault
-
-    def requiredRefMap = [
-        reference_genome: refGenome,
-        reference_fai: refFai,
-        reference_dict: refDict,
-        bwa_index_base: bwaBase,
-        onco_target_bed: refsParsed.onco_target_bed,
-        capture_wes_bed: refsParsed.capture_wes_bed ?: refsParsed.onco_target_bed,
-        sf_bed: refsParsed.sf_bed,
-        elprep_intervals: elprepIntervals
-    ]
-    requiredRefMap.each { key, value ->
-        if (!value) {
-            writeStage1Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', key)
-            throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}'")
-        }
-    }
-
-    ['reference_genome', 'reference_fai', 'reference_dict', 'onco_target_bed', 'capture_wes_bed', 'sf_bed', 'elprep_intervals'].each { key ->
-        def p = requiredRefMap[key].toString()
-        def f = hostPathForReference(p, refDir)
-        if (f == null || !f.exists()) {
-            writeStage1Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', "${key}=${p}")
-            throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}=${p}'")
-        }
-    }
-
-    def hostBwaBase = hostPathForReference(bwaBase.toString(), refDir)
-    def indexSuffixes = ['.0123', '.amb', '.ann', '.bwt.2bit.64', '.pac']
-    indexSuffixes.each { suffix ->
-        def idxFile = new File("${hostBwaBase}${suffix}")
-        if (!idxFile.exists()) {
-            writeStage1Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', idxFile.toString())
-            throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${idxFile}'")
-        }
-    }
-
     def chPlatformPayload = channel.fromList(samplesParsed.findAll { s -> !s.mapped_bam })
         .combine(PREFLIGHT_INGESTION_GUARD.out.preflight_lock)
         .map { sample, _preflightLock ->
@@ -594,6 +599,7 @@ workflow STAGE1_ALIGNMENT {
         reference_fai: refFai.toString(),
         reference_dict: refDict.toString(),
         bwa_index_base: bwaBase.toString(),
+        reference_host_root: (refDir?.toString() ?: intake.yamlRefDataRoot ?: ''),
         onco_target_bed: (refsParsed.onco_target_bed ?: refsParsed.capture_wes_bed),
         sf_bed: refsParsed.sf_bed,
         clinvar_db: refsParsed.clinvar_db,

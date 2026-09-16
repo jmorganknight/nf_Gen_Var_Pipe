@@ -23,7 +23,7 @@
 process REF_MANIFEST_SNAPSHOT_LOCK {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
 
     publishDir "${params.outdir}/audit_and_qc/ref_snapshot", mode: 'copy', overwrite: true
 
@@ -211,7 +211,7 @@ def get_container_digest(containers_block, key):
     return digest_text if digest_text else 'BUILD_PENDING'
 
 manifest = {
-    'pipeline'         : 'WES_Onco_Panel_v18.4',
+    'pipeline'         : 'GEN_VAR_PIPELINE_v1',
     'timestamp_utc'    : datetime.now(timezone.utc).isoformat(),
     'hash_engine'      : 'SHA256',
     'verification_depth': 'HIGH_INTEGRITY',
@@ -223,7 +223,7 @@ containers_cfg = infra_doc.get('containers', {}) if isinstance(infra_doc, dict) 
 manifest['container_digests'] = {
     'core': get_container_digest(containers_cfg, 'core'),
     'annotation': get_container_digest(containers_cfg, 'annotation'),
-    'multiomics': get_container_digest(containers_cfg, 'multiomics'),
+    'reporting': get_container_digest(containers_cfg, 'reporting'),
 }
 
 def walk_refs(obj, prefix=''):
@@ -272,7 +272,7 @@ PYEOF
 
     stub:
     """
-    echo '{"pipeline":"WES_Onco_Panel_v18.4","stub":true,"reference_hashes":{},"container_digests":{"core":"BUILD_PENDING","annotation":"BUILD_PENDING","multiomics":"BUILD_PENDING"}}' \
+    echo '{"pipeline":"GEN_VAR_PIPELINE_v1","stub":true,"reference_hashes":{},"container_digests":{"core":"BUILD_PENDING","annotation":"BUILD_PENDING","reporting":"BUILD_PENDING"}}' \
         > reference_snapshot.tokens
     touch yaml_snapshot_bundle.tar.gz
     """

@@ -100,7 +100,7 @@ flowchart TD
   E --> G["5-branch completeness check"]
   F --> G
   G --> H["STAGE5_BUILD_MULTI_BRANCH_MANIFEST"]
-  H --> I["samples_hg002_banked_stage5.yaml\nexplicit status per branch"]
+  H --> I["samples_<sample_id>_banked_stage5.yaml\nexplicit status per branch"]
   I --> J["CLINICAL_PROVENANCE_MANIFEST\nRS256 signed clinical bundle"]
   J --> K["Stage 6 compatibility artifacts"]
 ```
@@ -143,7 +143,7 @@ Published under the selected `--outdir`:
 - `pgx/*.clinical_bundle.tar.gz`
 - `pgx/*.provenance.json`
 - `audit_and_qc/stage5/*.stage5_router.json`
-- `samples_hg002_banked_stage5.yaml`
+- `samples_<sample_id>_banked_stage5.yaml`
 
 ## Execute
 
@@ -151,7 +151,7 @@ Published under the selected `--outdir`:
 cd Stage_5_Clinical_Annotation_PGx_Triage
 nextflow run main.nf \
   -profile docker \
-  --input ../Stage_4_Ancestry_Phasing_Highway/tests/mini_control/samples_hg002_banked_stage4.yaml \
+  --input ../Stage_4_Ancestry_Phasing_Highway/tests/mini_control/samples_<sample_id>_banked_stage4.yaml \
   --references ../control_plane/references.yaml \
   --thresholds ../control_plane/thresholds.yaml \
   --outdir tests/mini_control
@@ -161,7 +161,7 @@ Optional signer override:
 
 ```bash
 nextflow run main.nf -profile docker \
-  --input ../Stage_4_Ancestry_Phasing_Highway/tests/mini_control/samples_hg002_banked_stage4.yaml \
+  --input ../Stage_4_Ancestry_Phasing_Highway/tests/mini_control/samples_<sample_id>_banked_stage4.yaml \
   --signer_key_path ../keys/clinical_signer.pem \
   --signer_pub_path ../keys/clinical_signer.pub.pem
 ```
@@ -175,4 +175,4 @@ python3 tests/fmea/run_stage5_fmea_suite.py
 ## Notes
 
 - Stage 5 emits Stage 6-compatible annotation/PRS/SF/PGx artifact names and a complete banked manifest.
-- Signed bundle/provenance artifacts are generated per sample and referenced in `samples_hg002_banked_stage5.yaml`.
+- Signed bundle/provenance artifacts are generated per sample and referenced in `samples_<sample_id>_banked_stage5.yaml`.

@@ -9,6 +9,8 @@ work/
 # Docker & Temp Directories
 tmp/
 .tmp/
+containers/*.sif
+containers/.build*
 
 # Binary Genomic Assets & Big Data (BAM, CRAM, VCF, FASTQ, BigWig)
 *.bam

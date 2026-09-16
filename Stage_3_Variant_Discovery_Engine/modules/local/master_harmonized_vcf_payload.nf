@@ -13,7 +13,8 @@ process MASTER_HARMONIZED_VCF_PAYLOAD {
     tuple val(sample_id), path("${sample_id}.normalized.vcf.gz.tbi"), emit: normalized_tbi
 
     script:
-    def refsJson = groovy.json.JsonOutput.toJson(stage3_refs).replace('\\', '\\\\').replace("'", "\\'")
+    def stage3RefsMap = (stage3_refs instanceof Map) ? (stage3_refs as Map) : [:]
+    def refsJson = groovy.json.JsonOutput.toJson(stage3RefsMap).replace('\\', '\\\\').replace("'", "\\'")
     def metaJson = groovy.json.JsonOutput.toJson(sample_meta).replace('\\', '\\\\').replace("'", "\\'")
     def publishedOutDir = new File(params.outdir.toString()).isAbsolute() ? new File(params.outdir.toString()).canonicalPath : new File(workflow.launchDir.toString(), params.outdir.toString()).canonicalPath
     """

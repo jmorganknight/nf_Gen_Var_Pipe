@@ -38,12 +38,12 @@ Executed three-phase workspace sanitization and YAML control-plane extraction to
 | Stage 3 fallback resolution | `tests/mini_control`, `tests/fixtures/` | (removed) — uses only `tests/schemas`, `tests/` | ✅ Commit `8536d23` |
 
 ### Script Updates (Phase 1)
-- `Stage_1_Alignment_Read_Processing/run_local_stage1.sh`: Updated input/outdir defaults
+- `Stage_1_Alignment_Read_Processing`: local rerun guidance moved to direct Nextflow invocation defaults
 - `Stage_1_Alignment_Read_Processing/tests/fmea/run_stage1_fmea_suite.py`: Cross-workspace refs corrected
 - `Stage_2_PostAlign_Sample_Validation_Gate/tests/fmea/run_stage2_fmea_suite.py`: Removed `mini_control` references
 - `Stage_3_Variant_Discovery_Engine/tests/fmea/run_stage3_fmea_suite.py`: Consolidated BAM candidates, removed obsolete paths
 - `Stage_4_Ancestry_Phasing_Highway/tests/fmea/run_stage4_fmea_suite.py`: Fixed path references
-- `Stage_5_Clinical_Annotation_PGx_Triage/tests/fmea/run_stage5_fmea_suite.py`: Removed cross-workspace refs to nf_WES_Onco_Risk
+- `Stage_5_Clinical_Annotation_PGx_Triage/tests/fmea/run_stage5_fmea_suite.py`: Removed cross-workspace refs to the legacy workspace
 
 **Commits**:
 - `1a06738`: Fixture migration & deletion (36 files changed)

@@ -1,7 +1,7 @@
 process STAGE1_FAIL_CLOSED {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
 
     publishDir "${params.outdir}/audit_and_qc/stage1", mode: 'copy', overwrite: true
 

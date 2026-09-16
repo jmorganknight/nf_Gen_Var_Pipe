@@ -1,7 +1,7 @@
 process BANK_STAGE2_CONTRACT {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
 
     publishDir "${params.outdir}/contracts/stage2", mode: 'copy', overwrite: true, pattern: '*.stage2.contract.fragment.json'
 

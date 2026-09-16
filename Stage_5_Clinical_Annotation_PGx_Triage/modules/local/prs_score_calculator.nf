@@ -1,7 +1,7 @@
 process PRS_SCORE_CALCULATOR {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
 
     tag "${meta.sample_id}"

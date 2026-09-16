@@ -214,6 +214,7 @@ def buildStage2InputChannel() {
         capture_wes_bed : refsCombined.capture_wes_bed ?: refsCombined.onco_target_bed,
         onco_target_bed : refsCombined.onco_target_bed ?: refsCombined.capture_wes_bed,
         sf_bed          : refsCombined.sf_bed,
+        reference_host_root: (referenceInfo.yamlRefDataRoot ?: ''),
         verifybamid2_svd_prefix: refsCombined.verifybamid2_svd_prefix,
         verifybamid2_ud_path: refsCombined.verifybamid2_ud_path,
         verifybamid2_bed: refsCombined.verifybamid2_bed

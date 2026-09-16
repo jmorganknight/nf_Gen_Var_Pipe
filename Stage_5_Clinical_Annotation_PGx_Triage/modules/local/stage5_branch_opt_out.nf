@@ -1,7 +1,7 @@
 process STAGE5_BRANCH_OPT_OUT {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
 
     tag "${sample_id}:${branch_name}"

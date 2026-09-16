@@ -1,7 +1,7 @@
 process ASSAY_TARGET_ROUTER {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
 
     publishDir "${params.outdir}/audit_and_qc/stage2", mode: 'copy', overwrite: true,
         pattern: "*.assay_target_router_audit.json"

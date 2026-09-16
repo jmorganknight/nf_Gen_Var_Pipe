@@ -108,7 +108,7 @@ Stage 1 now includes explicit runtime guards before alignment execution:
 | `CROSS_SAMPLE_IDENTITY_GATE` | verified BAM/BAI + SVD/freemix config | identity audit + identity-verified BAM/BAI | all short-read | fail closed on contamination threshold breach; skip mode if insufficient markers. |
 | `STAGE1_FLAGSTAT` | identity-verified BAM/BAI | `flagstat.txt` | all short-read | fails on samtools errors. |
 | `STAGE1_AUDIT_SINK` | route/fastp/align/identity/junction/flagstat artifacts | `stage1_audit_payload.json` | all short-read | fails on sink assembly/write failure. |
-| `BANK_STAGE1_CONTRACT` + `ASSEMBLE_STAGE1_BANKED_MANIFEST` | final BAM/BAI + ref metadata | banked files and `samples_hg002_banked_stage1.yaml` | all short-read | fails if banking/manifest write fails. |
+| `BANK_STAGE1_CONTRACT` + `ASSEMBLE_STAGE1_BANKED_MANIFEST` | final BAM/BAI + ref metadata | banked files and `samples_<sample_id>_banked_stage1.yaml` | all short-read | fails if banking/manifest write fails. |
 
 ## Inputs
 
@@ -126,7 +126,7 @@ Published under `tests/mini_control/`:
 - `audit_and_qc/stage1/stage1_audit_payload.json`
 - `audit_and_qc/stage1/*.flagstat.txt`
 - `audit_and_qc/stage1/stage1_rejection_audit.json` (failure scenarios)
-- `samples_hg002_banked_stage1.yaml`
+- `samples_<sample_id>_banked_stage1.yaml`
 
 Stage 2 handoff fields include:
 
@@ -145,7 +145,7 @@ Run Stage 1 standalone:
 cd Stage_1_Alignment_Read_Processing
 nextflow run main.nf \
     -profile docker \
-    --input tests/mini_control/samples_hg002_banked_stage0.yaml \
+    --input tests/mini_control/samples_<sample_id>_banked_stage0.yaml \
     --outdir tests/mini_control
 ```
 
@@ -180,7 +180,3 @@ python3 tests/fmea/run_stage1_fmea_suite.py
 - Default Stage 1 work directory: /scratch/nextflow_work
 - Default Stage 1 temp directory: /scratch/tmp
 - Heavy-path CPU ceiling: 30 cores
-
-To run a fresh local Stage 1 rerun with the scratch directories cleared first, use `./run_local_stage1.sh`.
-
-The wrapper clears the Stage 1 scratch work and temp directories before launching Nextflow, so it is intended for fresh reruns rather than resume-based recovery.

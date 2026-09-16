@@ -10,7 +10,7 @@ process STAGE3_VARIANT_ENGINE {
     path 'normalized.vcf', emit: normalized_vcf
     path 'normalized.vcf.tbi', emit: normalized_tbi
     path 'harmonization_audit.json', emit: audit
-    path 'samples_hg002_banked_stage3.yaml', emit: banked_manifest
+    path 'samples_*_banked_stage3.yaml', emit: banked_manifest
 
     script:
     def refsPath = file(params.references).toString().replace('\\', '\\\\').replace("'", "\\'")
@@ -170,6 +170,32 @@ def eh_json_to_vcf(json_path: Path, vcf_path: Path, sample_id: str):
     if not rows:
         rows = [['1', '1', '.', 'N', '<STR>', '0', 'PASS', f'SVTYPE=STR;SAMPLE={sample_id};EMPTY_CALLSET=1']]
     write_simple_vcf(vcf_path, sample_id, 'EXPANSIONHUNTER', rows)
+
+
+def validate_vcf_schema(path: Path, label: str):
+    if not path.exists():
+        raise SystemExit(f'STAGE3_SCHEMA_VALIDATION_FAILURE: missing {label} VCF {path}')
+    lines = path.read_text(encoding='utf-8', errors='replace').splitlines()
+    if not lines:
+        raise SystemExit(f'STAGE3_SCHEMA_VALIDATION_FAILURE: empty {label} VCF payload: {path}')
+    fileformat = None
+    chrom_header = None
+    for line in lines:
+        if line.startswith('##fileformat='):
+            fileformat = line
+        if line.startswith('#CHROM'):
+            chrom_header = line
+            break
+    if fileformat is None or not fileformat.startswith('##fileformat=VCFv4.2'):
+        raise SystemExit(f'STAGE3_SCHEMA_VALIDATION_FAILURE: invalid VCF fileformat header in {label} payload: {fileformat or "<missing>"}')
+    if chrom_header is None:
+        raise SystemExit(f'STAGE3_SCHEMA_VALIDATION_FAILURE: missing #CHROM header in {label} payload: {path}')
+    expected_cols = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']
+    cols = chrom_header.split('\t')
+    for idx, col in enumerate(expected_cols):
+        if idx >= len(cols) or cols[idx] != col:
+            raise SystemExit(f'STAGE3_SCHEMA_VALIDATION_FAILURE: malformed VCF column header in {label} payload at position {idx + 1}; expected {col}')
+    return True
 
 
 stage2_manifest = Path('${stage2_manifest}')
@@ -455,7 +481,8 @@ banked = {
         'stage4_handoff_note': 'Normalized, atomized, left-aligned VCF ready for annotation.'
     }]
 }
-Path('samples_hg002_banked_stage3.yaml').write_text(json.dumps(banked, indent=2) + chr(10), encoding='utf-8')
+canonical_id = ''.join(ch if (ch.isalnum() or ch in ('_', '-')) else '_' for ch in sample_id) or 'UNKNOWN'
+Path(f'samples_{canonical_id}_banked_stage3.yaml').write_text(json.dumps(banked, indent=2) + chr(10), encoding='utf-8')
 PYEOF
     """
 
@@ -548,7 +575,8 @@ Path('harmonization_audit.json').write_text(json.dumps({
     'status': 'PASS',
     'stub': True
 }, indent=2) + chr(10), encoding='utf-8')
-Path('samples_hg002_banked_stage3.yaml').write_text(json.dumps({'samples': [{
+canonical_id = ''.join(ch if (ch.isalnum() or ch in ('_', '-')) else '_' for ch in sample_id) or 'UNKNOWN'
+Path(f'samples_{canonical_id}_banked_stage3.yaml').write_text(json.dumps({'samples': [{
     'sample_id': sample_id,
     'sequencing_type': sequencing_type,
     'validation_token': validation_token,
@@ -565,28 +593,3 @@ Path('samples_hg002_banked_stage3.yaml').write_text(json.dumps({'samples': [{
 PYEOF
     """
 }
-
-def validate_vcf_schema(path: Path, *, label: str):
-    if not path.exists():
-        raise SystemExit(f'STAGE3_SCHEMA_VALIDATION_FAILURE: missing {label} VCF {path}')
-    lines = path.read_text(encoding='utf-8', errors='replace').splitlines()
-    if not lines:
-        raise SystemExit(f'STAGE3_SCHEMA_VALIDATION_FAILURE: empty {label} VCF payload: {path}')
-    fileformat = None
-    chrom_header = None
-    for line in lines:
-        if line.startswith('##fileformat='):
-            fileformat = line
-        if line.startswith('#CHROM'):
-            chrom_header = line
-            break
-    if fileformat is None or not fileformat.startswith('##fileformat=VCFv4.2'):
-        raise SystemExit(f'STAGE3_SCHEMA_VALIDATION_FAILURE: invalid VCF fileformat header in {label} payload: {fileformat or "<missing>"}')
-    if chrom_header is None:
-        raise SystemExit(f'STAGE3_SCHEMA_VALIDATION_FAILURE: missing #CHROM header in {label} payload: {path}')
-    expected_cols = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']
-    cols = chrom_header.split('\t')
-    for idx, col in enumerate(expected_cols):
-        if idx >= len(cols) or cols[idx] != col:
-            raise SystemExit(f'STAGE3_SCHEMA_VALIDATION_FAILURE: malformed VCF column header in {label} payload at position {idx + 1}; expected {col}')
-    return True

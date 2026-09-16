@@ -18,7 +18,7 @@
 process PREFLIGHT_INGESTION_GUARD {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
 
     publishDir "${params.outdir}/audit_and_qc/preflight_lock", mode: 'copy', overwrite: true
 
@@ -29,10 +29,10 @@ process PREFLIGHT_INGESTION_GUARD {
     val samples_manifest_source
     path thresholds_yaml
     path infrastructure_yaml
-    path resolved_ref_genome
-    path resolved_ref_fai
-    path resolved_ref_dict
-    path resolved_ref_bwa_base
+    path resolved_ref_genome, name: 'resolved_reference_genome.fa'
+    path resolved_ref_fai, name: 'resolved_reference_genome.fa.fai'
+    path resolved_ref_dict, name: 'resolved_reference_genome.dict'
+    path resolved_ref_bwa_base, name: 'resolved_bwa_index_base.fa'
     val ref_data_root
 
     output:
@@ -153,6 +153,11 @@ def resolve_reference_path(path_text, ref_data_root):
 
 
 def sha256_of_path(path_text, ref_data_root):
+    if os.path.exists(path_text):
+        if os.path.isdir(path_text):
+            return sha256_of_directory(path_text)
+        return sha256_of_file(path_text)
+
     path_text = resolve_reference_path(path_text, ref_data_root)
     if os.path.isdir(path_text):
         return sha256_of_directory(path_text)
@@ -204,7 +209,9 @@ def get_container_digest(containers_block, key):
     digest = entry.get('digest')
     if digest is None:
         return 'BUILD_PENDING'
-    digest_text = str(digest).strip()
+    digest_text = str(digest).split('#', 1)[0].strip()
+    if digest_text.startswith(('"', "'")) and digest_text.endswith(('"', "'")):
+        digest_text = digest_text[1:-1].strip()
     return digest_text if digest_text else 'BUILD_PENDING'
 
 
@@ -240,7 +247,7 @@ samples_manifest_source = json.loads('''${samplesManifestSourceJson}''')
 
 manifest = {
     'node': 'PREFLIGHT_INGESTION_GUARD',
-    'pipeline': 'WES_Onco_Panel_v18.4',
+    'pipeline': 'GEN_VAR_PIPELINE_v1',
     'preflight_status': 'STAGE0_PREFLIGHT_LOCK_PASS',
     'timestamp_utc': datetime.now(timezone.utc).isoformat(),
     'hash_engine': 'SHA-256',
@@ -253,7 +260,7 @@ manifest = {
     'container_digests': {
         'core': get_container_digest(containers_cfg, 'core'),
         'annotation': get_container_digest(containers_cfg, 'annotation'),
-        'multiomics': get_container_digest(containers_cfg, 'multiomics'),
+        'reporting': get_container_digest(containers_cfg, 'reporting'),
     },
 }
 
@@ -273,8 +280,12 @@ def walk_refs(obj, prefix=''):
     if isinstance(obj, dict):
         for key, value in obj.items():
             walk_refs(value, f'{prefix}.{key}' if prefix else key)
-    elif isinstance(obj, str) and '/' in obj:
-        manifest['reference_hashes'][prefix] = sha256_of_path(obj, yaml_ref_data_root)
+    elif isinstance(obj, os.PathLike):
+        manifest['reference_hashes'][prefix] = sha256_of_path(os.fspath(obj), yaml_ref_data_root)
+    elif isinstance(obj, str):
+        candidate = obj.strip()
+        if candidate and ('/' in candidate or os.path.exists(candidate)):
+            manifest['reference_hashes'][prefix] = sha256_of_path(candidate, yaml_ref_data_root)
 
 
 walk_refs(refs)
@@ -313,7 +324,7 @@ PYEOF
     cat > preflight_lock.json <<'EOF'
 {
   "node": "PREFLIGHT_INGESTION_GUARD",
-  "pipeline": "WES_Onco_Panel_v18.4",
+    "pipeline": "GEN_VAR_PIPELINE_v1",
   "preflight_status": "STAGE0_PREFLIGHT_LOCK_PASS",
   "stub": true,
   "sample_count": 0,
@@ -323,7 +334,7 @@ PYEOF
   "container_digests": {
     "core": "BUILD_PENDING",
     "annotation": "BUILD_PENDING",
-    "multiomics": "BUILD_PENDING"
+        "reporting": "BUILD_PENDING"
   }
 }
 EOF

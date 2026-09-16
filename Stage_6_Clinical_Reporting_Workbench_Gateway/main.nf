@@ -170,7 +170,7 @@ def resolveStage5Artifact(File stage5Root, String artifactName, String fallbackN
 
 process STAGE6_RUO_DEV_REPORT_LOCK {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-reporting:2.1.0'
     stageInMode 'symlink'
     publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'RUO_DEV_REPORT_LOCKED.txt'
 

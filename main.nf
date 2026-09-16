@@ -406,7 +406,7 @@ def loadAtomicIntakeContract() {
     ]
 }
 
-workflow MASTER_WES_ONCO_ORCHESTRATOR {
+workflow MASTER_GEN_VAR_ORCHESTRATOR {
     main:
     def ys = new groovy.yaml.YamlSlurper()
     def intake = loadAtomicIntakeContract()
@@ -505,7 +505,7 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
     def parsedRefs = resolvedRefInfo.refs
     
     // Validate that all 4 required keys are present
-    def missingRefKeys = requiredReferenceKeys.findAll { !parsedRefs.get(it) }
+    def missingRefKeys = requiredReferenceKeys.findAll { key -> !parsedRefs.get(key) }
     if (missingRefKeys) {
         throw new IllegalArgumentException("[OPTION_A_REF_VALIDATION] Missing required reference keys in references.yaml: ${missingRefKeys.join(', ')}")
     }
@@ -730,8 +730,11 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
     def chStage4Input = ASSEMBLE_STAGE3_BANKED_MANIFEST.out.banked_manifest.flatMap { stage3Manifest ->
         def rows = ys.parse(stage3Manifest)?.samples ?: []
         def stage3Root = params.outdir.toString()
-        def stage2ManifestFile = new File(params.outdir.toString(), 'samples_hg002_banked_stage2.yaml')
-        def stage2Rows = stage2ManifestFile.exists() ? (ys.parse(stage2ManifestFile)?.samples ?: []) : []
+        def stage2ManifestCandidates = new File(params.outdir.toString()).listFiles()?.findAll { f ->
+            f.name ==~ /samples_.*_banked_stage2\.yaml/
+        }?.sort { a, b -> a.name <=> b.name } ?: []
+        def stage2ManifestFile = stage2ManifestCandidates ? stage2ManifestCandidates[0] : null
+        def stage2Rows = (stage2ManifestFile != null && stage2ManifestFile.exists()) ? (ys.parse(stage2ManifestFile)?.samples ?: []) : []
         rows.collect { rec ->
             def stage2Rec = stage2Rows.find { row -> (row.sample_id ?: '').toString() == (rec.sample_id ?: '').toString() } ?: [:]
             def stage3Token = rec.validation_token?.toString() ?: ''
@@ -893,5 +896,5 @@ workflow MASTER_WES_ONCO_ORCHESTRATOR {
 }
 
 workflow {
-    MASTER_WES_ONCO_ORCHESTRATOR()
+    MASTER_GEN_VAR_ORCHESTRATOR()
 }

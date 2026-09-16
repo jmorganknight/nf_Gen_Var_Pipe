@@ -11,10 +11,26 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 ROOT = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_4_Ancestry_Phasing_Highway')
-STAGE3_FIXTURE = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/banked_stage3/samples_hg002_banked_stage3.yaml')
 REFS = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/conf/references.yaml')
 THRESHOLDS = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/conf/thresholds.yaml')
 SUMMARY = ROOT / 'tests/fmea/stage4_fmea_summary.tsv'
+
+
+def pick_stage3_fixture() -> Path:
+    stage3_tests = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests')
+    preferred = [
+        stage3_tests / 'mini_control' / 'full_stage3' / 'samples_mini_control_banked_stage3.yaml',
+    ]
+    for candidate in preferred:
+        if candidate.exists():
+            return candidate
+
+    for root in [stage3_tests / 'mini_control', stage3_tests / 'banked_stage3', stage3_tests / 'fmea' / 'runs']:
+        matches = sorted(root.rglob('samples_*_banked_stage3.yaml'))
+        if matches:
+            return matches[0]
+
+    raise FileNotFoundError('No Stage 3 banked manifest fixture found for Stage 4 FMEA')
 
 
 @dataclass
@@ -100,7 +116,8 @@ def tsv_row(name: str, result: ScenarioResult) -> str:
 
 
 def main() -> None:
-    base = load_manifest(STAGE3_FIXTURE)
+    stage3_fixture = pick_stage3_fixture()
+    base = load_manifest(stage3_fixture)
     SUMMARY.parent.mkdir(parents=True, exist_ok=True)
 
     results: List[ScenarioResult] = []
@@ -109,7 +126,7 @@ def main() -> None:
     results.append(run_case('invalid_stage3_token', invalid_token, REFS, expect_ok=False))
 
     missing_models_refs = make_temp_refs(missing_models=True)
-    results.append(run_case('missing_poppca_models', STAGE3_FIXTURE, missing_models_refs, expect_ok=False))
+    results.append(run_case('missing_poppca_models', stage3_fixture, missing_models_refs, expect_ok=False))
 
     missing_tbi = make_temp_manifest(base, {'sample.normalized_vcf_tbi': '/tmp/missing_stage4_input.vcf.tbi'})
     results.append(run_case('unphased_vcf_fallback_fails_closed', missing_tbi, REFS, expect_ok=False))
@@ -117,7 +134,14 @@ def main() -> None:
     lines = ['scenario\tstatus\texit_code\tdetails']
     for result in results:
         lines.append(tsv_row(result.name, result))
-    write_text(SUMMARY, '\n'.join(lines) + '\n')
+    write_text(
+        SUMMARY,
+        '# FMEA Regulatory Audit Summary\n'
+        '# stage: 4\n'
+        f'# cases_exercised: {len(results)}\n'
+        + '\n'.join(lines)
+        + '\n',
+    )
     print(SUMMARY.read_text(encoding='utf-8'))
 
 

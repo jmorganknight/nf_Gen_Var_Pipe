@@ -3,6 +3,8 @@ process STAGE3_COPY_NUMBER_CNV {
     container 'genvar-core:2.1.0'
     cpus { (params.stage3_cnv_cpus ?: params.stage3_cpus ?: params.stage3_variant_heavy_default_cpus ?: 8) as int }
 
+    publishDir "${params.outdir}/${sample_id}/stage3_copy_number_cnv", mode: 'copy', pattern: "*.vcf*|*.json", enabled: true
+
     input:
     tuple val(sample_id), path(stage2_manifest), path(sorted_bam), path(sorted_bai), val(is_wgs), val(target_bed), path(fasta), path(fasta_fai), val(sample_qc_meta), val(stage3_refs), val(sample_meta)
 
@@ -10,18 +12,19 @@ process STAGE3_COPY_NUMBER_CNV {
     tuple val(sample_id), path('copy_number_cnv.calibrated.vcf'), path('stage3.copy_number_cnv.audit.json'), val(stage3_refs), val(sample_meta), emit: calibrated_vcf
     path 'stage3.copy_number_cnv.audit.json', emit: audit
 
-    publishDir "${params.outdir}/${sample_id}/stage3_copy_number_cnv", mode: 'copy', pattern: "*.vcf*|*.json", enabled: true
-
     script:
     def threads = (task.cpus ?: 1) as int
-    def sampleMetaJson = groovy.json.JsonOutput.toJson(sample_meta).replace('\\', '\\\\').replace("'", "\\'")
+    def stage3RefsMap = (stage3_refs instanceof Map) ? (stage3_refs as Map) : [:]
+    def sampleMetaMap = (sample_meta instanceof Map) ? (sample_meta as Map) : [:]
+    def sampleMetaJson = groovy.json.JsonOutput.toJson(sampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
+    def cnvkitRef = (stage3RefsMap.cnvkit_pooled_reference ?: stage3RefsMap.cnvkit_reference ?: stage3RefsMap.cnvkit_pooled_ref ?: '')?.toString()
     """
     set -euo pipefail
 
     THREADS=${threads}
     TARGET_BED="${target_bed ?: ''}"
     IS_WGS="${is_wgs}"
-    CNVKIT_REF="${stage3_refs.cnvkit_pooled_reference ?: ''}"
+    CNVKIT_REF="${cnvkitRef}"
 
     for tool in python3 cnvkit.py samtools; do
         if ! command -v "\${tool}" >/dev/null 2>&1; then
@@ -168,7 +171,7 @@ audit = {
     'fasta': str(Path('${fasta}').resolve()),
     'target_bed': '${target_bed ?: ''}' or None,
     'is_wgs': str('${is_wgs}').strip().lower() in {'1', 'true', 'yes', 'y', 'on', 'wgs'},
-    'cnvkit_reference': '${stage3_refs.cnvkit_pooled_reference ?: ''}' or None,
+    'cnvkit_reference': '${cnvkitRef ?: ''}' or None,
     'cnvkit_calls_cns': str(calls_path.resolve()),
     'validation_depth_tsv': str(validation_depth.resolve()),
     'validation_depth_quantiles': depth_q,

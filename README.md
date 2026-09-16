@@ -15,6 +15,17 @@ This repository now uses a centralized control plane under control_plane/ for im
 - control_plane/thresholds.yaml defines clinical thresholds and stage-specific operating limits.
 - control_plane/infrastructure.yaml defines resource policy and execution profiles.
 
+## Container Build Root
+
+Runtime container recipes are rooted under containers/ and are split by governed stage role.
+
+- containers/Dockerfile.core builds genvar-core:2.1.0 for Stages 0 through 4.
+- containers/Dockerfile.annotate builds genvar-annotation:2.1.0 for Stage 5.
+- containers/Dockerfile.reporting builds genvar-reporting:2.1.0 for Stage 6.
+- containers/build_containers.sh builds Docker images and optional SIF artifacts directly into containers/.
+
+Production builds do not embed placeholder binaries. The build script pins an official elPrep release source for genvar-core and resolves the PharmCAT JAR for genvar-annotation from control_plane/references.yaml.
+
 The execution model is hub-and-spoke:
 
 - The root pipeline orchestrates multi-stage clinical flow.
@@ -311,7 +322,7 @@ Useful options:
 
 ```bash
 scripts/run_stage3_infrastructure_profile_matrix.sh \
-	--input Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control/samples_hg002_banked_stage2_snv_only.yaml \
+	--input Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control/samples_<sample_id>_banked_stage2_snv_only.yaml \
 	--profiles "small medium large"
 ```
 

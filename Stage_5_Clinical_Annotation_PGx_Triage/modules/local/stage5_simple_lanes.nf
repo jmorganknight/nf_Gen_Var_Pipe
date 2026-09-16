@@ -1,6 +1,6 @@
 process STAGE5_PGX_BRANCH {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/pgx", mode: 'copy', overwrite: true, pattern: '*.pgx.*'
@@ -29,7 +29,7 @@ process STAGE5_PGX_BRANCH {
 
 process STAGE5_SF_BRANCH {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/secondary_findings", mode: 'copy', overwrite: true, pattern: '*.sf.*'
@@ -58,7 +58,7 @@ process STAGE5_SF_BRANCH {
 
 process STAGE5_PRS_BRANCH {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/prs", mode: 'copy', overwrite: true, pattern: '*.prs.*'
@@ -87,7 +87,7 @@ process STAGE5_PRS_BRANCH {
 
 process STAGE5_SOMATIC_BRANCH {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-annotation:2.1.0'
     stageInMode 'symlink'
     tag "${sample_id}"
     publishDir "${params.outdir}/somatic", mode: 'copy', overwrite: true, pattern: '*.somatic.*'

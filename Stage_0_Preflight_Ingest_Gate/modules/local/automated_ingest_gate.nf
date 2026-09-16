@@ -35,7 +35,7 @@
 process AUTOMATED_INGEST_GATE {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
     stageInMode 'symlink'
 
     tag "${meta.sample_id}"
@@ -177,7 +177,7 @@ qc_thresh = clinical.get('qc_thresholds', {})
 
 report = {
     "node": "AUTOMATED_INGEST_GATE",
-    "pipeline": "WES_Onco_Panel_v18.4",
+    "pipeline": "GEN_VAR_PIPELINE_v1",
     "timestamp_utc": datetime.now(timezone.utc).isoformat(),
     "sample_id_hash": hashlib.sha256(sample_id.encode()).hexdigest(),
     "sample_type": sample_type,
@@ -446,7 +446,7 @@ PYEOF
     : > "${meta.sample_id}_R1.validated.fastq.gz"
     : > "${meta.sample_id}_R2.validated.fastq.gz"
     printf 'VALID_PASS|INTAKE_VALIDATED_STUB\n' > intake_validation_token
-    printf '{"pipeline":"WES_Onco_Panel_v18.4","status":"VALID_PASS","stub":true}' \
+    printf '{"pipeline":"GEN_VAR_PIPELINE_v1","status":"VALID_PASS","stub":true}' \
         > "${meta.sample_id}.intake_validation_report.json"
     """
 }

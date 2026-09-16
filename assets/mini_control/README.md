@@ -8,8 +8,8 @@ It now pairs with the unified samples_mini_control.yaml manifest, which uses the
 
 - `samples_mini_control.yaml`: Unified canonical mini-control manifest for Stage 0-6 debugging.
 - `build_mini_control.sh`: Generates the mini-control FASTQ pair from a BAM/CRAM source.
-- `hg002_mini_R1.fastq.gz`: Mini-control R1 FASTQ fixture.
-- `hg002_mini_R2.fastq.gz`: Mini-control R2 FASTQ fixture.
+- `mini_control_R1.fastq.gz`: Mini-control R1 FASTQ fixture.
+- `mini_control_R2.fastq.gz`: Mini-control R2 FASTQ fixture.
 
 ## Source Provenance
 
@@ -72,4 +72,4 @@ HG002_CRAM_REFERENCE=/path/to/GRCh38.fa \
 - The script slices six governed loci using `samtools view`.
 - Slices are merged, collated (`samtools collate -u -O`), and converted to paired FASTQ.
 - Temporary slice artifacts are cleaned automatically.
-- If `samtools` is not on host PATH, the script falls back to Docker (`wes-onco-core:1.0.0`).
+- If `samtools` is not on host PATH, the script falls back to Docker (`genvar-core:2.1.0`).

@@ -16,15 +16,42 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 MAIN_NF = ROOT / "main.nf"
 PIPELINE_ROOT = ROOT.parent
-BASE_STAGE2 = PIPELINE_ROOT / "Stage_2_PostAlign_Sample_Validation_Gate" / "tests" / "banked_stage2" / "samples_hg002_banked_stage2.yaml"
 SAFE_BAM = Path(__file__).resolve().parent / "stage3_safe.bam"
 SAFE_BAI = Path(__file__).resolve().parent / "stage3_safe.bam.bai"
 REF_ROOT = Path(os.environ.get("NXF_REF_DATA_ROOT", str((PIPELINE_ROOT / "assets" / "references").resolve())))
-BAM_CANDIDATES = [
-    PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing" / "tests" / "banked_stage1" / "HG002_FULL_CONTROL_WES" / "audit_and_qc" / "identity" / "HG002_FULL_CONTROL_WES.identity_verified.bam",
-    PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing" / "tests" / "banked_stage1" / "HG002_FULL_CONTROL_WES" / "aligned" / "HG002_FULL_CONTROL_WES.markdup.bam",
-    SAFE_BAM,
-]
+
+
+def pick_stage2_manifest() -> Path:
+    stage2_root = PIPELINE_ROOT / "Stage_2_PostAlign_Sample_Validation_Gate" / "tests"
+    preferred = [
+        stage2_root / "mini_control" / "samples_mini_control_banked_stage2.yaml",
+    ]
+    for candidate in preferred:
+        if candidate.exists():
+            return candidate
+
+    for root in [stage2_root / "mini_control", stage2_root / "banked_stage2", stage2_root / "fmea" / "runs"]:
+        matches = sorted(root.rglob("samples_*_banked_stage2.yaml"))
+        if matches:
+            return matches[0]
+
+    raise FileNotFoundError("No Stage 2 banked manifest fixture found for Stage 3 FMEA")
+
+
+def pick_stage1_bam_pair() -> tuple[Path, Path]:
+    search_roots = [
+        PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing" / "tests" / "mini_control",
+        PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing" / "tests" / "banked_stage1",
+        PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing" / "tests" / "fmea" / "runs",
+    ]
+    for root in search_roots:
+        for bam in sorted(root.rglob("*.identity_verified.bam")) + sorted(root.rglob("*.markdup.bam")):
+            bai = Path(str(bam) + ".bai")
+            if bam.exists() and bai.exists():
+                return bam, bai
+    if SAFE_BAM.exists() and SAFE_BAI.exists():
+        return SAFE_BAM, SAFE_BAI
+    raise FileNotFoundError("No Stage 1 BAM/BAI pair found for Stage 3 FMEA")
 
 
 def run_nf(input_yaml: Path, outdir: Path, work_dir: Path) -> tuple[int, float, str]:
@@ -57,27 +84,16 @@ def write_text(path: Path, text: str) -> None:
 
 
 def resolve_bam_pair() -> tuple[Path, Path] | tuple[None, None]:
-    for bam in BAM_CANDIDATES:
-        bai = Path(str(bam) + ".bai")
-        if bam.exists() and bai.exists():
-            return bam, bai
-    return None, None
+    try:
+        return pick_stage1_bam_pair()
+    except FileNotFoundError:
+        return None, None
 
 
 def stage_file(src: Path, dst: Path) -> None:
-    """Stage test fixtures quickly: hardlink/symlink first, copy as fallback."""
-    if dst.exists() or dst.is_symlink():
+    """Stage test fixtures by copying them into the scenario directory."""
+    if dst.exists():
         dst.unlink()
-    try:
-        os.link(src, dst)
-        return
-    except OSError:
-        pass
-    try:
-        dst.symlink_to(src)
-        return
-    except OSError:
-        pass
     shutil.copy2(src, dst)
 
 
@@ -135,12 +151,10 @@ def scenario_manifest(base_text: str, scenario_dir: Path, *, validation_token: s
     bai = input_dir / "sorted.bam.bai"
     if bam_exists:
         src_bam, src_bai = resolve_bam_pair()
-        if src_bam is not None and src_bai is not None:
-            stage_file(src_bam, bam)
-            stage_file(src_bai, bai)
-        else:
-            bam.write_text("BAM_PLACEHOLDER\n", encoding="utf-8")
-            bai.write_text("BAI_PLACEHOLDER\n", encoding="utf-8")
+        if src_bam is None or src_bai is None:
+            raise FileNotFoundError("No real Stage 1 BAM/BAI pair found for Stage 3 FMEA")
+        stage_file(src_bam, bam)
+        stage_file(src_bai, bai)
     input_yaml = scenario_dir / "input.yaml"
     write_text(
         input_yaml,
@@ -157,10 +171,8 @@ def scenario_manifest(base_text: str, scenario_dir: Path, *, validation_token: s
 
 
 def main() -> int:
-    if not BASE_STAGE2.exists():
-        raise FileNotFoundError(f"missing Stage 2 fixture: {BASE_STAGE2}")
-
-    base_text = BASE_STAGE2.read_text(encoding="utf-8")
+    base_stage2 = pick_stage2_manifest()
+    base_text = base_stage2.read_text(encoding="utf-8")
     fmea_root = Path(__file__).resolve().parent
     runs = fmea_root / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -219,14 +231,14 @@ def main() -> int:
         work_dir = scenario_dir / "work"
 
         code, elapsed, output = run_nf(input_yaml, outdir, work_dir)
-        banked = outdir / "samples_hg002_banked_stage3.yaml"
+        banked_candidates = sorted(outdir.glob("samples_*_banked_stage3.yaml"))
 
         checks: list[tuple[bool, str]] = []
         if sc["expect_code"] == "zero":
             checks.append((code == 0, f"expected exit_code=0 observed={code}"))
-            checks.append((banked.exists(), f"missing banked manifest: {banked}"))
-            if banked.exists():
-                banked_text = banked.read_text(encoding="utf-8")
+            checks.append((len(banked_candidates) == 1, f"expected one Stage 3 banked manifest in {outdir}; observed={len(banked_candidates)}"))
+            if banked_candidates:
+                banked_text = banked_candidates[0].read_text(encoding="utf-8")
                 checks.append(("\"active_branches\": []" in banked_text or "active_branches: []" in banked_text, "banked manifest did not record an empty branch set"))
         else:
             checks.append((code != 0, f"expected non-zero exit_code observed={code}"))
@@ -241,7 +253,13 @@ def main() -> int:
         lines.append(f"{sc['name']}\t{'PASS' if ok else 'FAIL'}\t{elapsed:.2f}\t{code}\t{'OK' if ok else ' | '.join(errors)}\n")
 
     summary = fmea_root / "STAGE3_FMEA_SUMMARY.tsv"
-    summary.write_text("".join(lines), encoding="utf-8")
+    summary.write_text(
+        "# FMEA Regulatory Audit Summary\n"
+        "# stage: 3\n"
+        f"# cases_exercised: {len(scenarios)}\n"
+        "".join(lines),
+        encoding="utf-8",
+    )
 
     print(f"[Stage3 FMEA] wrote summary: {summary}")
     for line in lines[1:]:

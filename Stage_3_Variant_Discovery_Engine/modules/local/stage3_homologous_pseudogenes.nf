@@ -11,10 +11,12 @@ process STAGE3_HOMOLOGOUS_PSEUDOGENES {
     path 'stage3.homologous_pseudogenes.audit.json', emit: audit
 
     script:
+    def stage3RefsMap = (stage3_refs instanceof Map) ? (stage3_refs as Map) : [:]
+    def pseudogeneMask = (stage3RefsMap.pseudogene_mask ?: stage3RefsMap.cyp2d6_paralog_mask_bed ?: '')?.toString()
     """
     set -euo pipefail
 
-    MASK_BED="${stage3_refs.pseudogene_mask ?: ''}"
+    MASK_BED="${pseudogeneMask}"
 
     if [[ -z "\${MASK_BED}" || ! -f "\${MASK_BED}" ]]; then
         echo "STAGE3_PRECONDITION_FAILURE: pseudogene mask asset missing for homologous_pseudogenes branch" >&2
@@ -79,7 +81,7 @@ audit = {
     'sorted_bam': str(Path('${sorted_bam}').resolve()),
     'sorted_bai': str(Path('${sorted_bai}').resolve()),
     'fasta': str(Path('${fasta}').resolve()),
-    'pseudogene_mask': str(Path('${stage3_refs.pseudogene_mask ?: ''}').resolve()) if '${stage3_refs.pseudogene_mask ?: ''}' else None,
+    'pseudogene_mask': str(Path('${pseudogeneMask}').resolve()) if '${pseudogeneMask}' else None,
     'records_emitted': kept,
     'status': 'PASS',
 }

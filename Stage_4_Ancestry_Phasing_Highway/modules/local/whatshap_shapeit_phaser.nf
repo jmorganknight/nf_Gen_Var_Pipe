@@ -1,7 +1,7 @@
 process WHATSHAP_SHAPEIT_PHASER {
 
     label 'process_high'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
     stageInMode 'symlink'
 
     tag "${meta.sample_id}"

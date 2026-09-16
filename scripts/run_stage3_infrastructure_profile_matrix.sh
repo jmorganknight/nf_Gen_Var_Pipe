@@ -12,7 +12,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STAGE3_MAIN="${ROOT_DIR}/Stage_3_Variant_Discovery_Engine/main.nf"
 
 PROFILE="docker"
-INPUT_MANIFEST="${ROOT_DIR}/Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control/samples_hg002_banked_stage2.yaml"
+INPUT_MANIFEST="${ROOT_DIR}/Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control/samples_<sample_id>_banked_stage2.yaml"
 OUT_BASE="${ROOT_DIR}/Stage_3_Variant_Discovery_Engine/tests/infrastructure_profile_matrix"
 PROFILES=(small medium large)
 
@@ -33,7 +33,7 @@ Options:
 Examples:
   scripts/run_stage3_infrastructure_profile_matrix.sh
   scripts/run_stage3_infrastructure_profile_matrix.sh \
-    --input Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control/samples_hg002_banked_stage2_snv_only.yaml \
+    --input Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control/samples_<sample_id>_banked_stage2_snv_only.yaml \
     --profiles "small medium large"
 EOF
 }

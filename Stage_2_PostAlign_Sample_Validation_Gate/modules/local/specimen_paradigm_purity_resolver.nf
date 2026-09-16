@@ -1,7 +1,7 @@
 process SPECIMEN_PARADIGM_PURITY_RESOLVER {
 
     label 'process_medium'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
 
     publishDir "${params.outdir}/audit_and_qc/stage2", mode: 'copy', overwrite: true, pattern: '*.purity_and_sex_validation_audit.json'
 

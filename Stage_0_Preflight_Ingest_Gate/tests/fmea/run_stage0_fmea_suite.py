@@ -333,6 +333,9 @@ def main() -> int:
 
     summary_path = Path(__file__).resolve().parent / "STAGE0_FMEA_SUMMARY.tsv"
     with summary_path.open("w", encoding="utf-8") as handle:
+        handle.write("# FMEA Regulatory Audit Summary\n")
+        handle.write("# stage: 0\n")
+        handle.write(f"# cases_exercised: {len(results)}\n")
         handle.write("scenario\tstatus\telapsed_seconds\texit_code\tdetails\n")
         for row in results:
             handle.write(

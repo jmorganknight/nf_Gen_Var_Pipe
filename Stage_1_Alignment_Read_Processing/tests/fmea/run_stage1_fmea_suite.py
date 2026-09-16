@@ -11,6 +11,28 @@ from pathlib import Path
 import textwrap
 
 
+def pick_stage0_manifest() -> Path:
+    roots = [
+        Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/mini_control"),
+        Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/tests/mini_control"),
+    ]
+    preferred = [
+        root / "samples_mini_control_banked_stage0.yaml"
+        for root in roots
+    ]
+    for candidate in preferred:
+        if candidate.exists():
+            return candidate
+
+    for root in roots:
+        matches = sorted(root.glob("samples_*_banked_stage0.yaml"))
+        if matches:
+            return matches[0]
+
+    searched = ", ".join(str(root) for root in roots)
+    raise FileNotFoundError(f"No Stage 0 banked manifest found under: {searched}")
+
+
 def run_nf(stage1_root: Path, input_yaml: Path, references_yaml: Path, thresholds_yaml: Path, outdir: Path, stub: bool = False) -> tuple[int, float, str]:
     cmd = [
         "nextflow",
@@ -67,11 +89,7 @@ def main() -> int:
 
     references = Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/control_plane/references.yaml")
     thresholds = Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/control_plane/thresholds.yaml")
-    stage0_nominal_candidates = [
-        Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/inputs/hg002_mini/samples_hg002_banked_stage0.yaml"),
-        Path("/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_0_Preflight_Ingest_Gate/tests/banked_stage0/samples_hg002_banked_stage0.yaml"),
-    ]
-    stage0_nominal = next((path for path in stage0_nominal_candidates if path.exists()), stage0_nominal_candidates[0])
+    stage0_nominal = pick_stage0_manifest()
 
     scenarios = [
         {
@@ -165,12 +183,12 @@ def main() -> int:
 
         rejection_candidates = [rejection_json, runs / sc["name"] / "stage1_rejection_audit.json", runs / sc["name"] / "out" / "stage1_rejection_audit.json"]
         rejection = next((p for p in rejection_candidates if p.exists()), None)
-        banked = outdir / "samples_hg002_banked_stage1.yaml"
+        banked_candidates = sorted(outdir.glob("samples_*_banked_stage1.yaml"))
 
         checks = []
         if sc["expect_code"] == "zero":
             checks.append((code == 0, f"expected exit_code=0 observed={code}"))
-            checks.append((banked.exists(), f"missing banked manifest: {banked}"))
+            checks.append((len(banked_candidates) == 1, f"expected one Stage 1 banked manifest in {outdir}; observed={len(banked_candidates)}"))
         else:
             checks.append((code != 0, f"expected non-zero exit_code observed={code}"))
 
@@ -200,7 +218,13 @@ def main() -> int:
         lines.append(row(sc["name"], ok, elapsed, code, details))
 
     summary = fmea_root / "STAGE1_FMEA_SUMMARY.tsv"
-    summary.write_text("".join(lines), encoding="utf-8")
+    summary.write_text(
+        "# FMEA Regulatory Audit Summary\n"
+        "# stage: 1\n"
+        f"# cases_exercised: {len(scenarios)}\n"
+        "".join(lines),
+        encoding="utf-8",
+    )
 
     print(f"[Stage1 FMEA] wrote summary: {summary}")
     for line in lines[1:]:

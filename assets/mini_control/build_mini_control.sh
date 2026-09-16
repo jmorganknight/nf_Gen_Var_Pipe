@@ -6,13 +6,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-OUT_R1="${SCRIPT_DIR}/hg002_mini_R1.fastq.gz"
-OUT_R2="${SCRIPT_DIR}/hg002_mini_R2.fastq.gz"
+OUT_R1="${SCRIPT_DIR}/mini_control_R1.fastq.gz"
+OUT_R2="${SCRIPT_DIR}/mini_control_R2.fastq.gz"
 TMP_DIR="$(mktemp -d "${SCRIPT_DIR}/.tmp_mini_control.XXXXXX")"
 
 DEFAULT_SOURCE_URL="https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/AshkenazimTrio/HG002_NA24385_son/NIST_Illumina_2x150bps/bwa-mem-0.7.8-illumina-ref_GRCh38-20161213/HG002.GRCh38.2x150.bam"
 SOURCE_INPUT="${1:-${HG002_SOURCE_BAM:-${DEFAULT_SOURCE_URL}}}"
-SAMTOOLS_DOCKER_IMAGE="${SAMTOOLS_DOCKER_IMAGE:-wes-onco-core:1.0.0}"
+SAMTOOLS_DOCKER_IMAGE="${SAMTOOLS_DOCKER_IMAGE:-genvar-core:2.1.0}"
 CRAM_REFERENCE="${HG002_CRAM_REFERENCE:-}"
 
 REGIONS=(
@@ -95,11 +95,11 @@ for idx in "${!REGIONS[@]}"; do
   slice_files+=("${slice_bam}")
 done
 
-merged_bam="${TMP_DIR}/hg002_mini_merged.bam"
+merged_bam="${TMP_DIR}/mini_control_merged.bam"
 log "Merging ${#slice_files[@]} slices"
 run_samtools merge -f "${merged_bam}" "${slice_files[@]}"
 
-collated_bam="${TMP_DIR}/hg002_mini_collated.bam"
+collated_bam="${TMP_DIR}/mini_control_collated.bam"
 log "Collating read pairs"
 run_samtools collate -u -o "${collated_bam}" "${merged_bam}"
 

@@ -1,15 +1,15 @@
 process ASSEMBLE_STAGE0_BANKED_MANIFEST {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
 
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true, saveAs: { _name -> params.banked_samplesheet_name.toString() }
+    publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'samples_*_banked_stage0.yaml'
 
     input:
     path fragment_jsons
 
     output:
-    path 'banked_stage0.yaml', emit: banked_samplesheet
+    path 'samples_*_banked_stage0.yaml', emit: banked_samplesheet
 
     script:
     """
@@ -187,7 +187,14 @@ for record in records:
     append_kv(lines, 4, 'intake_route_decision', record.get('intake_route_decision'), 'JSON record showing deterministic Stage 0 routing after token evaluation.')
     append_kv(lines, 4, 'save_dir', record.get('save_dir'), 'Root banking directory in which Stage 0 published all sample-scoped outputs.')
 
-Path('banked_stage0.yaml').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+newline = '\\n'
+payload = newline.join(lines) + newline
+sample_ids = sorted({str(rec.get('sample_id', 'UNKNOWN')) for rec in records})
+canonical_id = sample_ids[0] if len(sample_ids) == 1 else 'multi_sample'
+safe_id = ''.join(ch if (ch.isalnum() or ch in ('_', '-')) else '_' for ch in canonical_id) or 'UNKNOWN'
+canonical_name = f'samples_{safe_id}_banked_stage0.yaml'
+
+Path(canonical_name).write_text(payload, encoding='utf-8')
 PYEOF
     """
 }

@@ -16,21 +16,43 @@ ROOT = Path(__file__).resolve().parents[2]
 PIPELINE_ROOT = ROOT.parent
 MAIN_NF = ROOT / "main.nf"
 STAGE1_ROOT = PIPELINE_ROOT / "Stage_1_Alignment_Read_Processing"
-BASE_MANIFEST_CANDIDATES = [
-    STAGE1_ROOT / "tests" / "banked_stage1" / "samples_hg002_banked_stage1.yaml",
-    STAGE1_ROOT / "tests" / "fmea" / "runs" / "nominal_hg002" / "out" / "samples_hg002_banked_stage1.yaml",
-]
 REFERENCES = PIPELINE_ROOT / "conf" / "references.yaml"
 THRESHOLDS = PIPELINE_ROOT / "conf" / "thresholds.yaml"
-SEX_CASE_BAM = STAGE1_ROOT / "tests" / "banked_stage1" / "HG002_ILLUMINA" / "audit_and_qc" / "identity" / "HG002_ILLUMINA.identity_verified.bam"
-SEX_CASE_BAI = STAGE1_ROOT / "tests" / "banked_stage1" / "HG002_ILLUMINA" / "audit_and_qc" / "identity" / "HG002_ILLUMINA.identity_verified.bam.bai"
 SEX_CASE_INTAKE_TOKEN = STAGE1_ROOT / "tests" / "fmea" / "inputs" / "valid_stage0_token.txt"
 
 
+def pick_stage1_identity_assets() -> tuple[Path, Path]:
+    search_roots = [
+        STAGE1_ROOT / "tests" / "mini_control",
+        STAGE1_ROOT / "tests" / "banked_stage1",
+        STAGE1_ROOT / "tests" / "fmea" / "runs",
+    ]
+    for root in search_roots:
+        for bam in sorted(root.rglob("*.identity_verified.bam")):
+            bai = Path(str(bam) + ".bai")
+            if bai.exists():
+                return bam, bai
+    raise FileNotFoundError("No Stage 1 identity-verified BAM/BAI pair found for Stage 2 FMEA")
+
+
 def pick_manifest() -> Path:
-    for candidate in BASE_MANIFEST_CANDIDATES:
+    preferred = [
+        STAGE1_ROOT / "tests" / "mini_control" / "samples_mini_control_banked_stage1.yaml",
+    ]
+    for candidate in preferred:
         if candidate.exists():
             return candidate
+
+    search_roots = [
+        STAGE1_ROOT / "tests" / "mini_control",
+        STAGE1_ROOT / "tests" / "banked_stage1",
+        STAGE1_ROOT / "tests" / "fmea" / "runs",
+    ]
+    for root in search_roots:
+        matches = sorted(root.rglob("samples_*_banked_stage1.yaml"))
+        if matches:
+            return matches[0]
+
     raise FileNotFoundError("No Stage 1 banked manifest fixture found for Stage 2 FMEA")
 
 
@@ -143,20 +165,20 @@ def materialize_stage1_fixture_paths(manifest_text: str) -> str:
     )
 
 
-def force_existing_bam_paths(manifest_text: str) -> str:
+def force_existing_bam_paths(manifest_text: str, bam_path: Path, bai_path: Path, token_path: Path) -> str:
     lines = manifest_text.splitlines()
     out: list[str] = []
     for line in lines:
         stripped = line.lstrip()
         indent = line[: len(line) - len(stripped)]
         if stripped.startswith('mapped_bam:'):
-            out.append(f'{indent}mapped_bam: "{SEX_CASE_BAM}"')
+            out.append(f'{indent}mapped_bam: "{bam_path}"')
             continue
         if stripped.startswith('mapped_bai:'):
-            out.append(f'{indent}mapped_bai: "{SEX_CASE_BAI}"')
+            out.append(f'{indent}mapped_bai: "{bai_path}"')
             continue
         if stripped.startswith('intake_validation_token:'):
-            out.append(f'{indent}intake_validation_token: "{SEX_CASE_INTAKE_TOKEN}"')
+            out.append(f'{indent}intake_validation_token: "{token_path}"')
             continue
         out.append(line)
     return "\n".join(out) + "\n"
@@ -182,6 +204,7 @@ def check_purity_discrepancy(sample_type: str, physician_purity: float, estimate
 def main() -> int:
     manifest = pick_manifest()
     base_text = manifest.read_text(encoding="utf-8")
+    sex_case_bam, sex_case_bai = pick_stage1_identity_assets()
 
     lines = ["scenario\tstatus\telapsed_seconds\texit_code\tdetails\n"]
     failed = False
@@ -191,12 +214,17 @@ def main() -> int:
 
         # Existing fail-closed cases
         c1_manifest = tdirp / "case1_missing_bam_banked_stage1.yaml"
-        c1_text = base_text.replace(
-            'mapped_bam: "/scratch/nextflow_work/e9/c29e5d17f8e2304673c579e3972895/HG002_FULL_CONTROL_WES.markdup.bam"',
-            'mapped_bam: "/tmp/does_not_exist.stage2.bam"',
-        ).replace(
-            'mapped_bai: "/scratch/nextflow_work/e9/c29e5d17f8e2304673c579e3972895/HG002_FULL_CONTROL_WES.markdup.bam.bai"',
-            'mapped_bai: "/tmp/does_not_exist.stage2.bam.bai"',
+        c1_text = re.sub(
+            r'^\s*mapped_bam:\s*".*"\s*$',
+            '    mapped_bam: "/tmp/does_not_exist.stage2.bam"',
+            base_text,
+            flags=re.MULTILINE,
+        )
+        c1_text = re.sub(
+            r'^\s*mapped_bai:\s*".*"\s*$',
+            '    mapped_bai: "/tmp/does_not_exist.stage2.bam.bai"',
+            c1_text,
+            flags=re.MULTILINE,
         )
         write_text(c1_manifest, c1_text)
         ok, code, elapsed, details = run_case(
@@ -214,7 +242,12 @@ def main() -> int:
         # Requested: sex_mismatch_xx_to_xy
         c2_manifest = tdirp / "sex_mismatch_xx_to_xy_banked_stage1.yaml"
         c2_thresholds = tdirp / "thresholds_case2.json"
-        c2_text = force_existing_bam_paths(force_reported_sex_xx(materialize_stage1_fixture_paths(base_text)))
+        c2_text = force_existing_bam_paths(
+            force_reported_sex_xx(materialize_stage1_fixture_paths(base_text)),
+            sex_case_bam,
+            sex_case_bai,
+            SEX_CASE_INTAKE_TOKEN,
+        )
         write_text(c2_manifest, c2_text)
 
         t2 = {
@@ -335,7 +368,13 @@ def main() -> int:
         failed = True
 
     summary = Path(__file__).resolve().parent / "STAGE2_FMEA_SUMMARY.tsv"
-    summary.write_text("".join(lines), encoding="utf-8")
+    summary.write_text(
+        "# FMEA Regulatory Audit Summary\n"
+        "# stage: 2\n"
+        f"# cases_exercised: {len(lines) - 1}\n"
+        "".join(lines),
+        encoding="utf-8",
+    )
 
     print(f"[Stage2 FMEA] wrote summary: {summary}")
     for line in lines[1:]:

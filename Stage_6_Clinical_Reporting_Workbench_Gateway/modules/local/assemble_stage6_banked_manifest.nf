@@ -1,10 +1,10 @@
 process ASSEMBLE_STAGE6_BANKED_MANIFEST {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-reporting:2.1.0'
     stageInMode 'symlink'
 
-    publishDir "${params.outdir}", mode: 'rellink', overwrite: true, pattern: 'samples_hg002_banked_stage6.yaml'
+    publishDir "${params.outdir}", mode: 'rellink', overwrite: true, pattern: 'samples_*_banked_stage6.yaml'
 
     input:
     path manifest_fragments
@@ -12,7 +12,7 @@ process ASSEMBLE_STAGE6_BANKED_MANIFEST {
     path lab_metrics
 
     output:
-    path 'samples_hg002_banked_stage6.yaml', emit: banked_manifest
+    path 'samples_*_banked_stage6.yaml', emit: banked_manifest
 
     script:
     """
@@ -95,7 +95,11 @@ for sid in sorted(by_sample):
     lines.append(f'      signoff_status: "{wb.get("signoff_status", report.get("report_status", "PENDING_DIRECTOR_REVIEW"))}"')
     lines.append('    save_dir: "${params.outdir}"')
 
-Path('samples_hg002_banked_stage6.yaml').write_text('\\n'.join(lines) + '\\n', encoding='utf-8')
+content = '\\n'.join(lines) + '\\n'
+sample_ids = sorted(str(sid) for sid in by_sample.keys())
+canonical_id = sample_ids[0] if len(sample_ids) == 1 else 'multi_sample'
+safe_id = ''.join(ch if (ch.isalnum() or ch in ('_', '-')) else '_' for ch in canonical_id) or 'UNKNOWN'
+Path(f'samples_{safe_id}_banked_stage6.yaml').write_text(content, encoding='utf-8')
 PYEOF
     """
 }

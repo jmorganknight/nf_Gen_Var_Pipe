@@ -1,0 +1,56 @@
+FROM ubuntu:22.04@sha256:281c5745f657873d78e5531fc5ba8575f46ab7769b94550ac99543f122679986
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV MAMBA_ROOT_PREFIX=/opt/micromamba
+ENV PATH=/opt/conda/bin:/usr/local/bin:${PATH}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    wget \
+    curl \
+    git \
+    bzip2 \
+    ca-certificates \
+    python3 \
+    python3-pip \
+    python3-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    liblzma-dev \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest \
+    | tar -xvj -C /usr/local/bin --strip-components=1 bin/micromamba && \
+    micromamba create -y -p /opt/conda -c conda-forge -c bioconda \
+      python=3.11 \
+      bcftools \
+      htslib \
+      tabix && \
+    micromamba clean -a -y && \
+    /opt/conda/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/conda/bin/pip install --no-cache-dir \
+      numpy \
+      pandas \
+      PyYAML \
+      jinja2 \
+      reportlab \
+      cryptography
+
+RUN command -v bcftools && \
+    command -v tabix && \
+    /opt/conda/bin/python - <<'PY'
+import json
+from pathlib import Path
+
+audit = {
+    'image': 'genvar-reporting:2.1.0',
+    'implemented_binaries': ['bcftools', 'tabix'],
+    'implemented_python_packages': ['numpy', 'pandas', 'PyYAML', 'jinja2', 'reportlab', 'cryptography'],
+}
+Path('/opt/container_binary_audit.reporting.json').write_text(json.dumps(audit, indent=2) + '\n', encoding='utf-8')
+print('genvar-reporting:2.1.0 audit emitted')
+PY
+
+WORKDIR /workspace

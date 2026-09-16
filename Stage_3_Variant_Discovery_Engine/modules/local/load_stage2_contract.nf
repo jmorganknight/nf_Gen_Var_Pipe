@@ -1,6 +1,6 @@
 process LOAD_STAGE2_CONTRACT {
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
 
     input:
     path stage2_manifest

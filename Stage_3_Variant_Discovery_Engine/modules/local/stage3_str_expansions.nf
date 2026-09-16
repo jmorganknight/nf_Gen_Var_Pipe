@@ -11,10 +11,12 @@ process STAGE3_STR_EXPANSIONS {
     path 'stage3.str_expansions.audit.json', emit: audit
 
     script:
+    def stage3RefsMap = (stage3_refs instanceof Map) ? (stage3_refs as Map) : [:]
+    def catalogPath = (stage3RefsMap.expansionhunter_catalog ?: stage3RefsMap.expansionhunter_variant_catalog ?: '')?.toString()
     """
     set -euo pipefail
 
-    CATALOG="${stage3_refs.expansionhunter_catalog ?: ''}"
+    CATALOG="${catalogPath}"
     if [[ -z "\${CATALOG}" || ! -f "\${CATALOG}" ]]; then
         echo "STAGE3_PRECONDITION_FAILURE: missing ExpansionHunter catalog for str_expansions branch" >&2
         exit 1
@@ -122,7 +124,7 @@ audit = {
     'sorted_bam': str(Path('${sorted_bam}').resolve()),
     'sorted_bai': str(Path('${sorted_bai}').resolve()),
     'fasta': str(Path('${fasta}').resolve()),
-    'catalog': str(Path('${stage3_refs.expansionhunter_catalog ?: ''}').resolve()) if '${stage3_refs.expansionhunter_catalog ?: ''}' else None,
+    'catalog': str(Path('${catalogPath}').resolve()) if '${catalogPath}' else None,
     'source_payload': source,
     'records_emitted': len(records),
     'status': 'PASS',

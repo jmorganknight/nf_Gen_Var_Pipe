@@ -5,7 +5,7 @@ include { WHATSHAP_SHAPEIT_PHASER } from '../../modules/local/whatshap_shapeit_p
 process STAGE4_PGX_PHASE_FILTER {
 
     label 'process_medium'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
     tag "${meta.sample_id}"
 
     input:

@@ -35,9 +35,9 @@ def resolve_verifybamid2_binary():
         shutil.which('verifybamid2'),
         shutil.which('VerifyBamID2'),
         shutil.which('VerifyBamID'),
-        '/opt/micromamba/envs/wes-onco/bin/verifybamid2',
-        '/opt/micromamba/envs/wes-onco/bin/VerifyBamID2',
-        '/opt/micromamba/envs/wes-onco/bin/VerifyBamID',
+        '/opt/micromamba/envs/gen-var/bin/verifybamid2',
+        '/opt/micromamba/envs/gen-var/bin/VerifyBamID2',
+        '/opt/micromamba/envs/gen-var/bin/VerifyBamID',
     ]
     for candidate in candidates:
         if candidate and Path(candidate).exists():
@@ -87,9 +87,10 @@ def resolve_svd_prefix(refs_payload):
         if is_svd_prefix(prefix):
             return prefix
     scan_roots = [
+        Path('/opt/conda/share'),
         Path('/opt/reference/verifybamid2'),
         Path('/opt/reference'),
-        Path('/opt/micromamba/envs/wes-onco/share'),
+        Path('/opt/micromamba/envs/gen-var/share'),
         Path('/usr/share'),
     ]
     discovered = []

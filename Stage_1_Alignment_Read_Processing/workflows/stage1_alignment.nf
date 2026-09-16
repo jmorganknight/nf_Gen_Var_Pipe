@@ -111,7 +111,8 @@ workflow STAGE1_ALIGNMENT {
     def ch_identity_input = COORDINATE_STANDARDIZED_CRAM_JUNCTION_HUB.out.verified_stream
         .combine(ch_svd_panel)
         .combine(ch_freemix_limit)
-        .map { meta, bam, bai, svdPanel, freemixLimit -> tuple(meta, bam, bai, svdPanel, freemixLimit) }
+        .combine(ch_reference_meta)
+        .map { meta, bam, bai, svdPanel, freemixLimit, referenceMeta -> tuple(meta, bam, bai, svdPanel, freemixLimit, referenceMeta) }
 
     CROSS_SAMPLE_IDENTITY_GATE(ch_identity_input)
     STAGE1_FLAGSTAT(CROSS_SAMPLE_IDENTITY_GATE.out.audited_stream)

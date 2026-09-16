@@ -45,6 +45,7 @@ cpic_allele_table: "pgx/cpic"
 pgx_cpic_dir: "pgx/cpic"
 pgx_pharmvar_dir: "pgx/pharmvar/definitions"
 pharmvar_star_alleles: "pgx/pharmvar"
+pharmcat_jar: "pgx/pharmvar/bin/pharmcat.jar"
 acmg_schema: "clinical/acmg"
 mane_transcripts: "beds/mane_select_v1.3.bed"
 cyp2d6_mask_bed: "beds/paralog_homology_masks.bed"
@@ -52,9 +53,13 @@ paralog_safe_regions: "beds/paralog_homology_masks.bed"
 pgx_gene_panel: "pgx/panel/pgx_gene_panel.yaml"
 gene_rule_set: "pgx/rules/gene_rule_set.yaml"
 
+container_assets:
+  pharmcat_jar: "pgx/pharmvar/bin/pharmcat.jar"
+
 pgx:
   cpic_allele_table: "pgx/cpic"
   pharmvar_star_alleles: "pgx/pharmvar"
+  pharmcat_jar: "pgx/pharmvar/bin/pharmcat.jar"
   cyp2d6_mask_bed: "beds/paralog_homology_masks.bed"
   paralog_safe_regions: "beds/paralog_homology_masks.bed"
   pgx_gene_panel: "pgx/panel/pgx_gene_panel.yaml"
@@ -113,6 +118,7 @@ references:
   pgx:
     cpic_allele_table: "pgx/cpic"
     pharmvar_star_alleles: "pgx/pharmvar"
+    pharmcat_jar: "pgx/pharmvar/bin/pharmcat.jar"
     cyp2d6_mask_bed: "beds/paralog_homology_masks.bed"
     paralog_safe_regions: "beds/paralog_homology_masks.bed"
     pgx_gene_panel: "pgx/panel/pgx_gene_panel.yaml"

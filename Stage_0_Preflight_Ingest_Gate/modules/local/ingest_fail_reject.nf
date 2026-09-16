@@ -6,7 +6,7 @@
 process INGEST_FAIL_REJECT {
 
     label 'process_low'
-    container 'wes-onco-core:1.0.0'
+    container 'genvar-core:2.1.0'
 
     tag "${meta.sample_id}"
 

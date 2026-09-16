@@ -11,11 +11,6 @@ from pathlib import Path
 from typing import List
 
 ROOT = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_6_Clinical_Reporting_Workbench_Gateway')
-BASE_INPUT_CANDIDATES = [
-    Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/mini_control/samples_hg002_banked_stage5.yaml'),
-    Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/banked_stage5/samples_hg002_banked_stage5.yaml'),
-    Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/results/master_orchestrator/samples_hg002_banked_stage5.yaml'),
-]
 REFS = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/conf/references.yaml')
 THRESHOLDS = Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/conf/thresholds.yaml')
 SUMMARY = ROOT / 'tests/fmea/stage6_fmea_summary.tsv'
@@ -41,9 +36,24 @@ def write_text(path: Path, text: str) -> None:
 
 
 def pick_base_input() -> Path:
-    for candidate in BASE_INPUT_CANDIDATES:
+    candidates = [
+        Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/mini_control/samples_mini_control_banked_stage5.yaml'),
+    ]
+    for candidate in candidates:
         if candidate.exists():
             return candidate
+
+    search_roots = [
+        Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/mini_control'),
+        Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fixtures/banked_stage5'),
+        Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fmea/runs'),
+        Path('/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/results/master_orchestrator'),
+    ]
+    for root in search_roots:
+        matches = sorted(root.rglob('samples_*_banked_stage5.yaml'))
+        if matches:
+            return matches[0]
+
     raise FileNotFoundError('No Stage 5 banked manifest found for Stage 6 FMEA')
 
 
@@ -125,7 +135,7 @@ def mutate_candidate_vus_disparity(stage5_copy: Path) -> None:
 def write_input(text: str, name: str, stage5_copy: Path | None = None) -> Path:
     if stage5_copy is None:
         stage5_copy = copy_stage5_fixture(name)
-    path = stage5_copy / 'samples_hg002_banked_stage5.yaml'
+    path = stage5_copy / 'samples_stage5_fmea_input_banked_stage5.yaml'
     write_text(path, text)
     return path
 
@@ -166,7 +176,14 @@ def main() -> None:
     lines = ['scenario\tstatus\texit_code\tdetails']
     for result in results:
         lines.append(tsv_row(result.name, result))
-    write_text(SUMMARY, '\n'.join(lines) + '\n')
+    write_text(
+        SUMMARY,
+        '# FMEA Regulatory Audit Summary\n'
+        '# stage: 6\n'
+        f'# cases_exercised: {len(results)}\n'
+        + '\n'.join(lines)
+        + '\n',
+    )
     print(SUMMARY.read_text(encoding='utf-8'))
 
 

@@ -19,7 +19,7 @@ flowchart TD
     I --> G
     B --> G
     G --> J["ASSEMBLE_STAGE0_BANKED_MANIFEST"]
-    J --> K["samples_hg002_banked_stage0.yaml"]
+    J --> K["samples_<sample_id>_banked_stage0.yaml"]
     H --> L["sample ingest_rejection_audit.json"]
 ```
 
@@ -37,7 +37,7 @@ control_plane/references.yaml + thresholds.yaml + infrastructure.yaml ----^     
                                              |
                                        VALID_PASS ---+---> BANK_STAGE0_SUCCESS -> ASSEMBLE_STAGE0_BANKED_MANIFEST
                                              |                                  |
-                                     INVALID_REJECT -+-> INGEST_FAIL_REJECT            +-> samples_hg002_banked_stage0.yaml
+                                     INVALID_REJECT -+-> INGEST_FAIL_REJECT            +-> samples_<sample_id>_banked_stage0.yaml
 ```
 
 ## Module Inventory
@@ -49,7 +49,7 @@ control_plane/references.yaml + thresholds.yaml + infrastructure.yaml ----^     
 | `EVALUATE_INTAKE_STATUS` | intake payload tuple | route decision JSON + payload passthrough | No direct halt; route decision is deterministic from token prefix. |
 | `INGEST_FAIL_REJECT` | invalid intake payload, signer keypair | `*.ingest_rejection_audit.json` | Emits signed RS256 rejection audit; falls back to SHA256 signature payload only if key usage fails. |
 | `BANK_STAGE0_SUCCESS` | valid intake payload + route decision audit + preflight lock artifacts + infrastructure YAML | banked validated FASTQs, intake token artifact, stage0 audit bundle, manifest fragment | Fails if banking/copy/tar operations fail. |
-| `ASSEMBLE_STAGE0_BANKED_MANIFEST` | all manifest fragments | `tests/mini_control/samples_hg002_banked_stage0.yaml` | Fails on malformed fragments or write errors. |
+| `ASSEMBLE_STAGE0_BANKED_MANIFEST` | all manifest fragments | `tests/mini_control/samples_<sample_id>_banked_stage0.yaml` | Fails on malformed fragments or write errors. |
 
 ## Wet Lab Fast-Fail Protocol
 
@@ -72,10 +72,10 @@ Stage 0 publishes to `tests/mini_control/` with the following contract:
 - `<sample_id>/audit_and_qc/<sample_id>.intake_validation_report.json`
 - `<sample_id>/audit_and_qc/<sample_id>.intake_route_decision.json`
 - `<sample_id>/audit_and_qc/<sample_id>.ingest_rejection_audit.json` (invalid/reject scenarios)
-- `tests/mini_control/samples_hg002_banked_stage0.yaml`
+- `tests/mini_control/samples_<sample_id>_banked_stage0.yaml`
 
 `reference_snapshot.tokens` includes:
 
 - SHA256 hashes for active YAML contracts (`control_plane/references.yaml`, `control_plane/thresholds.yaml`, `control_plane/infrastructure.yaml`, plus sample manifest path used in run)
 - Reference asset hash map
-- Governed container digest entries for `core`, `annotation`, and `multiomics` with `BUILD_PENDING` fallback
+- Governed container digest entries for `core`, `annotation`, and `reporting` with `BUILD_PENDING` fallback
