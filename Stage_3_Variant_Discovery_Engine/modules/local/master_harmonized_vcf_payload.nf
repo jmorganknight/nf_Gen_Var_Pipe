@@ -15,7 +15,8 @@ process MASTER_HARMONIZED_VCF_PAYLOAD {
     script:
     def stage3RefsMap = (stage3_refs instanceof Map) ? (stage3_refs as Map) : [:]
     def refsJson = groovy.json.JsonOutput.toJson(stage3RefsMap).replace('\\', '\\\\').replace("'", "\\'")
-    def metaJson = groovy.json.JsonOutput.toJson(sample_meta).replace('\\', '\\\\').replace("'", "\\'")
+    def sampleMetaMap = (sample_meta instanceof Map) ? (sample_meta as Map) : [:]
+    def metaJson = groovy.json.JsonOutput.toJson(sampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
     def publishedOutDir = new File(params.outdir.toString()).isAbsolute() ? new File(params.outdir.toString()).canonicalPath : new File(workflow.launchDir.toString(), params.outdir.toString()).canonicalPath
     """
     set -euo pipefail

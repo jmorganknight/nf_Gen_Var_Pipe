@@ -8,6 +8,9 @@ process STAGE4_PGX_PHASE_FILTER {
     container 'genvar-core:2.1.0'
     tag "${meta.sample_id}"
 
+    publishDir "${params.outdir}/phased", mode: 'copy', overwrite: true, pattern: '*.vcf.gz*'
+    publishDir "${params.outdir}/audit_and_qc/stage4", mode: 'copy', overwrite: true, pattern: '*.json'
+
     input:
     tuple val(meta), path(ancestry_metrics_json), path(phased_vcf), path(phased_tbi), path(phasing_audit)
 
@@ -37,7 +40,8 @@ payload.update({
     'pgx_target_genes': pgx_genes,
     'phase_scope': 'cis_trans_resolved_pgx_targets',
     'phase_region_targets': ['CYP2D6', 'CYP2C19', 'DPYD'],
-    'status': 'PASS'
+    'phase_quality_token': ('PHASED' if payload.get('status') == 'PHASED' else 'PASS_WITH_LIMITATIONS'),
+    'status': payload.get('status', 'PASS_WITH_LIMITATIONS')
 })
 Path(f'{sid}.pgx_phasing_audit.json').write_text(json.dumps(payload, indent=2) + '\\n', encoding='utf-8')
 PYEOF

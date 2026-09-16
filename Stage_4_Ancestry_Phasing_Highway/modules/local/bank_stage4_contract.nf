@@ -29,23 +29,44 @@ meta = json.loads('''${metaJson}''')
 ancestry_path = json.loads('''${ancestryJson}''')
 sid = '${sid}'
 ancestry = json.loads(Path(ancestry_path).read_text(encoding='utf-8'))
+phasing = json.loads(Path('${phasing_audit}').read_text(encoding='utf-8'))
+
+phase_status = str(phasing.get('status') or 'PASS_WITH_LIMITATIONS')
+phase_mode = str(phasing.get('phasing_mode') or 'pass_through_unphased')
+if phase_status == 'PHASED':
+    handoff_note = 'Ancestry-projected and genotype-phased VCF ready for Stage 5 annotation and PGx triage.'
+else:
+    handoff_note = 'Ancestry-projected VCF ready for Stage 5 with phasing limitations documented in phasing_audit_json.'
+
+save_dir = str(meta.get('save_dir') or '').strip()
+if save_dir:
+    save_root = Path(save_dir)
+else:
+    save_root = Path('.')
+published_phased_vcf = str(save_root / 'phased' / Path('${phased_vcf}').name)
+published_phased_tbi = str(save_root / 'phased' / Path('${phased_tbi}').name)
+published_ancestry_audit = str(save_root / 'audit_and_qc' / 'stage4' / Path(ancestry_path).name)
+published_phasing_audit = str(save_root / 'audit_and_qc' / 'stage4' / Path('${phasing_audit}').name)
 
 fragment = dict(meta)
 fragment.update({
     'sample_id': sid,
     'run_mode': meta.get('run_mode', 'production'),
     'validation_token': meta.get('validation_token', ''),
-    'phased_vcf': '${phased_vcf}',
-    'phased_vcf_tbi': '${phased_tbi}',
-    'ancestry_metrics_json': ancestry_path,
-    'phasing_audit_json': '${phasing_audit}',
+    'phased_vcf': published_phased_vcf,
+    'phased_vcf_tbi': published_phased_tbi,
+    'ancestry_metrics_json': published_ancestry_audit,
+    'phasing_audit_json': published_phasing_audit,
     'ancestry_label': ancestry.get('ancestry_label'),
     'superpopulation': ancestry.get('superpopulation'),
     'subpopulation': ancestry.get('subpopulation'),
     'pc_coordinates': ancestry.get('pc_coordinates', {}),
+    'stage4_phase_status': phase_status,
+    'stage4_phase_mode': phase_mode,
+    'stage4_phase_reason': phasing.get('phasing_reason'),
     'reference_build': meta.get('reference_build', {}),
-    'stage4_handoff_note': 'Ancestry-projected, phased VCF ready for Stage 5 annotation and PGx triage.',
-    'save_dir': meta.get('save_dir', ''),
+    'stage4_handoff_note': handoff_note,
+    'save_dir': save_dir,
 })
 with open(f'{sid}.banked_stage4.fragment.json', 'w', encoding='utf-8') as handle:
     json.dump(fragment, handle, indent=2)

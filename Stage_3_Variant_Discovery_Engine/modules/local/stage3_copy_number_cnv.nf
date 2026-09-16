@@ -14,10 +14,14 @@ process STAGE3_COPY_NUMBER_CNV {
 
     script:
     def threads = (task.cpus ?: 1) as int
-    def stage3RefsMap = (stage3_refs instanceof Map) ? (stage3_refs as Map) : [:]
     def sampleMetaMap = (sample_meta instanceof Map) ? (sample_meta as Map) : [:]
     def sampleMetaJson = groovy.json.JsonOutput.toJson(sampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
-    def cnvkitRef = (stage3RefsMap.cnvkit_pooled_reference ?: stage3RefsMap.cnvkit_reference ?: stage3RefsMap.cnvkit_pooled_ref ?: '')?.toString()
+    def cnvkitRef = ''
+    try {
+        cnvkitRef = (stage3_refs?.cnvkit_pooled_reference ?: stage3_refs?.cnvkit_reference ?: stage3_refs?.cnvkit_pooled_ref ?: '')?.toString()
+    } catch (Throwable _ignored) {
+        cnvkitRef = ''
+    }
     """
     set -euo pipefail
 
@@ -153,6 +157,10 @@ records.sort(key=lambda r: (r[0].replace('chr', ''), r[1], r[2]))
 with out_vcf.open('w', encoding='utf-8') as out:
     out.write('##fileformat=VCFv4.2' + chr(10))
     out.write('##source=STAGE3_COPY_NUMBER_CNV' + chr(10))
+    out.write('##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Structural variant type">' + chr(10))
+    out.write('##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant">' + chr(10))
+    out.write('##INFO=<ID=CN,Number=1,Type=Integer,Description="Estimated integer copy number state">' + chr(10))
+    out.write('##INFO=<ID=LOG2,Number=1,Type=Float,Description="CNVkit segment log2 ratio">' + chr(10))
     out.write('##INFO=<ID=BRANCH,Number=1,Type=String,Description="Stage 3 variant branch origin">' + chr(10))
     out.write('##FILTER=<ID=LOW_LOG2,Description="CNVkit absolute log2 below reporting floor">' + chr(10))
     out.write('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO' + chr(10))

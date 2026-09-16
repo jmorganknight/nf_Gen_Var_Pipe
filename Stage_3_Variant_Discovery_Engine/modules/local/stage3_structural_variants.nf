@@ -14,7 +14,8 @@ process STAGE3_STRUCTURAL_VARIANTS {
 
     script:
     def threads = (task.cpus ?: 1) as int
-    def sampleMetaJson = groovy.json.JsonOutput.toJson(sample_meta).replace('\\', '\\\\').replace("'", "\\'")
+    def sampleMetaMap = (sample_meta instanceof Map) ? (sample_meta as Map) : [:]
+    def sampleMetaJson = groovy.json.JsonOutput.toJson(sampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
     """
     set -euo pipefail
 

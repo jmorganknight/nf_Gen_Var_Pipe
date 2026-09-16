@@ -11,7 +11,8 @@ process STAGE3_TRISOMY_ANEUPLOIDY {
     path 'stage3.trisomy_aneuploidy.audit.json', emit: audit
 
     script:
-    def sampleMetaJson = groovy.json.JsonOutput.toJson(sample_meta).replace('\\', '\\\\').replace("'", "\\'")
+    def sampleMetaMap = (sample_meta instanceof Map) ? (sample_meta as Map) : [:]
+    def sampleMetaJson = groovy.json.JsonOutput.toJson(sampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
     """
     set -euo pipefail
 

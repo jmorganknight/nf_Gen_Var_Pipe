@@ -10,7 +10,8 @@ process MERGE_STAGE3_BRANCH_VCFS {
     tuple val(sample_id), path('stage3.merged.selected.vcf'), path('stage3.merged.mane_audit.json'), path(vcf_schema), val(stage3_refs), val(sample_meta), path('stage3.merged.calibration_audit.json'), emit: merged_vcf_bundle
 
     script:
-    def sampleMetaJson = groovy.json.JsonOutput.toJson(sample_meta).replace('\\', '\\\\').replace("'", "\\'")
+    def sampleMetaMap = (sample_meta instanceof Map) ? (sample_meta as Map) : [:]
+    def sampleMetaJson = groovy.json.JsonOutput.toJson(sampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
     """
     set -euo pipefail
 
@@ -61,7 +62,7 @@ def chrom_rank(chrom: str):
 
 fileformat_line = None
 meta_headers = []
-column_header = None
+column_header_candidates = []
 seen_headers = set()
 observed_branches = set()
 records = []
@@ -79,8 +80,7 @@ for src_index, vcf in enumerate(vcf_paths):
                 meta_headers.append(line)
             continue
         if line.startswith('#CHROM'):
-            if column_header is None:
-                column_header = line
+            column_header_candidates.append(line)
             continue
         if not line.strip():
             continue
@@ -101,14 +101,34 @@ for src_index, vcf in enumerate(vcf_paths):
         except ValueError:
             pos = 0
         key = (chrom_rank(chrom), pos, cols[3], cols[4], src_index, line_index)
-        records.append((key, line))
+        records.append((key, cols))
 
 if fileformat_line is None:
     fileformat_line = '##fileformat=VCFv4.2'
-if column_header is None:
+if not column_header_candidates:
     raise SystemExit('STAGE3_MERGE_FAILURE: merged VCF missing #CHROM header')
 
-ordered_records = [line for _key, line in sorted(records, key=lambda pair: pair[0])]
+column_header = max(column_header_candidates, key=lambda line: len(line.split(TAB)))
+selected_header_cols = column_header.split(TAB)
+selected_col_count = len(selected_header_cols)
+records_padded = 0
+records_trimmed = 0
+
+ordered_records = []
+for _key, cols in sorted(records, key=lambda pair: pair[0]):
+    out_cols = list(cols)
+    if len(out_cols) < selected_col_count:
+        if selected_col_count >= 10 and len(out_cols) == 8:
+            out_cols.append('GT')
+            out_cols.append('./.')
+        while len(out_cols) < selected_col_count:
+            out_cols.append('.')
+        records_padded += 1
+    elif len(out_cols) > selected_col_count:
+        out_cols = out_cols[:selected_col_count]
+        records_trimmed += 1
+    ordered_records.append(TAB.join(out_cols))
+
 out_vcf = Path('stage3.merged.selected.vcf')
 out_vcf.write_text(NL.join([fileformat_line] + meta_headers + [column_header] + ordered_records) + NL, encoding='utf-8')
 
@@ -121,6 +141,10 @@ merge_mane_audit = {
     'expected_active_branch_count': expected_active_count,
     'received_branch_payload_count': len(vcf_paths),
     'observed_branches': sorted(observed_branches),
+    'selected_header_columns': selected_col_count,
+    'sample_columns_present': selected_col_count >= 10,
+    'records_padded_to_header': records_padded,
+    'records_trimmed_to_header': records_trimmed,
     'branch_tokens': {
         name: (
             'SKIPPED_BY_MANIFEST'
