@@ -100,12 +100,111 @@ clinical:
       qual_low: 20  # QUAL >= 20: Tier III classification (minimal).
       af_multiplier_tier2: 2.5  # Tier II AF threshold = popmax_cutoff * 2.5 (relaxed filter).
 
+  germline:
+    # ACMG evidence weight map consumed by Stage 5 germline Bayesian scoring.
+    acmg_weights:
+      PVS1_STRONG: 2.50  # Very strong LoF pathogenic evidence.
+      PVS1_MODERATE: 1.50  # Moderate LoF pathogenic evidence.
+      PP3: 0.40  # Multi-predictor computational pathogenic support.
+      BP4: -0.40  # Multi-predictor computational benign support.
+      PM2: 0.70  # Population rarity pathogenic support.
+      BS1: -0.90  # Benign population-frequency support.
+      BA1: -2.20  # Stand-alone benign population-frequency support.
+
+    # Applied only when benign and pathogenic evidence both coexist and no stronger override fires.
+    conflict_dampening_factor: 0.35
+
   prs:
+    # Minimum marker count required before PRS scoring is considered valid.
+    no_call_min_markers_required: 2
+
+  pgx:
+    # Star-allele definitions used by Stage 5 PGx diplotyping. Add loci here rather than hardcoding in code.
+    star_alleles:
+      CYP2C19:
+        reference_allele: "*1"
+        allele_definitions:
+          "*2":
+            function_class: "no_function"
+            loci:
+              - variant_id: "rs4244285"
+                genome_build: "hg38"
+                chrom: "chr10"
+                pos: 94781859
+                ref: "G"
+                alt: "A"
+          "*3":
+            function_class: "no_function"
+            loci:
+              - variant_id: "rs4986893"
+                genome_build: "hg38"
+                chrom: "chr10"
+                pos: 94775381
+                ref: "G"
+                alt: "A"
+          "*17":
+            function_class: "increased_function"
+            loci:
+              - variant_id: "rs12248560"
+                genome_build: "hg38"
+                chrom: "chr10"
+                pos: 94761974
+                ref: "C"
+                alt: "T"
+
+    # Diplotype-to-phenotype translation map used after allele calling.
+    phenotype_map:
+      CYP2C19:
+        "*1/*1": "Normal Metabolizer"
+        "*1/*2": "Intermediate Metabolizer"
+        "*1/*3": "Intermediate Metabolizer"
+        "*2/*2": "Poor Metabolizer"
+        "*2/*3": "Poor Metabolizer"
+        "*1/*17": "Rapid Metabolizer"
+        "*17/*17": "Ultrarapid Metabolizer"
+        "*2/*17": "Intermediate Metabolizer"
+        default: "Unknown Metabolizer"
+
+    # CPIC actionability and trace text keyed by phenotype.
+    cpic_guidelines:
+      CYP2C19:
+        "Normal Metabolizer":
+          cpic_actionability_tier: "A"
+          recommendation_trace: "Standard CPIC substrate-specific recommendations apply."
+        "Intermediate Metabolizer":
+          cpic_actionability_tier: "A"
+          recommendation_trace: "Consider alternative therapy or dose adjustment per CPIC substrate-specific guidance."
+        "Poor Metabolizer":
+          cpic_actionability_tier: "A"
+          recommendation_trace: "Avoid affected substrates or choose alternative therapy per CPIC guidance."
+        "Rapid Metabolizer":
+          cpic_actionability_tier: "A"
+          recommendation_trace: "Consider increased dose or alternative therapy per CPIC substrate-specific guidance."
+        "Ultrarapid Metabolizer":
+          cpic_actionability_tier: "A"
+          recommendation_trace: "Consider alternative therapy for affected substrates per CPIC guidance."
+        "Unknown Metabolizer":
+          cpic_actionability_tier: "C"
+          recommendation_trace: "Phenotype unresolved; review required."
+
+  prs:
+    no_call_min_markers_required: 2  # Minimum observed marker count before PRS is emitted; below this, fail closed with marker QC no-call.
     prs_min_r2_floor: 0.50  # Minimum imputation or model-fit r^2 retained for PRS marker inclusion.
     prs_gq_floor: 20  # Minimum genotype quality retained for PRS marker inclusion.
 
   sf:
+    minimum_pathogenicity_class: 4  # Only Likely Pathogenic (4) or Pathogenic (5) variants are reportable.
+    clinical_protocol_link_base: "urn:acmg-sf-v3.2:"  # Stable protocol-link prefix for ACMG secondary findings reports.
     sf_gq_floor: 30  # Minimum genotype quality retained for ACMG secondary findings review.
+
+  somatic:
+    minimum_vaf: 0.05  # Minimum variant allele fraction retained for Stage 5 somatic interpretation.
+    reportable_tiers:
+      - "I"
+      - "II"
+      - "III"
+      - "IV"
+    hotspot_tier_bump: 1  # Number of AMP/ASCO/CAP tiers elevated when a record overlaps a hotspot.
 
   reporting:
     publish_dir_mode: "copy"  # File publication mode expected for reportable clinical artifacts.

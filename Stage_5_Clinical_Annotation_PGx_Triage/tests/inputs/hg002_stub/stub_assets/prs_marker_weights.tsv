@@ -1,0 +1,4 @@
+marker_id	chrom	pos	ref	alt	weight	description
+rs4244285	10	96541616	G	A	0.12	CYP2C19 star-allele marker
+rs3892097	22	42128945	C	T	0.08	CYP2D6 proxy marker
+rs1801133	1	114716160	C	T	-0.05	MTHFR marker

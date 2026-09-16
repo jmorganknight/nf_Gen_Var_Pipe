@@ -6,81 +6,16 @@
 
 ref_data_root: "/media/jmk/Extreme Pro/pipeline_references"
 
-# Core Genome Assembly & Index
-fasta: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
-fai: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
-dict: "reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
-bwa_index: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
-reference_genome: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
-reference_fai: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
-reference_dict: "reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
-bwa_index_base: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
-
-# Target BED Masks & Clinical Panels
-target_bed_acmg: "beds/ACMG_SF_v3.2_hs38DH.bed"
-target_bed_mane: "beds/mane_select_v1.3.bed"
-target_bed_onco: "beds/OncoPanel_v4.2_Master_hs38DH.bed"
-somatic_hotspots: "beds/somatic_hotspots_v2.1.bed_hs38DH"
-
-# Clinical Databases & Frequency Repositories
-clinvar_vcf: "clinvar/clinvar_20260601.vcf.gz"
-clinvar_3star_vcf: "clinvar/clinvar_3star_pathogenic_20260601.vcf.gz"
-gnomad_vcf: "clinvar/gnomad.v4.0.genomes.vcf.gz"
-dbsnp_vcf: "clinvar/dbsnp_156_hs38DH.vcf.gz"
-hgmd_pro_mock_vcf: "clinvar/hgmd_pro_mock.vcf.gz"
-
-# Pathogenicity & Splicing Models
-cadd_tsv: "models/CADD_GRCh38_v1.7.tsv.gz"
-revel_tsv: "models/revel_GRCh38_v1.7.tsv.gz"
-pangolin_weights: "models/Pangolin_Weights_v1.0"
-pgs_weights: "models/pgs_weights_v1.tsv"
-
-# Ancestry & Phasing Models
-poppca_model_dir: "PopPCA_models/models"
-pop_pca_model_dir: "PopPCA_models/models"
-pgen_1000g_prefix: "1000G/all_hg38"
-
-# Pharmacogenomic & Clinical Annotation Assets
-cpic_allele_table: "pgx/cpic"
-pgx_cpic_dir: "pgx/cpic"
-pgx_pharmvar_dir: "pgx/pharmvar/definitions"
-pharmvar_star_alleles: "pgx/pharmvar"
-pharmcat_jar: "pgx/pharmvar/bin/pharmcat.jar"
-acmg_schema: "clinical/acmg"
-mane_transcripts: "beds/mane_select_v1.3.bed"
-cyp2d6_mask_bed: "beds/paralog_homology_masks.bed"
-paralog_safe_regions: "beds/paralog_homology_masks.bed"
-pgx_gene_panel: "pgx/panel/pgx_gene_panel.yaml"
-gene_rule_set: "pgx/rules/gene_rule_set.yaml"
-
-container_assets:
-  pharmcat_jar: "pgx/pharmvar/bin/pharmcat.jar"
-
-pgx:
-  cpic_allele_table: "pgx/cpic"
-  pharmvar_star_alleles: "pgx/pharmvar"
-  pharmcat_jar: "pgx/pharmvar/bin/pharmcat.jar"
-  cyp2d6_mask_bed: "beds/paralog_homology_masks.bed"
-  paralog_safe_regions: "beds/paralog_homology_masks.bed"
-  pgx_gene_panel: "pgx/panel/pgx_gene_panel.yaml"
-  gene_rule_set: "pgx/rules/gene_rule_set.yaml"
-
-clinical:
-  acmg_schema: "clinical/acmg"
-  mane_transcripts: "beds/mane_select_v1.3.bed"
-
-# Stage 3 Caller-Specific WGS Asset Map Targets
-pseudogene_mask: "beds/paralog_homology_masks.bed"
-expansionhunter_catalog: "beds/variant_catalog_grch38.json"
-cnvkit_wgs_flat_ref: "models/flat_reference_grch38.cnn"
-
 references:
+  # ==========================================
+  # 1. Core Reference Genome & Indices (Base Layer)
+  # ==========================================
   reference_checksum_manifest: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/assets/reference_checksums.sha256"
-  reference_genome: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+  reference_genome: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"       # Primary reference FASTA
   grch38_fasta: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
-  reference_fai: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
+  reference_fai: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"       # FASTA index
   grch38_fai: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
-  reference_dict: "reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
+  reference_dict: "reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"     # Sequence dictionary
   grch38_dict: "reference/GRCh38_full_analysis_set_plus_decoy_hla.dict"
   bwa_index_base: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
   bwa_index: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa"
@@ -90,35 +25,60 @@ references:
   bwa_index_bwt_2bit_64: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.bwt.2bit.64"
   bwa_index_0123: "reference/GRCh38_full_analysis_set_plus_decoy_hla.fa.0123"
 
-  onco_target_bed: "beds/OncoPanel_v4.2_Master_hs38DH.bed"
-  capture_wes_bed: "beds/OncoPanel_v4.2_Master_hs38DH.bed"
-  sf_bed: "beds/ACMG_SF_v3.2_hs38DH.bed"
-  mane_db: "beds/mane_select_v1.3.bed"
-  hotspot_registry: "beds/somatic_hotspots_v2.1.bed_hs38DH"
+  # ==========================================
+  # 2. Stage 3 Variant Discovery & Target Masks
+  # ==========================================
+  stage3:
+    stage3_vcf_schema: "clinical/schemas/v4.2_Production_Schema.json"           # VCF output schema contract
+    expansionhunter_variant_catalog: "beds/variant_catalog_grch38.json"          # Repeat expansion catalog
+    cnvkit_pooled_reference: "models/flat_reference_grch38.cnn"                # CNV baseline reference
+    cyp2d6_paralog_mask_bed: "beds/paralog_homology_masks.bed"                   # Homology/paralog filter mask
 
-  clinvar_db: "clinvar/clinvar_20260601.vcf.gz"
-  clinvar_3star_db: "clinvar/clinvar_3star_pathogenic_20260601.vcf.gz"
-  gnomad_db: "clinvar/gnomad.v4.0.genomes.vcf.gz"
+  onco_target_bed: "beds/OncoPanel_v4.2_Master_hs38DH.bed"                     # Oncology panel capture intervals
+  capture_wes_bed: "beds/OncoPanel_v4.2_Master_hs38DH.bed"
+  sf_bed: "beds/ACMG_SF_v3.2_hs38DH.bed"                                       # ACMG secondary findings intervals
+  mane_db: "beds/mane_select_v1.3.bed"                                         # MANE transcript select manifest
+  hotspot_registry: "beds/somatic_hotspots_v2.1.bed_hs38DH"                    # Somatic mutation hotspots
+
+  # ==========================================
+  # 3. Clinical Databases & Functional Scores
+  # ==========================================
+  clinvar_db: "clinvar/clinvar_20260601.vcf.gz"                                # Primary ClinVar database
+  clinvar_3star_db: "clinvar/clinvar_3star_pathogenic_20260601.vcf.gz"         # High-confidence ClinVar subset
+  gnomad_db: "clinvar/gnomad.v4.0.genomes.vcf.gz"                              # Population allele frequency database
   gnomad_vcf: "clinvar/gnomad.v4.0.genomes.vcf.gz"
-  dbsnp_resource: "clinvar/dbsnp_156_hs38DH.vcf.gz"
-  hgmd_db: "clinvar/hgmd_pro_mock.vcf.gz"
+  dbsnp_resource: "clinvar/dbsnp_156_hs38DH.vcf.gz"                            # dbSNP reference ID mapping
+  hgmd_db: "clinvar/hgmd_pro_mock.vcf.gz"                                      # Human Gene Mutation Database reference
   hgmd_pro_db: "clinvar/hgmd_pro_mock.vcf.gz"
 
-  prs_weights: "models/pgs_weights_v1.tsv"
   models:
-    cadd_scores: "models/CADD_GRCh38_v1.7.tsv.gz"
-    revel_scores: "models/revel_GRCh38_v1.7.tsv.gz"
-    pangolin_weights: "models/Pangolin_Weights_v1.0"
-    poppca_models: "PopPCA_models/models"
+    cadd_scores: "models/CADD_GRCh38_v1.7.tsv.gz"                              # CADD functional prediction scores
+    revel_scores: "models/revel_GRCh38_v1.7.tsv.gz"                            # REVEL missense prediction scores
+    pangolin_weights: "models/Pangolin_Weights_v1.0"                           # Splice-disruption models
+    poppca_models: "PopPCA_models/models"                                      # Ancestry PCA projection models
+
+  pop_pca_model_dir: "PopPCA_models/models"
+
+  # ==========================================
+  # 4. Stage 5 Engine-Specific Governance Blocks
+  # ==========================================
+  prs:
+    marker_weights_tsv: "models/pgs_weights_v1.tsv"                            # Polygenic risk score weights
+
+  sf:
+    acmg_registry_json: "clinical/acmg/schema.json"                            # ACMG v3.2 gene registry JSON
+    acmg_bed_mask: "beds/ACMG_SF_v3.2_hs38DH.bed"                              # ACMG v3.2 target BED mask
+
+  somatic:
+    hotspots_bed: "beds/somatic_hotspots_v2.1.bed_hs38DH"                       # Somatic tier-elevation hotspots
 
   pgx_cpic_dir: "pgx/cpic"
   pgx_pharmvar_dir: "pgx/pharmvar/definitions"
-  pop_pca_model_dir: "PopPCA_models/models"
 
   pgx:
-    cpic_allele_table: "pgx/cpic"
-    pharmvar_star_alleles: "pgx/pharmvar"
-    pharmcat_jar: "pgx/pharmvar/bin/pharmcat.jar"
+    cpic_allele_table: "pgx/cpic"                                              # CPIC recommendations
+    pharmvar_star_alleles: "pgx/pharmvar"                                      # PharmVar allele definitions
+    pharmcat_jar: "pgx/pharmvar/bin/pharmcat.jar"                              # PharmCAT engine binary
     cyp2d6_mask_bed: "beds/paralog_homology_masks.bed"
     paralog_safe_regions: "beds/paralog_homology_masks.bed"
     pgx_gene_panel: "pgx/panel/pgx_gene_panel.yaml"
@@ -128,8 +88,9 @@ references:
     acmg_schema: "clinical/acmg"
     mane_transcripts: "beds/mane_select_v1.3.bed"
 
-  stage3:
-    stage3_vcf_schema: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_3_Variant_Discovery_Engine/tests/schemas/v4.2_Production_Schema.json"
-    expansionhunter_variant_catalog: "beds/variant_catalog_grch38.json"
-    cnvkit_pooled_reference: "models/flat_reference_grch38.cnn"
-    cyp2d6_paralog_mask_bed: "beds/paralog_homology_masks.bed"
+
+
+
+
+
+
