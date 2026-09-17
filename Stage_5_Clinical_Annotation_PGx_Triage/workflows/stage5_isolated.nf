@@ -15,7 +15,7 @@ def branchRequested(List requestedBranches, String branchName) {
 process STAGE5_EMIT_BRANCH_SKIP_MANIFEST {
     label 'process_low'
     container 'genvar-annotation:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
     tag "${sample_id}:${branch_name}"
 
     input:
@@ -51,7 +51,7 @@ JSON
 process STAGE5_ANNOTATE_REQUESTED_BRANCH_MANIFEST {
     label 'process_low'
     container 'genvar-annotation:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
     tag "${sample_id}:${branch_name}"
 
     input:

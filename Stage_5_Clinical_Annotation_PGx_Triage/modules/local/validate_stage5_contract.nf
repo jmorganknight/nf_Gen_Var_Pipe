@@ -30,7 +30,7 @@ workflow VALIDATE_STAGE5_CONTRACT {
     ch_stage5_bundle_json
 
     main:
-    def validatorScript = params.stage5_contract_validator_path?.toString()?.trim()
+    def validatorScript = params.containsKey('stage5_contract_validator_path') ? params.stage5_contract_validator_path?.toString()?.trim() : null
     if (!validatorScript) {
         validatorScript = new File(workflow.projectDir.toString(), 'lib/Stage5ContractValidator.groovy').toString()
     }

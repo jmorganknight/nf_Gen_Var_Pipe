@@ -3,7 +3,7 @@ nextflow.enable.dsl = 2
 process SIGN_OFF_CLINICAL_BUNDLE {
     label 'process_low'
     container 'genvar-annotation:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
     publishDir "${params.outdir}/clinical_release", mode: 'copy', overwrite: true, pattern: '*_production_release.*'
     tag "${sample_id ?: 'UNKNOWN'}"
 

@@ -2,7 +2,7 @@ process CLINICAL_PROVENANCE_MANIFEST {
 
     label 'process_low'
     container 'genvar-annotation:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
 
     tag "${sample_id}"
 

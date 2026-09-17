@@ -36,7 +36,7 @@ process AUTOMATED_INGEST_GATE {
 
     label 'process_low'
     container 'genvar-core:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
 
     tag "${meta.sample_id}"
 
@@ -437,8 +437,9 @@ else:
     print(f"[AUTOMATED_INGEST_GATE] REJECT — {sample_id} ({token})")
 PYEOF
 
-    ln -sr "${fastq_1}" "${sid}_R1.validated.fastq.gz"
-    ln -sr "${fastq_2}" "${sid}_R2.validated.fastq.gz"
+    # Copy validated fastqs for production auditability (no symlinks)
+    cp "${fastq_1}" "${sid}_R1.validated.fastq.gz"
+    cp "${fastq_2}" "${sid}_R2.validated.fastq.gz"
     """
 
     stub:

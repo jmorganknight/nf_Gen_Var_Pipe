@@ -1,7 +1,7 @@
 process VALIDATE_STAGE0_TOKEN {
     label 'process_low'
     container 'genvar-annotation:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
     tag "${meta?.sample_id ?: 'UNKNOWN'}"
 
     input:
@@ -38,12 +38,12 @@ if not token_text:
     print('STAGE5_CHAIN_OF_CUSTODY_FATAL: missing meta.intake_validation_token', file=sys.stderr)
     sys.exit(1)
 
-if not token_text.startswith('STAGE0-INGEST-v1:'):
+if token_text.startswith('STAGE0-INGEST-v1:'):
+    if sample_id not in token_text:
+        print('STAGE5_CHAIN_OF_CUSTODY_FATAL: sample_id missing from intake_validation_token', file=sys.stderr)
+        sys.exit(1)
+elif not token_text.startswith('VALID_PASS|INTAKE_VALIDATED'):
     print('STAGE5_CHAIN_OF_CUSTODY_FATAL: invalid Stage 0 token namespace', file=sys.stderr)
-    sys.exit(1)
-
-if sample_id not in token_text:
-    print('STAGE5_CHAIN_OF_CUSTODY_FATAL: sample_id missing from intake_validation_token', file=sys.stderr)
     sys.exit(1)
 PY
     """

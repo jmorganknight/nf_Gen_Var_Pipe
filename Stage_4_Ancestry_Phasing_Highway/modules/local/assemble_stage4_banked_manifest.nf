@@ -2,7 +2,7 @@ process ASSEMBLE_STAGE4_BANKED_MANIFEST {
 
     label 'process_low'
     container 'genvar-core:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
 
     publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'samples_*_banked_stage4.yaml'
 

@@ -2,7 +2,7 @@ process MEDICAL_DIRECTOR_WORKBENCH_GATEWAY {
 
     label 'process_low'
     container 'genvar-reporting:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
 
     tag "${meta.sample_id}"
 

@@ -2,7 +2,7 @@ process BANK_STAGE4_CONTRACT {
 
     label 'process_low'
     container 'genvar-core:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
 
     tag "${meta.sample_id}"
 

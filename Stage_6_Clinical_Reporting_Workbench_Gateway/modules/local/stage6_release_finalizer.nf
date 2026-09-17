@@ -2,7 +2,7 @@ process STAGE6_RELEASE_FINALIZER {
 
     label 'process_low'
     container 'genvar-reporting:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
 
     publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'Stage6_SHA256SUMS.txt'
 

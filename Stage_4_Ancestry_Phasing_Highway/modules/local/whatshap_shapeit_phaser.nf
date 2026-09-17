@@ -2,7 +2,7 @@ process WHATSHAP_SHAPEIT_PHASER {
 
     label 'process_high'
     container 'genvar-core:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
 
     tag "${meta.sample_id}"
 

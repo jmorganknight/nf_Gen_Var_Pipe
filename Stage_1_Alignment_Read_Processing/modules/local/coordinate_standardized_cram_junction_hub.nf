@@ -27,11 +27,11 @@ process COORDINATE_STANDARDIZED_CRAM_JUNCTION_HUB {
 
     samtools quickcheck "${bam_cram}"
 
-    # Avoid duplicating very large BAMs in scratch; symlink into the task workdir.
-    ln -sfn "\$(readlink -f "${bam_cram}" 2>/dev/null || printf '%s' "${bam_cram}")" "${sid}.junction_verified.bam"
+    # Production audit trail: real file copies (not symlinks) for CLIA/CAP/NY compliance
+    cp --reflink=auto "${bam_cram}" "${sid}.junction_verified.bam" 2>/dev/null || cp "${bam_cram}" "${sid}.junction_verified.bam"
 
     if [ -s "${index}" ]; then
-        ln -sfn "\$(readlink -f "${index}" 2>/dev/null || printf '%s' "${index}")" "${sid}.junction_verified.bam.bai"
+        cp --reflink=auto "${index}" "${sid}.junction_verified.bam.bai" 2>/dev/null || cp "${index}" "${sid}.junction_verified.bam.bai"
     else
         samtools index -@ "${task.cpus}" "${sid}.junction_verified.bam" "${sid}.junction_verified.bam.bai"
     fi

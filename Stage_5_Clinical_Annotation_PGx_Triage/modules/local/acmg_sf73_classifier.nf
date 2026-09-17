@@ -2,7 +2,7 @@ process ACMG_SF73_CLASSIFIER {
 
     label 'process_low'
     container 'genvar-annotation:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
 
     tag "${sample_id}"
 

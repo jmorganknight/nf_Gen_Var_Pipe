@@ -1,7 +1,7 @@
 process ASSEMBLE_CLINICAL_BUNDLE {
     label 'process_low'
     container 'genvar-annotation:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
     tag "${meta?.sample_id ?: 'UNKNOWN'}"
 
     input:

@@ -5,6 +5,7 @@ include { VALIDATE_STAGE5_REFERENCES } from './modules/local/validate_stage5_ref
 include { VALIDATE_STAGE5_CONTRACT } from './modules/local/validate_stage5_contract.nf'
 include { ASSEMBLE_CLINICAL_BUNDLE } from './modules/local/assemble_clinical_bundle.nf'
 include { SIGN_OFF_CLINICAL_BUNDLE } from './modules/local/sign_off_clinical_bundle.nf'
+include { ASSEMBLE_STAGE5_MANIFEST_FROM_RELEASE } from './modules/local/assemble_stage5_manifest_from_release.nf'
 include { GERMLINE_BRANCH_ENGINE } from './subworkflows/local/germline_branch_engine.nf'
 include { PGX_BRANCH_ENGINE } from './subworkflows/local/pgx_branch_engine.nf'
 include { PRS_BRANCH_ENGINE } from './subworkflows/local/prs_branch_engine.nf'
@@ -41,6 +42,10 @@ Set<String> allowedStage5Branches() {
 
 Map mapOrEmpty(Object value) {
     value instanceof Map ? (value as Map) : [:]
+}
+
+def readOptionalParam(String paramName) {
+    params.containsKey(paramName) ? params[paramName] : null
 }
 
 File resolvePath(String rawPath, String rootDir) {
@@ -106,7 +111,7 @@ def resolveStageConfigPath(Object overridePath, Object configuredPath, String fi
 }
 
 String resolveGitCommitSha() {
-    def explicit = params.git_commit_sha?.toString()?.trim()
+    def explicit = readOptionalParam('git_commit_sha')?.toString()?.trim()
     if (explicit) {
         return explicit
     }
@@ -219,7 +224,7 @@ Map buildBranchDirectiveFlags(List<String> requestedBranches) {
     ]
 }
 
-Map buildStage5Meta(Map sample, File manifestDir, def thresholdsFile, def referencesFile) {
+Map buildStage5Meta(Map sample, File manifestDir, def thresholdsFile, def referencesFile, def infrastructureFile) {
     def sampleId = sample.sample_id?.toString()?.trim()
     if (!sampleId) {
         throw new IllegalStateException('STAGE5_PRECONDITION_FAILURE: sample_id is required for every Stage 4 manifest entry')
@@ -246,9 +251,17 @@ Map buildStage5Meta(Map sample, File manifestDir, def thresholdsFile, def refere
     def intakeToken = intakeTokenPath.exists() ? intakeTokenPath.toString() : intakeTokenRaw
 
     def requestedBranches = normalizeRequestedBranches(sample.requested_branches, sampleId)
-    def containerDigest = sample.container_digest?.toString()?.trim() ?: params.container_digest?.toString()?.trim()
+    def containerDigest = sample.container_digest?.toString()?.trim() ?: readOptionalParam('container_digest')?.toString()?.trim()
+    if (!containerDigest && infrastructureFile != null) {
+        def infraFile = infrastructureFile instanceof File ? infrastructureFile : new File(infrastructureFile.toString())
+        if (infraFile.exists()) {
+            def infraDoc = mapOrEmpty(new groovy.yaml.YamlSlurper().parse(infraFile))
+            def containers = mapOrEmpty(infraDoc.containers)
+            containerDigest = containers?.annotation?.digest?.toString()?.trim() ?: containers?.reporting?.digest?.toString()?.trim()
+        }
+    }
     if (!containerDigest) {
-        throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: container_digest is required for sample '${sampleId}' or via --container_digest")
+        throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: container_digest is required for sample '${sampleId}', via --container_digest, or from control_plane/infrastructure.yaml")
     }
 
     def policyVersion = sample.policy_version?.toString()?.trim()
@@ -282,6 +295,8 @@ workflow STAGE5_CLINICAL_TRIAGE {
     ch_thresholds_yaml
     ch_references_yaml
     ch_references_validated
+    ch_infrastructure_yaml
+    ch_container_digest
 
     main:
     VALIDATE_STAGE0_TOKEN(ch_intake_payload)
@@ -382,9 +397,9 @@ workflow STAGE5_CLINICAL_TRIAGE {
     ASSEMBLE_CLINICAL_BUNDLE(chBundleInput)
 
     def releaseGitCommitSha = resolveGitCommitSha()
-    def releaseContainerDigest = params.container_digest?.toString()?.trim()
+    def releaseContainerDigest = readOptionalParam('container_digest')?.toString()?.trim() ?: ch_container_digest?.toString()?.trim()
     if (!releaseContainerDigest) {
-        throw new IllegalStateException('STAGE5_PRECONDITION_FAILURE: --container_digest is required for release sign-off')
+        throw new IllegalStateException('STAGE5_PRECONDITION_FAILURE: container_digest is required for release sign-off (CLI override or control_plane/infrastructure.yaml)')
     }
 
     def chSignOffInput = ASSEMBLE_CLINICAL_BUNDLE.out.clinical_bundle.map { meta, bundleJson ->
@@ -395,9 +410,16 @@ workflow STAGE5_CLINICAL_TRIAGE {
 
     VALIDATE_STAGE5_CONTRACT(ASSEMBLE_CLINICAL_BUNDLE.out.clinical_bundle)
 
+    def chManifestInput = SIGN_OFF_CLINICAL_BUNDLE.out.production_release.map { sampleId, releaseJson, _sha256 ->
+        tuple(sampleId, releaseJson)
+    }
+
+    ASSEMBLE_STAGE5_MANIFEST_FROM_RELEASE(chManifestInput)
+
     emit:
     validated_bundle = VALIDATE_STAGE5_CONTRACT.out.validated_bundle
     production_release = SIGN_OFF_CLINICAL_BUNDLE.out.production_release
+    banked_manifest = ASSEMBLE_STAGE5_MANIFEST_FROM_RELEASE.out.banked_manifest
 }
 
 workflow {
@@ -412,14 +434,22 @@ workflow {
         throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: Stage 4 manifest not found: ${stage4ManifestFile}")
     }
 
-    def thresholdsFile = resolveStageConfigPath(params.thresh_config, params.thresholds, 'thresholds.yaml')
+    def thresholdsFile = resolveStageConfigPath(readOptionalParam('thresh_config'), params.thresholds, 'thresholds.yaml')
     if (!thresholdsFile.exists()) {
         throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: thresholds config not found: ${thresholdsFile}")
     }
 
-    def referencesFile = resolveStageConfigPath(params.ref_config, params.references, 'references.yaml')
+    def referencesFile = resolveStageConfigPath(readOptionalParam('ref_config'), params.references, 'references.yaml')
     if (!referencesFile.exists()) {
         throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: references config not found: ${referencesFile}")
+    }
+
+    def infrastructureFile = resolveStageConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
+    def governedContainerDigest = null
+    if (infrastructureFile != null && infrastructureFile.exists()) {
+        def infraDoc = mapOrEmpty(new groovy.yaml.YamlSlurper().parse(infrastructureFile))
+        def containers = mapOrEmpty(infraDoc.containers)
+        governedContainerDigest = containers?.annotation?.digest?.toString()?.trim() ?: containers?.reporting?.digest?.toString()?.trim()
     }
 
     VALIDATE_STAGE5_REFERENCES(channel.value(referencesFile))
@@ -433,9 +463,9 @@ workflow {
 
     def manifestDir = new File(stage4ManifestFile.toString()).parentFile ?: new File(projectDir.toString())
     def chIntakePayload = channel.fromList(samples).map { sample ->
-        def meta = buildStage5Meta(sample as Map, manifestDir, thresholdsFile, referencesFile)
+        def meta = buildStage5Meta(sample as Map, manifestDir, thresholdsFile, referencesFile, infrastructureFile)
         tuple(meta, file(meta.phased_vcf.toString(), checkIfExists: true))
     }
 
-    STAGE5_CLINICAL_TRIAGE(chIntakePayload, channel.value(thresholdsFile), channel.value(referencesFile), chReferencesValidated)
+    STAGE5_CLINICAL_TRIAGE(chIntakePayload, channel.value(thresholdsFile), channel.value(referencesFile), chReferencesValidated, channel.value(infrastructureFile), channel.value(governedContainerDigest))
 }

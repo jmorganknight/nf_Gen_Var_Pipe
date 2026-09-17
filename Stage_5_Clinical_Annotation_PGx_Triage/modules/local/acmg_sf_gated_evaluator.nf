@@ -2,7 +2,7 @@ process ACMG_SF_GATED_EVALUATOR {
 
     label 'process_low'
     container 'genvar-annotation:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
 
     tag "${meta.sample_id}"
 

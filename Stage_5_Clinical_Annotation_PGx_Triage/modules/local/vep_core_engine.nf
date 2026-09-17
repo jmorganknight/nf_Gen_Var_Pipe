@@ -2,7 +2,7 @@ process VEP_CORE_ENGINE {
 
     label 'process_medium'
     container 'genvar-annotation:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
 
     tag "${meta.sample_id}"
 

@@ -2,7 +2,7 @@ process FHIR_REPORT_BUILDER {
 
     label 'process_medium'
     container 'genvar-reporting:2.1.0'
-    stageInMode 'symlink'
+    stageInMode 'copy'
 
     tag "${meta.sample_id}"
 
