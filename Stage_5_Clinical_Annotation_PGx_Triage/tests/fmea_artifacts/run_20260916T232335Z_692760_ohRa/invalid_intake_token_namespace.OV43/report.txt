@@ -1,0 +1,8 @@
+test_name=Invalid Intake Token Namespace
+expected_error=STAGE5_CHAIN_OF_CUSTODY_FATAL
+exit_code=1
+expected_found=true
+primary_fatal=STAGE5_CHAIN_OF_CUSTODY_FATAL: missing meta.sample_id', file=sys.stderr)
+stdout_log=/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fmea_artifacts/run_20260916T232335Z_692760_ohRa/invalid_intake_token_namespace.OV43/stdout.log
+nextflow_log=/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fmea_artifacts/run_20260916T232335Z_692760_ohRa/invalid_intake_token_namespace.OV43/nextflow.log
+timestamp_utc=2026-09-16T23:23:45Z

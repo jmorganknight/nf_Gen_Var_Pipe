@@ -1,0 +1,6 @@
+ref_data_root: "/media/jmk/Extreme Pro/pipeline_references"
+references:
+  sf:
+    acmg_registry_json: "clinical/acmg/schema.json"
+  somatic:
+    hotspots_bed: "beds/somatic_hotspots_v2.1.bed_hs38DH"

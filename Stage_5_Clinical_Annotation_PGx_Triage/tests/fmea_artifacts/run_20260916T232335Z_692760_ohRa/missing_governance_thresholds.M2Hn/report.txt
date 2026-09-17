@@ -1,0 +1,8 @@
+test_name=Missing Governance Thresholds
+expected_error=STAGE5_GERMLINE_FATAL
+exit_code=1
+expected_found=true
+primary_fatal=STAGE5_GERMLINE_FATAL: missing required governance key acmg_weights
+stdout_log=/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fmea_artifacts/run_20260916T232335Z_692760_ohRa/missing_governance_thresholds.M2Hn/stdout.log
+nextflow_log=/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_5_Clinical_Annotation_PGx_Triage/tests/fmea_artifacts/run_20260916T232335Z_692760_ohRa/missing_governance_thresholds.M2Hn/nextflow.log
+timestamp_utc=2026-09-16T23:23:41Z

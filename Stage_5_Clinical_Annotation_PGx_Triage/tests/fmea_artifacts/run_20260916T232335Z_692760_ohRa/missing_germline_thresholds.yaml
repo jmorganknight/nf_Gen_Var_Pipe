@@ -1,0 +1,3 @@
+clinical:
+  germline:
+    conflict_dampening_factor: 0.35

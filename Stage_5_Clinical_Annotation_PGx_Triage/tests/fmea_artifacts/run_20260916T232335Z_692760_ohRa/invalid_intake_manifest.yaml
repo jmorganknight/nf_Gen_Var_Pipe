@@ -1,0 +1,9 @@
+samples:
+  - sample_id: "HG002_STUB"
+    validation_token: "VALID_PASS|VARIANTS_HARMONIZED"
+    intake_validation_token: "BROKEN_STAGE0_TOKEN_NAMESPACE"
+    phased_vcf: "tests/inputs/hg002_stub/stub_assets/stub.vcf"
+    phased_vcf_tbi: "tests/inputs/hg002_stub/stub_assets/stub.vcf.tbi"
+    ancestry_metrics_json: "tests/inputs/hg002_stub/stub_assets/stub.ancestry_metrics.json"
+    phasing_audit_json: "tests/inputs/hg002_stub/stub_assets/stub.phasing_audit.json"
+    requested_branches: ["germline", "pgx", "prs", "sf", "somatic"]
