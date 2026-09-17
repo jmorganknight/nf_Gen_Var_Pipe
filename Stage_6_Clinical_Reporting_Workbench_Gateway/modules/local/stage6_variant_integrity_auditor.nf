@@ -6,7 +6,7 @@ process STAGE6_VARIANT_INTEGRITY_AUDITOR {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/audit_and_qc/stage6", mode: 'rellink', overwrite: true, pattern: '*.json'
+    publishDir "${params.outdir}/audit_and_qc/stage6", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(stage5_manifest), path(clinical_bundle_tar_gz), path(stage5_provenance_json), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta)
@@ -26,6 +26,7 @@ import json
 from pathlib import Path
 
 sid = '${sid}'
+reference_meta = json.loads('''${groovy.json.JsonOutput.toJson(reference_meta)}''')
 acmg = json.loads(Path('${acmg_tiered_variants_json}').read_text(encoding='utf-8'))
 candidates = json.loads(Path('${candidate_vus_json}').read_text(encoding='utf-8'))
 queue = json.loads(Path('${vus_queue_json}').read_text(encoding='utf-8'))
@@ -99,13 +100,16 @@ confidence = {
     'status': 'PASS',
 }
 Path(f'{sid}.stage6_variant_integrity_audit.json').write_text(json.dumps(confidence, indent=2) + "\\n", encoding='utf-8')
+integrity_path = str(Path(f'{sid}.stage6_variant_integrity_audit.json').resolve())
+ledger_path = str(Path(f'{sid}.stage6_variant_ledger.json').resolve())
 fragment = {
     'sample_id': sid,
     'component': 'variant_integrity',
-    'integrity_audit': f'{sid}.stage6_variant_integrity_audit.json',
-    'variant_ledger': f'{sid}.stage6_variant_ledger.json',
+    'integrity_audit': integrity_path,
+    'variant_ledger': ledger_path,
     'reported_variant_count': reported_count,
     'candidate_vus_count': candidate_count,
+    'upgraded_vus_count': upgraded_count,
     'status': 'PASS',
 }
 Path(f'{sid}.stage6_variant_integrity.fragment.json').write_text(json.dumps(fragment, indent=2) + "\\n", encoding='utf-8')
@@ -116,6 +120,6 @@ PYEOF
     """
     printf '{"node":"STAGE6_VARIANT_INTEGRITY_AUDITOR","sample_id":"%s","preflight_lock":"%s","preflight_lock_status":"%s","reported_variant_count":0,"candidate_vus_count":0,"upgraded_vus_count":0,"remaining_vus_count":0,"variant_loss_delta":0,"status":"PASS","stub":true}' "${meta.sample_id}" "${reference_meta.preflight_lock ?: ''}" "${reference_meta.preflight_lock_status ?: ''}" > "${meta.sample_id}.stage6_variant_integrity_audit.json"
     printf '{"node":"STAGE6_VARIANT_INTEGRITY_AUDITOR","sample_id":"%s","preflight_lock":"%s","preflight_lock_status":"%s","reported_variant_count":0,"candidate_vus_count":0,"upgraded_vus_count":0,"remaining_vus_count":0,"accounted_variant_count":0}' "${meta.sample_id}" "${reference_meta.preflight_lock ?: ''}" "${reference_meta.preflight_lock_status ?: ''}" > "${meta.sample_id}.stage6_variant_ledger.json"
-    printf '{"sample_id":"%s","component":"variant_integrity","integrity_audit":"%s.stage6_variant_integrity_audit.json","variant_ledger":"%s.stage6_variant_ledger.json","reported_variant_count":0,"candidate_vus_count":0,"status":"PASS"}' "${meta.sample_id}" "${meta.sample_id}" "${meta.sample_id}" > "${meta.sample_id}.stage6_variant_integrity.fragment.json"
+    printf '{"sample_id":"%s","component":"variant_integrity","integrity_audit":"%s/%s.stage6_variant_integrity_audit.json","variant_ledger":"%s/%s.stage6_variant_ledger.json","reported_variant_count":0,"candidate_vus_count":0,"upgraded_vus_count":0,"status":"PASS"}' "${meta.sample_id}" "\$PWD" "${meta.sample_id}" "\$PWD" "${meta.sample_id}" > "${meta.sample_id}.stage6_variant_integrity.fragment.json"
     """
 }

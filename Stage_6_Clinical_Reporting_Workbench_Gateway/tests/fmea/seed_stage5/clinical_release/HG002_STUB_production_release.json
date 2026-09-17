@@ -1,0 +1,54 @@
+{
+  "sample_id": "HG002_STUB",
+  "audit_trail": {
+    "bundle_sha256": "de8c57fcf6ba6abe0def69ddd0cdb40eff0b17210d14cdbb65284dc08b357297",
+    "container_digest": "sha256:1234abcd",
+    "git_commit_sha": "stage6_fmea_seed",
+    "timestamp_utc": "2026-09-16T00:00:00Z"
+  },
+  "clinical_payload": {
+    "metadata": {
+      "sample_id": "HG002_STUB",
+      "patient_id": "HG002_STUB",
+      "case_id": "HG002_STUB",
+      "timestamp_utc": "2026-09-16T00:00:00Z"
+    },
+    "branches": {
+      "germline": {
+        "reported_variants": [],
+        "summary": {
+          "status": "COMPLETED",
+          "reported_variant_count": 0
+        }
+      },
+      "somatic": {
+        "reported_variants": [],
+        "summary": {
+          "status": "COMPLETED",
+          "reported_variant_count": 0
+        }
+      },
+      "sf": {
+        "reported_variants": [],
+        "summary": {
+          "status": "COMPLETED",
+          "reported_variant_count": 0
+        }
+      },
+      "pgx": {
+        "reported_calls": [],
+        "summary": {
+          "status": "COMPLETED",
+          "reported_variant_count": 0
+        }
+      },
+      "prs": {
+        "score_payload": {},
+        "summary": {
+          "status": "COMPLETED",
+          "reported_variant_count": 0
+        }
+      }
+    }
+  }
+}

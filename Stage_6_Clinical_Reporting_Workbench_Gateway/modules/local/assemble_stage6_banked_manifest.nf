@@ -4,7 +4,7 @@ process ASSEMBLE_STAGE6_BANKED_MANIFEST {
     container 'genvar-reporting:2.1.0'
     stageInMode 'symlink'
 
-    publishDir "${params.outdir}", mode: 'rellink', overwrite: true, pattern: 'samples_*_banked_stage6.yaml'
+    publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'samples_*_banked_stage6.yaml'
 
     input:
     path manifest_fragments
@@ -31,28 +31,90 @@ fragment_paths = [Path(p) for p in json.loads(fragment_json)]
 provenance_paths = [Path(p) for p in json.loads(provenance_json)]
 lab_metrics_paths = [Path(p) for p in json.loads(lab_metrics_json)]
 
+
+def fail(message: str):
+    raise SystemExit(f'STAGE6_MANIFEST_ERROR: {message}')
+
+
+def read_json(path: Path):
+    try:
+        return json.loads(path.read_text(encoding='utf-8'))
+    except Exception as exc:
+        fail(f'failed to parse JSON at {path}: {exc}')
+
+
+def require_nonempty_text(container: dict, key: str, sid: str, component: str):
+    value = container.get(key, '')
+    text = str(value).strip() if value is not None else ''
+    if not text:
+        fail(f'missing required field {component}.{key} for sample {sid}')
+    template_token = chr(36) + '{'
+    if template_token in text:
+        fail(f'unresolved template literal in {component}.{key} for sample {sid}: {text}')
+    return text
+
+
+def resolve_existing_path(path_text: str, sid: str, field_name: str):
+    raw = (path_text or '').strip()
+    if not raw:
+        fail(f'missing required path {field_name} for sample {sid}')
+    template_token = chr(36) + '{'
+    if template_token in raw:
+        fail(f'unresolved template literal in {field_name} for sample {sid}: {raw}')
+    candidate = Path(raw)
+    resolved = (candidate if candidate.is_absolute() else (Path.cwd() / candidate)).resolve()
+    if not resolved.exists():
+        fail(f'path does not exist for {field_name} sample {sid}: {resolved}')
+    return str(resolved)
+
+
+def resolve_existing_dir(path_text: str, sid: str, field_name: str):
+    resolved = Path(resolve_existing_path(path_text, sid, field_name))
+    if not resolved.is_dir():
+        fail(f'expected directory for {field_name} sample {sid}: {resolved}')
+    return str(resolved)
+
+
+def parse_required_int(container: dict, key: str, sid: str, component: str):
+    if key not in container:
+        fail(f'missing required numeric field {component}.{key} for sample {sid}')
+    try:
+        return int(container.get(key))
+    except Exception:
+        fail(f'invalid integer for {component}.{key} sample {sid}: {container.get(key)}')
+
+
 by_sample = defaultdict(dict)
 for path in fragment_paths:
-    data = json.loads(path.read_text(encoding='utf-8'))
-    sid = data.get('sample_id', 'UNKNOWN')
+    data = read_json(path)
+    sid = str(data.get('sample_id', '')).strip()
+    if not sid:
+        fail(f'fragment missing sample_id: {path}')
     component = data.get('component', path.stem)
     by_sample[sid][component] = data
 
 for path in provenance_paths:
-    try:
-        data = json.loads(path.read_text(encoding='utf-8'))
-    except Exception:
-        continue
-    sid = data.get('sample_id', path.name.split('.')[0])
-    by_sample[sid]['provenance_sink'] = {'provenance_json': str(path), 'status': data.get('status', 'PASS')}
+    data = read_json(path)
+    sid = str(data.get('sample_id', '')).strip()
+    if not sid:
+        fail(f'provenance payload missing sample_id: {path}')
+    by_sample[sid]['provenance_sink'] = {
+        'provenance_json': str(path.resolve()),
+        'status': data.get('status', 'PASS'),
+    }
 
 for path in lab_metrics_paths:
-    try:
-        data = json.loads(path.read_text(encoding='utf-8'))
-    except Exception:
-        continue
-    sid = data.get('sample_id', path.name.split('.')[0])
-    by_sample[sid]['lab_metrics_sink'] = {'lab_metrics_json': str(path), 'status': data.get('status', 'PASS')}
+    data = read_json(path)
+    sid = str(data.get('sample_id', '')).strip()
+    if not sid:
+        fail(f'lab metrics payload missing sample_id: {path}')
+    by_sample[sid]['lab_metrics_sink'] = {
+        'lab_metrics_json': str(path.resolve()),
+        'status': data.get('status', 'PASS'),
+    }
+
+if not by_sample:
+    fail('no sample fragments were provided to Stage 6 manifest assembly')
 
 lines = []
 lines.append('# ==============================================================================')
@@ -71,29 +133,75 @@ for sid in sorted(by_sample):
     prov = comp.get('audit_sink', comp.get('provenance_sink', {}))
     metrics = comp.get('lab_metrics_sink', {})
 
+    if not isinstance(pre, dict):
+        fail(f'precondition component missing or malformed for sample {sid}')
+    if not isinstance(integ, dict):
+        fail(f'variant_integrity component missing or malformed for sample {sid}')
+    if not isinstance(wetlab, dict):
+        fail(f'wetlab_confirmation component missing or malformed for sample {sid}')
+    if not isinstance(wb, dict):
+        fail(f'workbench_gateway component missing or malformed for sample {sid}')
+    if not isinstance(report, dict):
+        fail(f'fhir_report component missing or malformed for sample {sid}')
+    if not isinstance(metrics, dict):
+        fail(f'lab_metrics_sink component missing or malformed for sample {sid}')
+
+    validation_token = require_nonempty_text(pre, 'validation_token', sid, 'precondition')
+    run_mode = require_nonempty_text(pre, 'run_mode', sid, 'precondition')
+    contamination_status = require_nonempty_text(pre, 'stage2_contamination_status', sid, 'precondition')
+    contamination_action = require_nonempty_text(pre, 'stage2_contamination_policy_action', sid, 'precondition')
+    save_dir = require_nonempty_text(pre, 'save_dir', sid, 'precondition')
+
+    stage6_precondition_guard_json = resolve_existing_path(require_nonempty_text(pre, 'guard_audit', sid, 'precondition'), sid, 'stage6_precondition_guard_json')
+    stage6_variant_integrity_audit_json = resolve_existing_path(require_nonempty_text(integ, 'integrity_audit', sid, 'variant_integrity'), sid, 'stage6_variant_integrity_audit_json')
+    stage6_variant_ledger_json = resolve_existing_path(require_nonempty_text(integ, 'variant_ledger', sid, 'variant_integrity'), sid, 'stage6_variant_ledger_json')
+    wetlab_confirmation_pending_queue_json = resolve_existing_path(require_nonempty_text(wetlab, 'pending_queue', sid, 'wetlab_confirmation'), sid, 'wetlab_confirmation_pending_queue_json')
+    medical_director_signoff_json = resolve_existing_path(require_nonempty_text(wb, 'signoff', sid, 'workbench_gateway'), sid, 'medical_director_signoff_json')
+    fhir_genomics_json = resolve_existing_path(require_nonempty_text(report, 'fhir_json', sid, 'fhir_report'), sid, 'fhir_genomics_json')
+    clinical_report_html = resolve_existing_path(require_nonempty_text(report, 'html_report', sid, 'fhir_report'), sid, 'clinical_report_html')
+    clinical_report_pdf = resolve_existing_path(require_nonempty_text(report, 'pdf_report', sid, 'fhir_report'), sid, 'clinical_report_pdf')
+
+    provenance_value = report.get('provenance_audit_json', '')
+    if not str(provenance_value).strip() and isinstance(prov, dict):
+        provenance_value = prov.get('provenance_json', '')
+    provenance_audit_json = resolve_existing_path(str(provenance_value), sid, 'provenance_audit_json')
+    lab_metrics_json = resolve_existing_path(require_nonempty_text(metrics, 'lab_metrics_json', sid, 'lab_metrics_sink'), sid, 'lab_metrics_json')
+
+    reported_variant_count = parse_required_int(integ, 'reported_variant_count', sid, 'variant_integrity')
+    candidate_vus_count = parse_required_int(integ, 'candidate_vus_count', sid, 'variant_integrity')
+    upgraded_vus_count = parse_required_int(integ, 'upgraded_vus_count', sid, 'variant_integrity')
+    pending_confirmation_count = parse_required_int(wetlab, 'pending_confirmation_count', sid, 'wetlab_confirmation')
+    signoff_status_value = wb.get('signoff_status', report.get('report_status', ''))
+    signoff_status = str(signoff_status_value).strip()
+    if not signoff_status:
+        fail(f'missing required signoff status for sample {sid}')
+    template_token = chr(36) + '{'
+    if template_token in signoff_status:
+        fail(f'unresolved template literal in signoff status for sample {sid}: {signoff_status}')
+
     lines.append(f'  - sample_id: "{sid}"')
-    lines.append(f'    validation_token: "{pre.get("validation_token", "VALID_PASS|VARIANTS_HARMONIZED|STAGE6_COMPLETE")}"')
-    lines.append(f'    run_mode: "{pre.get("run_mode", "production")}"')
-    lines.append(f'    stage2_contamination_status: "{pre.get("stage2_contamination_status", "")}"')
-    lines.append(f'    stage2_contamination_policy_action: "{pre.get("stage2_contamination_policy_action", "")}"')
+    lines.append(f'    validation_token: "{validation_token}"')
+    lines.append(f'    run_mode: "{run_mode}"')
+    lines.append(f'    stage2_contamination_status: "{contamination_status}"')
+    lines.append(f'    stage2_contamination_policy_action: "{contamination_action}"')
     lines.append('    stage6_outputs:')
-    lines.append(f'      stage6_precondition_guard_json: "{pre.get("guard_audit", "")}"')
-    lines.append(f'      stage6_variant_integrity_audit_json: "{integ.get("integrity_audit", "")}"')
-    lines.append(f'      stage6_variant_ledger_json: "{integ.get("variant_ledger", "")}"')
-    lines.append(f'      wetlab_confirmation_pending_queue_json: "{wetlab.get("pending_queue", "")}"')
-    lines.append(f'      medical_director_signoff_json: "{wb.get("signoff", "")}"')
-    lines.append(f'      fhir_genomics_json: "{report.get("fhir_json", "")}"')
-    lines.append(f'      clinical_report_html: "{report.get("html_report", "")}"')
-    lines.append(f'      clinical_report_pdf: "{report.get("pdf_report", "")}"')
-    lines.append(f'      provenance_audit_json: "{report.get("provenance_audit_json", prov.get("provenance_json", ""))}"')
-    lines.append(f'      lab_metrics_json: "{metrics.get("lab_metrics_json", "")}"')
+    lines.append(f'      stage6_precondition_guard_json: "{stage6_precondition_guard_json}"')
+    lines.append(f'      stage6_variant_integrity_audit_json: "{stage6_variant_integrity_audit_json}"')
+    lines.append(f'      stage6_variant_ledger_json: "{stage6_variant_ledger_json}"')
+    lines.append(f'      wetlab_confirmation_pending_queue_json: "{wetlab_confirmation_pending_queue_json}"')
+    lines.append(f'      medical_director_signoff_json: "{medical_director_signoff_json}"')
+    lines.append(f'      fhir_genomics_json: "{fhir_genomics_json}"')
+    lines.append(f'      clinical_report_html: "{clinical_report_html}"')
+    lines.append(f'      clinical_report_pdf: "{clinical_report_pdf}"')
+    lines.append(f'      provenance_audit_json: "{provenance_audit_json}"')
+    lines.append(f'      lab_metrics_json: "{lab_metrics_json}"')
     lines.append('    integrity_summary:')
-    lines.append(f'      reported_variant_count: {int(integ.get("reported_variant_count", 0) or 0)}')
-    lines.append(f'      candidate_vus_count: {int(integ.get("candidate_vus_count", 0) or 0)}')
-    lines.append(f'      upgraded_vus_count: {int(integ.get("upgraded_vus_count", 0) or 0)}')
-    lines.append(f'      pending_confirmation_count: {int(wetlab.get("pending_confirmation_count", 0) or 0)}')
-    lines.append(f'      signoff_status: "{wb.get("signoff_status", report.get("report_status", "PENDING_DIRECTOR_REVIEW"))}"')
-    lines.append('    save_dir: "${params.outdir}"')
+    lines.append(f'      reported_variant_count: {reported_variant_count}')
+    lines.append(f'      candidate_vus_count: {candidate_vus_count}')
+    lines.append(f'      upgraded_vus_count: {upgraded_vus_count}')
+    lines.append(f'      pending_confirmation_count: {pending_confirmation_count}')
+    lines.append(f'      signoff_status: "{signoff_status}"')
+    lines.append(f'    save_dir: "{save_dir}"')
 
 content = '\\n'.join(lines) + '\\n'
 sample_ids = sorted(str(sid) for sid in by_sample.keys())

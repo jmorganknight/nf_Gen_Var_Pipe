@@ -6,13 +6,13 @@ process MEDICAL_DIRECTOR_WORKBENCH_GATEWAY {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/audit_and_qc/stage6", mode: 'rellink', overwrite: true, pattern: '*.json'
+    publishDir "${params.outdir}/audit_and_qc/stage6", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(stage5_manifest), path(clinical_bundle_tar_gz), path(stage5_provenance_json), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta)
 
     output:
-    path 'medical_director_workbench_signoff.json', emit: signoff
+    path "${meta.sample_id}.medical_director_workbench_signoff.json", emit: signoff
     tuple val(meta), path("${meta.sample_id}.stage6_workbench.fragment.json"), emit: fragment
 
     script:
@@ -79,11 +79,13 @@ payload = {
     'signed_bundle': '${clinical_bundle_tar_gz}',
     'workflow_gate': 'STAGE6_CLINICAL_WORKBENCH',
 }
-Path('medical_director_workbench_signoff.json').write_text(json.dumps(payload, indent=2) + "\\n", encoding='utf-8')
+signoff_name = f'{sid}.medical_director_workbench_signoff.json'
+Path(signoff_name).write_text(json.dumps(payload, indent=2) + "\\n", encoding='utf-8')
+signoff_path = str(Path(signoff_name).resolve())
 fragment = {
     'sample_id': sid,
     'component': 'workbench_gateway',
-    'signoff': 'medical_director_workbench_signoff.json',
+    'signoff': signoff_path,
     'signoff_status': 'PENDING_DIRECTOR_REVIEW',
     'candidate_vus_count': candidate_count,
     'reported_variant_count': reported_count,
@@ -114,8 +116,9 @@ payload = {
     'approval_digest': 'stub',
     'workflow_gate': 'STAGE6_CLINICAL_WORKBENCH',
 }
-Path('medical_director_workbench_signoff.json').write_text(json.dumps(payload, indent=2) + '\\n', encoding='utf-8')
-Path(f'{sid}.stage6_workbench.fragment.json').write_text(json.dumps({'sample_id': sid, 'component': 'workbench_gateway', 'signoff': 'medical_director_workbench_signoff.json', 'signoff_status': 'PENDING_DIRECTOR_REVIEW', 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
+signoff_name = f'{sid}.medical_director_workbench_signoff.json'
+Path(signoff_name).write_text(json.dumps(payload, indent=2) + '\\n', encoding='utf-8')
+Path(f'{sid}.stage6_workbench.fragment.json').write_text(json.dumps({'sample_id': sid, 'component': 'workbench_gateway', 'signoff': str(Path(signoff_name).resolve()), 'signoff_status': 'PENDING_DIRECTOR_REVIEW', 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
 PYEOF
     """
 }

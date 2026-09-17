@@ -6,15 +6,15 @@ process FHIR_REPORT_BUILDER {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/reporting", mode: 'rellink', overwrite: true, pattern: '*.*'
+    publishDir "${params.outdir}/reporting", mode: 'copy', overwrite: true, pattern: '*.*'
 
     input:
     tuple val(meta), path(stage5_manifest), path(clinical_bundle_tar_gz), path(stage5_provenance_json), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta)
 
     output:
-    path 'fhir_genomics_v3.json', emit: fhir_json
-    path 'clinical_report.html', emit: html_report
-    path 'clinical_report.pdf', emit: pdf_report
+    path "${meta.sample_id}.fhir_genomics_v3.json", emit: fhir_json
+    path "${meta.sample_id}.clinical_report.html", emit: html_report
+    path "${meta.sample_id}.clinical_report.pdf", emit: pdf_report
     tuple val(meta), path("${meta.sample_id}.provenance_audit.json"), emit: provenance_audit
     tuple val(meta), path("${meta.sample_id}.stage6_report.fragment.json"), emit: fragment
 
@@ -30,6 +30,13 @@ import hashlib
 from pathlib import Path
 
 sid = '${sid}'
+fhir_name = f'{sid}.fhir_genomics_v3.json'
+html_name = f'{sid}.clinical_report.html'
+pdf_name = f'{sid}.clinical_report.pdf'
+provenance_name = f'{sid}.provenance_audit.json'
+sink_name = f'{sid}.downgraded_variants_sink.json.gz'
+wetlab_name = f'{sid}.wetlab_confirmation_pending_queue.json'
+ledger_name = f'{sid}.stage6_variant_ledger.json'
 acmg = json.loads(Path('${acmg_tiered_variants_json}').read_text(encoding='utf-8'))
 candidate_payload = json.loads(Path('${candidate_vus_json}').read_text(encoding='utf-8'))
 queue = json.loads(Path('${vus_queue_json}').read_text(encoding='utf-8'))
@@ -161,9 +168,9 @@ provenance_payload = {
         'hotspot_registry': {'path': reference_meta_json.get('hotspot_registry', ''), 'sha256': sha256sum(reference_meta_json.get('hotspot_registry', ''))},
     },
     'pipeline_sinks': {
-        'downgraded_variants_sink_json_gz': {'path': 'downgraded_variants_sink.json.gz', 'exists': Path('downgraded_variants_sink.json.gz').exists()},
-        'wetlab_confirmation_pending_queue_json': {'path': 'wetlab_confirmation_pending_queue.json', 'exists': Path('wetlab_confirmation_pending_queue.json').exists()},
-        'zero_loss_ledger': {'path': f'{sid}.stage6_variant_ledger.json', 'exists': Path(f'{sid}.stage6_variant_ledger.json').exists()},
+        'downgraded_variants_sink_json_gz': {'path': sink_name, 'exists': Path(sink_name).exists()},
+        'wetlab_confirmation_pending_queue_json': {'path': wetlab_name, 'exists': Path(wetlab_name).exists()},
+        'zero_loss_ledger': {'path': ledger_name, 'exists': Path(ledger_name).exists()},
         'consent_bypass_secondary_findings': {'path': '${sf_artifact}', 'exists': Path('${sf_artifact}').exists()},
         'consent_bypass_prs': {'path': '${prs_artifact}', 'exists': Path('${prs_artifact}').exists()},
     },
@@ -176,7 +183,7 @@ provenance_payload = {
     },
     'digital_signatures': signoff_payload.get('digital_signatures', []),
 }
-Path(f'{sid}.provenance_audit.json').write_text(json.dumps(provenance_payload, indent=2) + "\\n", encoding='utf-8')
+Path(provenance_name).write_text(json.dumps(provenance_payload, indent=2) + "\\n", encoding='utf-8')
 
 bundle = {
     'resourceType': 'Bundle',
@@ -224,7 +231,7 @@ bundle = {
         {'url': 'urn:stage6:digital_signatures', 'valueString': json.dumps(signoff_payload.get('digital_signatures', []))},
     ],
 }
-Path('fhir_genomics_v3.json').write_text(json.dumps(bundle, indent=2) + "\\n", encoding='utf-8')
+Path(fhir_name).write_text(json.dumps(bundle, indent=2) + "\\n", encoding='utf-8')
 
 section_cards = []
 for title, items, css in [
@@ -293,7 +300,7 @@ html = f'''<!doctype html>
 </body>
 </html>
 '''
-Path('clinical_report.html').write_text(html, encoding='utf-8')
+Path(html_name).write_text(html, encoding='utf-8')
 
 # Minimal valid PDF generation without external dependencies.
 lines = [
@@ -347,15 +354,15 @@ for off in offsets[1:]:
 parts.append(b'trailer << /Size 6 /Root 1 0 R >>\\nstartxref\\n')
 parts.append(f'{xref_offset}\\n'.encode('utf-8'))
 parts.append(b'%%EOF\\n')
-Path('clinical_report.pdf').write_bytes(b''.join(parts))
+Path(pdf_name).write_bytes(b''.join(parts))
 
 fragment = {
     'sample_id': sid,
     'component': 'fhir_report',
-    'fhir_json': 'fhir_genomics_v3.json',
-    'html_report': 'clinical_report.html',
-    'pdf_report': 'clinical_report.pdf',
-    'provenance_audit_json': f'{sid}.provenance_audit.json',
+    'fhir_json': str(Path(fhir_name).resolve()),
+    'html_report': str(Path(html_name).resolve()),
+    'pdf_report': str(Path(pdf_name).resolve()),
+    'provenance_audit_json': str(Path(provenance_name).resolve()),
     'report_status': 'PRELIMINARY',
     'status': 'PASS',
 }
@@ -372,11 +379,15 @@ from pathlib import Path
 
 sid = '${meta.sample_id}'
 reference_meta = json.loads('''${stubReferenceMetaJson}''')
-Path('fhir_genomics_v3.json').write_text(json.dumps({'resourceType': 'Bundle', 'type': 'collection', 'entry': []}, indent=2) + '\\n', encoding='utf-8')
-Path('clinical_report.html').write_text('<html><body><h1>Stage 6 Clinical Reporting Workbench Gateway</h1></body></html>\\n', encoding='utf-8')
-Path('clinical_report.pdf').write_bytes(b'%PDF-1.4\\n%%EOF\\n')
-Path(f'{sid}.provenance_audit.json').write_text(json.dumps({'sample_id': sid, 'component': 'provenance', 'reference_assets': reference_meta, 'preflight_lock': reference_meta.get('preflight_lock', ''), 'preflight_lock_status': reference_meta.get('preflight_lock_status', ''), 'digital_signatures': [{'signature_algorithm': 'RS256', 'signature_value': 'STUB', 'signer_id': 'clinical_signer', 'public_key_fingerprint': 'STUB'}], 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
-Path(f'{sid}.stage6_report.fragment.json').write_text(json.dumps({'sample_id': sid, 'component': 'fhir_report', 'fhir_json': 'fhir_genomics_v3.json', 'html_report': 'clinical_report.html', 'pdf_report': 'clinical_report.pdf', 'provenance_audit_json': f'{sid}.provenance_audit.json', 'report_status': 'PRELIMINARY', 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
+fhir_name = f'{sid}.fhir_genomics_v3.json'
+html_name = f'{sid}.clinical_report.html'
+pdf_name = f'{sid}.clinical_report.pdf'
+provenance_name = f'{sid}.provenance_audit.json'
+Path(fhir_name).write_text(json.dumps({'resourceType': 'Bundle', 'type': 'collection', 'entry': []}, indent=2) + '\\n', encoding='utf-8')
+Path(html_name).write_text('<html><body><h1>Stage 6 Clinical Reporting Workbench Gateway</h1></body></html>\\n', encoding='utf-8')
+Path(pdf_name).write_bytes(b'%PDF-1.4\\n%%EOF\\n')
+Path(provenance_name).write_text(json.dumps({'sample_id': sid, 'component': 'provenance', 'reference_assets': reference_meta, 'preflight_lock': reference_meta.get('preflight_lock', ''), 'preflight_lock_status': reference_meta.get('preflight_lock_status', ''), 'digital_signatures': [{'signature_algorithm': 'RS256', 'signature_value': 'STUB', 'signer_id': 'clinical_signer', 'public_key_fingerprint': 'STUB'}], 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
+Path(f'{sid}.stage6_report.fragment.json').write_text(json.dumps({'sample_id': sid, 'component': 'fhir_report', 'fhir_json': str(Path(fhir_name).resolve()), 'html_report': str(Path(html_name).resolve()), 'pdf_report': str(Path(pdf_name).resolve()), 'provenance_audit_json': str(Path(provenance_name).resolve()), 'report_status': 'PRELIMINARY', 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
 PYEOF
     """
 }

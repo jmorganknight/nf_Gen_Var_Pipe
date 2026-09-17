@@ -6,7 +6,7 @@ process STAGE6_PRECONDITION_GUARD {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/audit_and_qc/stage6", mode: 'rellink', overwrite: true, pattern: '*.json'
+    publishDir "${params.outdir}/audit_and_qc/stage6", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(stage5_manifest), path(clinical_bundle_tar_gz), path(stage5_provenance_json), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta)
@@ -44,6 +44,10 @@ audit = {
     'sample_id': sid,
     'component': 'precondition',
     'validation_token': '${token}',
+    'run_mode': '${meta.run_mode}',
+    'stage2_contamination_status': '${meta.stage2_contamination_status}',
+    'stage2_contamination_policy_action': '${meta.stage2_contamination_policy_action}',
+    'save_dir': '${meta.save_dir}',
     'preflight_lock': reference_meta.get('preflight_lock', '') if isinstance(reference_meta, dict) else '',
     'preflight_lock_status': reference_meta.get('preflight_lock_status', '') if isinstance(reference_meta, dict) else '',
     'stage5_manifest': '${stage5_manifest}',
@@ -65,10 +69,16 @@ if not audit['preflight_lock']:
 if audit['preflight_lock_status'] != 'STAGE0_PREFLIGHT_LOCK_PASS':
     raise SystemExit(f"STAGE6_PRECONDITION_FAILURE: invalid preflight_lock_status for {sid}: {audit['preflight_lock_status']}")
 Path(f'{sid}.stage6_precondition_guard.json').write_text(json.dumps(audit, indent=2) + "\\n", encoding='utf-8')
+guard_path = str(Path(f'{sid}.stage6_precondition_guard.json').resolve())
 fragment = {
     'sample_id': sid,
     'component': 'precondition',
-    'guard_audit': f'{sid}.stage6_precondition_guard.json',
+    'validation_token': '${token}',
+    'run_mode': '${meta.run_mode}',
+    'stage2_contamination_status': '${meta.stage2_contamination_status}',
+    'stage2_contamination_policy_action': '${meta.stage2_contamination_policy_action}',
+    'save_dir': '${meta.save_dir}',
+    'guard_audit': guard_path,
     'status': 'PASS',
 }
 Path(f'{sid}.stage6_precondition.fragment.json').write_text(json.dumps(fragment, indent=2) + "\\n", encoding='utf-8')
@@ -78,6 +88,6 @@ PYEOF
     stub:
     """
     printf '{"node":"STAGE6_PRECONDITION_GUARD","sample_id":"%s","preflight_lock":"%s","preflight_lock_status":"%s","status":"PASS","stub":true}' "${meta.sample_id}" "${reference_meta.preflight_lock ?: ''}" "${reference_meta.preflight_lock_status ?: ''}" > "${meta.sample_id}.stage6_precondition_guard.json"
-    printf '{"sample_id":"%s","component":"precondition","guard_audit":"%s.stage6_precondition_guard.json","status":"PASS"}' "${meta.sample_id}" "${meta.sample_id}" > "${meta.sample_id}.stage6_precondition.fragment.json"
+    printf '{"sample_id":"%s","component":"precondition","validation_token":"%s","run_mode":"%s","stage2_contamination_status":"%s","stage2_contamination_policy_action":"%s","save_dir":"%s","guard_audit":"%s/%s.stage6_precondition_guard.json","status":"PASS"}' "${meta.sample_id}" "${meta.validation_token}" "${meta.run_mode ?: ''}" "${meta.stage2_contamination_status ?: ''}" "${meta.stage2_contamination_policy_action ?: ''}" "${meta.save_dir ?: ''}" "\$PWD" "${meta.sample_id}" > "${meta.sample_id}.stage6_precondition.fragment.json"
     """
 }

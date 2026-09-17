@@ -1,0 +1,13 @@
+ref_data_root: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_6_Clinical_Reporting_Workbench_Gateway/tests/fmea/seed_references"
+references:
+  reference_genome: "genome.fa"
+  reference_fai: "genome.fa.fai"
+  reference_dict: "genome.dict"
+  hotspot_registry: "hotspots.bed"
+  clinvar_db: "clinvar.vcf.gz"
+  gnomad_db: "gnomad.vcf.gz"
+  hgmd_db: "hgmd.tsv"
+  sf_bed: "sf.bed"
+  prs_weights: "prs_weights.tsv"
+  preflight_lock: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe/Stage_6_Clinical_Reporting_Workbench_Gateway/tests/fmea/seed_references/preflight.lock"
+  preflight_lock_status: "STAGE0_PREFLIGHT_LOCK_PASS"

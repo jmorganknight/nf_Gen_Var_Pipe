@@ -1,0 +1,15 @@
+samples:
+  - sample_id: "HG002_STUB"
+    validation_token: "VALID_PASS|VARIANTS_HARMONIZED|STAGE5_COMPLETE"
+    run_mode: "production"
+    stage2_contamination_status: "CLEAR"
+    stage2_contamination_policy_action: "PROCEED"
+    stage5_outputs:
+      acmg_tiered_variants_json: "annotation/HG002_STUB.stage5_acmg_tiered_variants.json"
+      vus_triage_queue_json: "annotation/HG002_STUB.stage5_vus_triage_queue.json"
+      sf_report_json: "secondary_findings/HG002_STUB.acmg_sf_bypassed_audit.json"
+      prs_calibrated_report_json: "prs/HG002_STUB.prs_bypassed_audit.json"
+      pgx_report_json: "pgx/HG002_STUB.pgx_report.json"
+      clinical_bundle_tar_gz: "pgx/HG002_STUB.clinical_bundle.tar.gz"
+      provenance_json: "pgx/HG002_STUB.provenance.json"
+      production_release_json: "clinical_release/HG002_STUB_production_release.json"

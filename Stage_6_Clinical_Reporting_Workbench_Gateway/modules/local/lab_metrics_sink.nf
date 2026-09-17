@@ -6,7 +6,7 @@ process LAB_METRICS_SINK {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/audit_and_qc/stage6", mode: 'rellink', overwrite: true, pattern: '*.lab_metrics.json'
+    publishDir "${params.outdir}/audit_and_qc/stage6", mode: 'copy', overwrite: true, pattern: '*.lab_metrics.json'
 
     input:
     tuple val(meta), path(stage5_manifest), path(clinical_bundle_tar_gz), path(stage5_provenance_json), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta)
@@ -75,7 +75,7 @@ Path(f'{sid}.lab_metrics.json').write_text(json.dumps(payload, indent=2) + '\\n'
 fragment = {
     'sample_id': sid,
     'component': 'lab_metrics_sink',
-    'lab_metrics_json': f'{sid}.lab_metrics.json',
+    'lab_metrics_json': str(Path(f'{sid}.lab_metrics.json').resolve()),
     'status': 'PASS',
 }
 Path(f'{sid}.stage6_lab_metrics.fragment.json').write_text(json.dumps(fragment, indent=2) + '\\n', encoding='utf-8')
@@ -89,7 +89,7 @@ import json
 from pathlib import Path
 sid = '${meta.sample_id}'
 Path(f'{sid}.lab_metrics.json').write_text(json.dumps({'node': 'LAB_METRICS_SINK', 'sample_id': sid, 'status': 'PASS', 'stub': True}, indent=2) + '\\n', encoding='utf-8')
-Path(f'{sid}.stage6_lab_metrics.fragment.json').write_text(json.dumps({'sample_id': sid, 'component': 'lab_metrics_sink', 'lab_metrics_json': f'{sid}.lab_metrics.json', 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
+Path(f'{sid}.stage6_lab_metrics.fragment.json').write_text(json.dumps({'sample_id': sid, 'component': 'lab_metrics_sink', 'lab_metrics_json': str(Path(f'{sid}.lab_metrics.json').resolve()), 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
 PYEOF
     """
 }

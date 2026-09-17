@@ -6,13 +6,13 @@ process STAGE6_WETLAB_CONFIRMATION_GATE {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/audit_and_qc/stage6", mode: 'rellink', overwrite: true, pattern: '*.json'
+    publishDir "${params.outdir}/audit_and_qc/stage6", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(stage5_manifest), path(clinical_bundle_tar_gz), path(stage5_provenance_json), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta)
 
     output:
-    path 'wetlab_confirmation_pending_queue.json', emit: pending_queue
+    path "${meta.sample_id}.wetlab_confirmation_pending_queue.json", emit: pending_queue
     tuple val(meta), path("${meta.sample_id}.stage6_wetlab_confirmation.fragment.json"), emit: fragment
 
     script:
@@ -70,17 +70,20 @@ for tier_name, tier_rows in (acmg.get('tiers', {}) if isinstance(acmg, dict) els
                 'action': 'SANGER_OR_MLPA_CONFIRMATION_PENDING',
             })
 
+pending_name = f'{sid}.wetlab_confirmation_pending_queue.json'
+
 payload = {
     'node': 'STAGE6_WETLAB_CONFIRMATION_GATE',
     'sample_id': sid,
     'pending_confirmation_count': len(pending),
     'pending_variants': pending,
 }
-Path('wetlab_confirmation_pending_queue.json').write_text(json.dumps(payload, indent=2) + "\\n", encoding='utf-8')
+Path(pending_name).write_text(json.dumps(payload, indent=2) + "\\n", encoding='utf-8')
+pending_path = str(Path(pending_name).resolve())
 fragment = {
     'sample_id': sid,
     'component': 'wetlab_confirmation',
-    'pending_queue': 'wetlab_confirmation_pending_queue.json',
+    'pending_queue': pending_path,
     'pending_confirmation_count': len(pending),
     'status': 'PASS',
 }
@@ -90,7 +93,7 @@ PYEOF
 
     stub:
     """
-    printf '{"node":"STAGE6_WETLAB_CONFIRMATION_GATE","sample_id":"%s","pending_confirmation_count":0,"pending_variants":[]}' "${meta.sample_id}" > wetlab_confirmation_pending_queue.json
-    printf '{"sample_id":"%s","component":"wetlab_confirmation","pending_queue":"wetlab_confirmation_pending_queue.json","pending_confirmation_count":0,"status":"PASS"}' "${meta.sample_id}" > "${meta.sample_id}.stage6_wetlab_confirmation.fragment.json"
+    printf '{"node":"STAGE6_WETLAB_CONFIRMATION_GATE","sample_id":"%s","pending_confirmation_count":0,"pending_variants":[]}' "${meta.sample_id}" > "${meta.sample_id}.wetlab_confirmation_pending_queue.json"
+    printf '{"sample_id":"%s","component":"wetlab_confirmation","pending_queue":"%s/%s.wetlab_confirmation_pending_queue.json","pending_confirmation_count":0,"status":"PASS"}' "${meta.sample_id}" "\$PWD" "${meta.sample_id}" > "${meta.sample_id}.stage6_wetlab_confirmation.fragment.json"
     """
 }

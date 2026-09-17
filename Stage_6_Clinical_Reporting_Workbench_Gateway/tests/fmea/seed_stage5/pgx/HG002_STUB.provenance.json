@@ -1,0 +1,11 @@
+{
+  "sample_id": "HG002_STUB",
+  "digital_signature": {
+    "signature_algorithm": "RS256",
+    "signature_value": "STUB",
+    "signer_id": "clinical_signer",
+    "public_key_fingerprint": "STUB",
+    "signed_digest_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "status": "PASS"
+}

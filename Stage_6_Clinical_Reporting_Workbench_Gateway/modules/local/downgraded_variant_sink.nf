@@ -6,13 +6,13 @@ process DOWNGRADED_VARIANT_SINK {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/audit_and_qc/stage6", mode: 'rellink', overwrite: true, pattern: '*.json.gz'
+    publishDir "${params.outdir}/audit_and_qc/stage6", mode: 'copy', overwrite: true, pattern: '*.json.gz'
 
     input:
     tuple val(meta), path(stage5_manifest), path(clinical_bundle_tar_gz), path(stage5_provenance_json), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta)
 
     output:
-    path 'downgraded_variants_sink.json.gz', emit: sink_archive
+    path "${meta.sample_id}.downgraded_variants_sink.json.gz", emit: sink_archive
     tuple val(meta), path("${meta.sample_id}.stage6_downgraded_sink.fragment.json"), emit: fragment
 
     script:
@@ -82,12 +82,13 @@ payload = {
     'remaining_vus_count': len(remaining),
     'upgraded_vus_count': len(upgraded),
 }
-with gzip.open('downgraded_variants_sink.json.gz', 'wt', encoding='utf-8') as handle:
+sink_name = f'{sid}.downgraded_variants_sink.json.gz'
+with gzip.open(sink_name, 'wt', encoding='utf-8') as handle:
     handle.write(json.dumps(payload, indent=2) + "\\n")
 fragment = {
     'sample_id': sid,
     'component': 'downgraded_sink',
-    'sink_archive': 'downgraded_variants_sink.json.gz',
+    'sink_archive': sink_name,
     'archive_count': len(archive),
     'status': 'PASS',
 }
@@ -102,9 +103,10 @@ import gzip, json
 from pathlib import Path
 sid = '${meta.sample_id}'
 payload = {'node':'DOWNGRADED_VARIANT_SINK','sample_id':sid,'archive_count':0,'archive':[]}
-with gzip.open('downgraded_variants_sink.json.gz', 'wt', encoding='utf-8') as handle:
+sink_name = f'{sid}.downgraded_variants_sink.json.gz'
+with gzip.open(sink_name, 'wt', encoding='utf-8') as handle:
     handle.write(json.dumps(payload, indent=2) + '\\n')
-Path(f'{sid}.stage6_downgraded_sink.fragment.json').write_text(json.dumps({'sample_id': sid, 'component': 'downgraded_sink', 'sink_archive': 'downgraded_variants_sink.json.gz', 'archive_count': 0, 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
+Path(f'{sid}.stage6_downgraded_sink.fragment.json').write_text(json.dumps({'sample_id': sid, 'component': 'downgraded_sink', 'sink_archive': sink_name, 'archive_count': 0, 'status': 'PASS'}, indent=2) + '\\n', encoding='utf-8')
 PYEOF
     """
 }

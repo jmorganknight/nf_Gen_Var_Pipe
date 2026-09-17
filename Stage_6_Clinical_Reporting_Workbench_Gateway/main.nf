@@ -1,6 +1,7 @@
 nextflow.enable.dsl = 2
 
 include { STAGE6_PRECONDITION_GUARD } from './modules/local/stage6_precondition_guard.nf'
+include { VERIFY_STAGE5_SIGNATURE } from './modules/local/verify_stage5_signature.nf'
 include { STAGE6_VARIANT_INTEGRITY_AUDITOR } from './modules/local/stage6_variant_integrity_auditor.nf'
 include { DOWNGRADED_VARIANT_SINK } from './modules/local/downgraded_variant_sink.nf'
 include { STAGE6_WETLAB_CONFIRMATION_GATE } from './modules/local/stage6_wetlab_confirmation_gate.nf'
@@ -9,6 +10,7 @@ include { FHIR_REPORT_BUILDER } from './modules/local/fhir_report_builder.nf'
 include { AUDIT_SINK } from './modules/local/audit_sink.nf'
 include { LAB_METRICS_SINK } from './modules/local/lab_metrics_sink.nf'
 include { ASSEMBLE_STAGE6_BANKED_MANIFEST } from './modules/local/assemble_stage6_banked_manifest.nf'
+include { STAGE6_RELEASE_FINALIZER } from './modules/local/stage6_release_finalizer.nf'
 
 
 def mapOrEmpty(Object value) {
@@ -203,13 +205,20 @@ workflow STAGE6_CLINICAL_REPORTING_WORKBENCH_GATEWAY {
 
     main:
     STAGE6_PRECONDITION_GUARD(ch_stage6_inputs)
-    STAGE6_VARIANT_INTEGRITY_AUDITOR(STAGE6_PRECONDITION_GUARD.out.validated_bundle)
-    DOWNGRADED_VARIANT_SINK(STAGE6_PRECONDITION_GUARD.out.validated_bundle)
-    STAGE6_WETLAB_CONFIRMATION_GATE(STAGE6_PRECONDITION_GUARD.out.validated_bundle)
-    MEDICAL_DIRECTOR_WORKBENCH_GATEWAY(STAGE6_PRECONDITION_GUARD.out.validated_bundle)
-    FHIR_REPORT_BUILDER(STAGE6_PRECONDITION_GUARD.out.validated_bundle)
-    AUDIT_SINK(STAGE6_PRECONDITION_GUARD.out.validated_bundle)
-    LAB_METRICS_SINK(STAGE6_PRECONDITION_GUARD.out.validated_bundle)
+    def verificationInput = STAGE6_PRECONDITION_GUARD.out.validated_bundle
+        .map { meta, stage5_manifest, clinical_bundle_tar_gz, stage5_provenance_json, acmg_tiered_variants_json, candidate_vus_json, vus_queue_json, sf_artifact, prs_artifact, pgx_artifact, reference_meta ->
+            tuple(meta, stage5_manifest, clinical_bundle_tar_gz, stage5_provenance_json, acmg_tiered_variants_json, candidate_vus_json, vus_queue_json, sf_artifact, prs_artifact, pgx_artifact, reference_meta, file(meta.stage5_production_release_json, checkIfExists: true))
+        }
+
+    VERIFY_STAGE5_SIGNATURE(verificationInput)
+
+    STAGE6_VARIANT_INTEGRITY_AUDITOR(VERIFY_STAGE5_SIGNATURE.out.verified_bundle)
+    DOWNGRADED_VARIANT_SINK(VERIFY_STAGE5_SIGNATURE.out.verified_bundle)
+    STAGE6_WETLAB_CONFIRMATION_GATE(VERIFY_STAGE5_SIGNATURE.out.verified_bundle)
+    MEDICAL_DIRECTOR_WORKBENCH_GATEWAY(VERIFY_STAGE5_SIGNATURE.out.verified_bundle)
+    FHIR_REPORT_BUILDER(VERIFY_STAGE5_SIGNATURE.out.verified_bundle)
+    AUDIT_SINK(VERIFY_STAGE5_SIGNATURE.out.verified_bundle)
+    LAB_METRICS_SINK(VERIFY_STAGE5_SIGNATURE.out.verified_bundle)
 
     def allFragments = STAGE6_PRECONDITION_GUARD.out.fragment
         .mix(STAGE6_VARIANT_INTEGRITY_AUDITOR.out.fragment)
@@ -229,8 +238,19 @@ workflow STAGE6_CLINICAL_REPORTING_WORKBENCH_GATEWAY {
 
     ASSEMBLE_STAGE6_BANKED_MANIFEST(allFragments.collect(), provenanceAudits.collect(), labMetrics.collect())
 
+    def releaseArtifacts = FHIR_REPORT_BUILDER.out.fhir_json
+        .mix(FHIR_REPORT_BUILDER.out.html_report)
+        .mix(FHIR_REPORT_BUILDER.out.pdf_report)
+        .mix(MEDICAL_DIRECTOR_WORKBENCH_GATEWAY.out.signoff)
+        .mix(ASSEMBLE_STAGE6_BANKED_MANIFEST.out.banked_manifest)
+        .mix(AUDIT_SINK.out.provenance_json.map { _meta, provenance -> provenance })
+        .mix(LAB_METRICS_SINK.out.lab_metrics_json.map { _meta, metrics -> metrics })
+
+    STAGE6_RELEASE_FINALIZER(releaseArtifacts.collect())
+
     emit:
     banked_manifest = ASSEMBLE_STAGE6_BANKED_MANIFEST.out.banked_manifest
+    integrity_manifest = STAGE6_RELEASE_FINALIZER.out.sha256_manifest
 }
 
 workflow {
@@ -260,6 +280,8 @@ workflow {
 
     def stage5Parsed = ys.parse(stage5ManifestFile)
     def referenceInfo = referencesFile ? loadResolvedReferences(referencesFile) : [refs: [:], refDataRoot: null]
+    def referencesDocument = mapOrEmpty(referenceInfo.document)
+    def referencesDocumentMap = mapOrEmpty(referencesDocument.references ?: referencesDocument)
     def refsParsed = mapOrEmpty(referenceInfo.refs)
     def refsMerged = mapOrEmpty(refsParsed) + mapOrEmpty(params.refs)
     def thresholdsParsed = thresholdsFile ? mapOrEmpty(ys.parse(thresholdsFile)) : [:]
@@ -335,6 +357,8 @@ workflow {
         cyp2d6_mask      : refsMerged.stage3?.cyp2d6_paralog_mask_bed,
         reference_checksum_manifest: refsMerged.reference_checksum_manifest ?: "${projectDir}/../assets/reference_checksums.sha256",
         reference_asset_checksums  : mapOrEmpty(refsMerged.reference_asset_checksums),
+        preflight_lock   : refsMerged.preflight_lock,
+        preflight_lock_status: referencesDocumentMap.preflight_lock_status ?: refsMerged.preflight_lock_status,
     ]
 
     ['reference_genome', 'reference_fai', 'reference_dict', 'hotspot_registry', 'clinvar_db', 'gnomad_db', 'hgmd_db', 'sf_bed', 'prs_weights'].each { key ->
@@ -371,8 +395,11 @@ workflow {
         def pgxArtifact = resolveStage5Artifact(pgxDir, sample.stage5_outputs?.pgx_report_json?.toString(), "${sid}.pgx_report.json")
         def clinicalBundle = resolveStage5Artifact(pgxDir, sample.stage5_outputs?.clinical_bundle_tar_gz?.toString(), "${sid}.clinical_bundle.tar.gz")
         def stage5Provenance = resolveStage5Artifact(pgxDir, sample.stage5_outputs?.provenance_json?.toString(), "${sid}.provenance.json")
+        def releaseDir = new File(stage5Root, 'clinical_release')
+        def stage5ProductionRelease = resolveStage5Artifact(releaseDir, sample.stage5_outputs?.production_release_json?.toString(), "${sid}_production_release.json")
         def hasClinicalBundle = clinicalBundle != null && clinicalBundle.exists()
         def hasStage5Provenance = stage5Provenance != null && stage5Provenance.exists()
+        def hasStage5ProductionRelease = stage5ProductionRelease != null && stage5ProductionRelease.exists()
         if (!hasClinicalBundle) {
             writeStage6Rejection(params.outdir.toString(), sid, 'MISSING_STAGE5_SIGNED_BUNDLE', sample.stage5_outputs?.clinical_bundle_tar_gz?.toString() ?: 'unset')
             throw new IllegalStateException("STAGE6_PRECONDITION_FAILURE: missing Stage 5 signed clinical bundle for sample '${sid}'")
@@ -380,6 +407,10 @@ workflow {
         if (!hasStage5Provenance) {
             writeStage6Rejection(params.outdir.toString(), sid, 'MISSING_STAGE5_PROVENANCE', sample.stage5_outputs?.provenance_json?.toString() ?: 'unset')
             throw new IllegalStateException("STAGE6_PRECONDITION_FAILURE: missing Stage 5 provenance payload for sample '${sid}'")
+        }
+        if (!hasStage5ProductionRelease) {
+            writeStage6Rejection(params.outdir.toString(), sid, 'MISSING_STAGE5_PRODUCTION_RELEASE', sample.stage5_outputs?.production_release_json?.toString() ?: 'unset')
+            throw new IllegalStateException("STAGE6_PRECONDITION_FAILURE: missing Stage 5 production release payload for sample '${sid}'")
         }
 
         [acmgTiered, candidateVus, vusQueue, sfArtifact, prsArtifact, pgxArtifact].each { pathObj ->
@@ -400,6 +431,7 @@ workflow {
             stage5_outputs   : mapOrEmpty(sample.stage5_outputs),
             stage5_bundle    : clinicalBundle.toString(),
             stage5_provenance: stage5Provenance.toString(),
+            stage5_production_release_json: stage5ProductionRelease.toString(),
             stage5_bundle_present: hasClinicalBundle,
             stage5_provenance_present: hasStage5Provenance,
             reference_build  : mapOrEmpty(sample.reference_build),
