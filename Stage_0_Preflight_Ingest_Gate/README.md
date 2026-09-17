@@ -4,6 +4,12 @@ Standalone Stage 0 micro-pipeline for preflight intake validation, reference sna
 
 Stage 0 now consumes governed contracts from the centralized control_plane/ directory and banks audit evidence into tests/<sample_id>/audit_and_qc/ for downstream LIMS readiness.
 
+Current state:
+
+- This stage is the canonical intake lock for the full pipeline and produces the preflight-lock evidence consumed downstream.
+- The mini-control fixtures in `assets/mini_control/` and `Stage_0_Preflight_Ingest_Gate/tests/` are used for local validation and branch-routing smoke tests.
+- Banked outputs are consumed by Stage 1 as the first regulated handoff artifact.
+
 ## Architecture Flow
 
 ```mermaid

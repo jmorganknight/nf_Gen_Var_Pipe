@@ -2,6 +2,12 @@
 
 `Stage_3_Variant_Discovery_Engine` consumes the Stage 2 banked manifest and executes only the variant branches explicitly enabled in the contract.
 
+Current state:
+
+- Stage 3 branch execution is contract-driven and remains isolated by branch identifier.
+- The current structure supports the full discovery set and produces a stable Stage 4 handoff manifest.
+- Audit outputs are organized to preserve zero-loss branch provenance into phasing and clinical interpretation.
+
 Current production-wired branches:
 
 - `snv_indel`

@@ -2,6 +2,13 @@
 
 Production-grade Stage 6 reporting gateway for zero-loss variant reconciliation, Medical Director workbench payloads, HL7 FHIR genomics report generation, and telemetry sink consolidation.
 
+Current state:
+
+- Stage 6 now includes explicit Stage 5 signature verification before any downstream reporting work is allowed to proceed.
+- The stage enforces zero-loss candidate VUS reconciliation and fail-closed precondition validation.
+- A release finalizer computes `Stage6_SHA256SUMS.txt` for final artifact integrity evidence.
+- The Stage 6 FMEA suite now proves the critical negative cases, including signature mismatch and missing regulated metadata.
+
 ## Clinical Scope
 
 Stage 6 consumes Stage 5 banked artifacts and enforces final fail-closed report governance before clinical handoff.
@@ -47,6 +54,7 @@ flowchart TD
 ## Module Inventory
 
 - `stage6_precondition_guard.nf`: validates Stage 5 contract completeness and token eligibility.
+- `verify_stage5_signature.nf`: verifies the signed Stage 5 release payload against the canonical clinical bundle digest.
 - `stage6_variant_integrity_auditor.nf`: enforces zero-loss candidate VUS reconciliation.
 - `downgraded_variant_sink.nf`: emits downgraded/suppressed variant sink artifacts.
 - `stage6_wetlab_confirmation_gate.nf`: materializes wet-lab confirmation queue artifacts.
@@ -54,6 +62,7 @@ flowchart TD
 - `fhir_report_builder.nf`: builds FHIR, HTML, PDF, and provenance outputs.
 - `audit_sink.nf`: consolidates audit payload lineage.
 - `lab_metrics_sink.nf`: emits operational laboratory metrics.
+- `stage6_release_finalizer.nf`: packages release artifact checksums into `Stage6_SHA256SUMS.txt`.
 - `assemble_stage6_banked_manifest.nf`: renders the Stage 6 banked manifest.
 
 ## Inputs
@@ -82,6 +91,13 @@ Published under Stage 6 output tree:
 - `reporting/clinical_report.pdf`
 - `reporting/*.provenance_audit.json`
 - Stage 6 banked manifest
+- `Stage6_SHA256SUMS.txt`
+
+Formal audit evidence is also tracked in:
+
+- `docs/STAGE6_REMEDIATION_CHANGELOG.md`
+- `tests/fmea/stage6_fmea_summary.tsv`
+- `stage6_audit_evidence.tar.gz`
 
 ## Zero-Loss Integrity Gate
 
@@ -151,4 +167,5 @@ python3 tests/fmea/run_stage6_fmea_suite.py
 ## Notes
 
 - Stage 6 is the final fail-closed reporting boundary before clinical delivery.
-- Signature lineage from Stage 5 is propagated into both workbench and FHIR reporting artifacts.
+- Signature lineage from Stage 5 is verified and propagated into both workbench and FHIR reporting artifacts.
+- The current release state includes final checksum packaging and formal remediation evidence for audit replay.

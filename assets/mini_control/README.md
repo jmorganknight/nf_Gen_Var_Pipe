@@ -4,6 +4,12 @@ This directory contains a governed mini-control dataset used to exercise branch 
 
 It now pairs with the unified samples_mini_control.yaml manifest, which uses the canonical schema standard and supports stage-skipping lookahead blocks for manual debugging.
 
+Current state:
+
+- The mini-control dataset is used for local stage smoke tests and branch-routing validation across the full pipeline.
+- It remains a compact, governed fixture for reproducing the documented Stage 0-6 execution flow.
+- The files here are intentionally small and stable so they can support documentation, testing, and audit examples.
+
 ## Files
 
 - `samples_mini_control.yaml`: Unified canonical mini-control manifest for Stage 0-6 debugging.

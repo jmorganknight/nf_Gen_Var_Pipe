@@ -7,6 +7,12 @@ Images:
 - `genvar-annotation:2.1.0`: Stage 5 annotation and PGx triage.
 - `genvar-reporting:2.1.0`: Stage 6 reporting and workbench.
 
+Current state:
+
+- The reporting image now supports Stage 6 signature verification, manifest assembly, and checksum finalization.
+- The annotation image continues to supply the signed Stage 5 bundle consumed by Stage 6.
+- The core image remains the governed runtime for the Stage 0-4 analytical path.
+
 Build policy:
 - No placeholder binaries are embedded in production images.
 - `genvar-core` is built from an official pinned elPrep release tarball by the build script, unless `--elprep-bin` overrides it.

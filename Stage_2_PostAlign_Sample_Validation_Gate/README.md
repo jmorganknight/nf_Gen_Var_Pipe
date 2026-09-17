@@ -2,6 +2,12 @@
 
 `Stage_2_PostAlign_Sample_Validation_Gate` is a standalone micro-pipeline that gates downstream variant discovery with fail-closed pre-calling checks.
 
+Current state:
+
+- Stage 2 remains the regulated QC gate between alignment and variant discovery.
+- The stage banks contamination, sex, purity, and assay-routing evidence into the Stage 3 contract.
+- Downstream discovery receives only samples that satisfy the current Stage 1/Stage 2 contract boundary.
+
 ## Clinical Scope
 
 This stage validates that Stage 1 contract prerequisites are present and clinically acceptable before Stage 3 compute-heavy callers begin:

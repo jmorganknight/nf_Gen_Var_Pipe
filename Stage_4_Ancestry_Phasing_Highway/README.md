@@ -2,6 +2,12 @@
 
 Standalone Stage 4 micro-pipeline for ancestry projection and haplotype phasing after Stage 3 harmonization.
 
+Current state:
+
+- Stage 4 is the final analytical handoff before clinical interpretation and branch-controlled Stage 5 processing.
+- The banked manifest now carries the Stage 5 `requested_branches` control-plane continuity required for fail-closed routing.
+- Stage 4 outputs are structured for stable phasing, ancestry projection, and downstream audit replay.
+
 ## Clinical Scope
 
 Stage 4 transforms Stage 3 harmonized variants into ancestry- and phasing-aware handoff artifacts required by Stage 5 clinical interpretation.

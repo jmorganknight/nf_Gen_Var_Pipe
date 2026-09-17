@@ -1,11 +1,18 @@
-⚠️ **CLINICAL PIPELINE UNDER CONSTRUCTION & ACTIVE REFACTORING** ⚠️
-*Notice: This pipeline is currently undergoing a major architectural refactor to enforce CAP/CLIA zero-loss data provenance and strict branch isolation. Upstream stages (1-3) are being cryptographically locked, and Stage 5 is being severed into isolated clinical domains (Germline, PGx, SF, PRS, Somatic). Do not use for production runs until this notice is removed.*
+⚠️ **CLINICAL PIPELINE RELEASE-HARDENED** ⚠️
+*Notice: The pipeline now reflects the current production-stage structure and Stage 6 remediation state. Stage 5 branch isolation is enforced, Stage 6 signature verification and release finalization are active, and the repository includes formal audit evidence packaging for regulated review.*
 
 # nf_Gen_Var_Pipe
 
 ## Status
 
-This repository contains a production-grade, stage-scoped Nextflow DSL2 clinical WES pipeline with fail-closed governance, externalized control planes, and signed downstream reporting artifacts.
+This repository contains a production-grade, stage-scoped Nextflow DSL2 clinical WES pipeline with fail-closed governance, externalized control planes, signed downstream reporting artifacts, and Stage 6 release integrity packaging.
+
+Current release state:
+
+- Stage 0 preflight/ingest, Stage 1 alignment, Stage 2 QC gating, Stage 3 discovery, and Stage 4 phasing are structured as standalone DSL2 stage directories.
+- Stage 5 enforces `requested_branches` control-plane routing and emits signed clinical bundles.
+- Stage 6 verifies Stage 5 signatures, enforces zero-loss reconciliation, builds clinical reporting outputs, and emits `Stage6_SHA256SUMS.txt` plus FMEA evidence.
+- Formal remediation documentation and evidence are packaged at the repository root for audit replay.
 
 ## Governance & Control Plane
 
@@ -58,7 +65,7 @@ The production clinical execution path is:
 | Stage 3 | Variant discovery + normalization + schema validation | `VALID_PASS|VARIANTS_HARMONIZED` |
 | Stage 4 | Phasing + ancestry projection | `VALID_PASS|VARIANTS_HARMONIZED` passthrough |
 | Stage 5 | Clinical triage and signed bundle creation | Stage 5 signed bundle + provenance |
-| Stage 6 | Zero-loss integrity + workbench + FHIR + telemetry sinks | Stage 6 banked manifest |
+| Stage 6 | Signature verification + zero-loss integrity + workbench + FHIR + telemetry sinks + final checksum packaging | Stage 6 banked manifest + `Stage6_SHA256SUMS.txt` |
 
 Stage 0 remains the intake/preflight control gate that validates incoming manifests and route decisions before Stage 1.
 
@@ -145,9 +152,18 @@ Purpose:
 ### Stage 6: Clinical Reporting Workbench Gateway
 
 Purpose:
-- Enforce zero-loss ledger checks and fail-closed reporting preconditions.
+- Enforce Stage 5 signature verification, zero-loss ledger checks, and fail-closed reporting preconditions.
 - Build Medical Director workbench payloads and FHIR/HTML/PDF outputs.
-- Emit dual telemetry sinks (`provenance` and lab metrics) and Stage 6 banked manifest.
+- Emit dual telemetry sinks (`provenance` and lab metrics), Stage 6 banked manifest, and release checksum evidence.
+
+## Release Evidence and Audit Packaging
+
+The Stage 6 remediation sprint produced formal evidence artifacts for traceability:
+
+- `Stage_6_Clinical_Reporting_Workbench_Gateway/docs/STAGE6_REMEDIATION_CHANGELOG.md`
+- `stage6_audit_evidence.tar.gz`
+- `Stage_6_Clinical_Reporting_Workbench_Gateway/tests/fmea/stage6_fmea_summary.tsv`
+- `Stage_6_Clinical_Reporting_Workbench_Gateway/tests/fmea/runs/baseline_success/out/Stage6_SHA256SUMS.txt`
 
 ## Externalized Control Planes
 

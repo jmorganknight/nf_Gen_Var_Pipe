@@ -2,6 +2,12 @@
 
 Standalone Stage 1 micro-pipeline for platform-aware intake routing, alignment/read processing, coordinate normalization, identity auditing, and Stage 2 contract banking.
 
+Current state:
+
+- Stage 1 is the first compute-heavy handoff after Stage 0 preflight locking.
+- The current contract emphasizes platform-aware routing, coordinate normalization, identity verification, and Stage 2-ready banked manifests.
+- Stage 1 outputs are now documented as part of the governed stage directories and remain isolated from later clinical-interpretation branches.
+
 ## Clinical Scope
 
 Stage 1 enforces the first clinical handoff gate after Stage 0 intake.

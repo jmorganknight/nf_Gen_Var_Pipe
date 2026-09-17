@@ -2,6 +2,12 @@
 
 Production Stage 5 branch engine that consumes Stage 4 phased/ancestry-ready payloads, runs parallel clinical interpretation lanes, signs the clinical bundle, and emits a Stage 6-ready banked manifest.
 
+Current state:
+
+- Stage 5 is the branch-isolated clinical interpretation layer and is now governed by explicit `requested_branches` routing.
+- Executed and skipped branches both emit auditable status metadata for later regulated review.
+- The signed bundle and provenance outputs are the canonical inputs to Stage 6 signature verification and reporting.
+
 ## Clinical Scope
 
 Stage 5 is the interpretation and packaging layer between Stage 4 phasing and Stage 6 reporting. It enforces Stage 4 token/asset preconditions, fans out into independent branch lanes, then cryptographically signs the assembled clinical bundle.
