@@ -1,6 +1,6 @@
 # Stage_5_Clinical_Annotation_PGx_Triage
 
-Production Stage 5 branch engine that consumes Stage 4 phased/ancestry-ready payloads, runs parallel clinical interpretation lanes, signs the clinical bundle, and emits a Stage 6-ready banked manifest.
+Production Stage 5 branch engine that consumes Stage 4 phased/ancestry-ready payloads, runs parallel clinical interpretation lanes, signs the clinical bundle, and emits a Stage 6-ready manifest.
 
 Current state:
 
@@ -98,7 +98,7 @@ Each queued/updated variant carries `upgrade_reason` for audit traceability.
 
 ```mermaid
 flowchart TD
-    A["Stage 4 banked manifest"] --> B["Stage 5 precondition checks"]
+    A["Stage 4 manifest"] --> B["Stage 5 precondition checks"]
   B --> C["Control-plane validation\nrequested_branches required"]
   C --> D{"Per-branch router"}
   D -->|Requested| E["Run branch workflow\nannotate COMPLETED manifest"]
@@ -106,7 +106,7 @@ flowchart TD
   E --> G["5-branch completeness check"]
   F --> G
   G --> H["STAGE5_BUILD_MULTI_BRANCH_MANIFEST"]
-  H --> I["samples_<sample_id>_banked_stage5.yaml\nexplicit status per branch"]
+  H --> I["samples_<sample_id>_stage5.yaml\nexplicit status per branch"]
   I --> J["CLINICAL_PROVENANCE_MANIFEST\nRS256 signed clinical bundle"]
   J --> K["Stage 6 compatibility artifacts"]
 ```
@@ -129,7 +129,7 @@ If required branch references are unresolved, Stage 5 fails closed with `STAGE5_
 
 Required:
 
-- Stage 4 banked manifest (`--input`) from `Stage_4_Ancestry_Phasing_Highway`
+- Stage 4 manifest (`--input`) from `Stage_4_Ancestry_Phasing_Highway`
 - `validation_token` containing `VALID_PASS|VARIANTS_HARMONIZED`
 - `phased_vcf`, `phased_vcf_tbi`, `ancestry_metrics_json`, `phasing_audit_json`
 - signer key pair (default from `thresholds.yaml` reporting section unless overridden)
@@ -149,7 +149,35 @@ Published under the selected `--outdir`:
 - `pgx/*.clinical_bundle.tar.gz`
 - `pgx/*.provenance.json`
 - `audit_and_qc/stage5/*.stage5_router.json`
-- `samples_<sample_id>_banked_stage5.yaml`
+- `samples_<sample_id>_stage5.yaml`
+
+## Tunable Features
+
+| Tunable | Default | Effect |
+|---|---|---|
+| `--input` | required | Stage 4 manifest input (`samples_<sample_id>_stage4.yaml` in current naming). |
+| `--outdir` | `tests/stage5` | Stage 5 parent publish root. |
+| `--stage5_outdir` | `<outdir>/Stage_5` | Explicit Stage 5 publish root override. |
+| `--references` / `--thresholds` / `--infrastructure` | `../control_plane/*.yaml` | Governs branch references, policy, and signer requirements. |
+| `--ref_data_root` / `--ref_dir` | inferred from env or references YAML | Reference root used for Stage 5 asset resolution. |
+| `--enable_prs_branch` | `true` | Enables/disables PRS branch output lane. |
+| `--enable_sf_branch` | `true` | Enables/disables secondary-findings branch output lane. |
+| `--prs_min_backbone_coverage` | `0.80` | Minimum PRS marker-coverage threshold for calibrated output. |
+| `--signer_key_path`, `--signer_pub_path` | from thresholds policy unless overridden | Explicit keypair path override for Stage 5 signing. |
+| `--signer_scope`, `--signer_id` | policy or bootstrap defaults | Signature identity metadata controls. |
+| `--allow_bootstrap_for_production_run` | policy default | Governs bootstrap signer acceptance in production runs. |
+
+Output path behavior:
+
+- Stage 5 uses two publish roots in current production wiring.
+- Branch artifacts (`annotation/`, `pgx/`, `prs/`, `secondary_findings/`, `audit_and_qc/stage5/`) publish under `--outdir`.
+- Signed-release artifacts and manifest (`clinical_release/*_production_release.*`, `samples_*_stage5.yaml`) publish under `--stage5_outdir`.
+- To fully flatten output, set both `--outdir` and `--stage5_outdir` to the same target directory.
+
+Artifact note for clinical review workflows:
+
+- Stage 5 emits ACMG-scored JSON artifacts (`*.stage5_acmg_tiered_variants.json`, candidate/queue JSON).
+- Stage 5 does not emit a pathogenic-only review VCF by default in the current production wiring.
 
 ## Execute
 
@@ -157,17 +185,17 @@ Published under the selected `--outdir`:
 cd Stage_5_Clinical_Annotation_PGx_Triage
 nextflow run main.nf \
   -profile docker \
-  --input ../Stage_4_Ancestry_Phasing_Highway/tests/mini_control/samples_<sample_id>_banked_stage4.yaml \
+  --input <stage4_outdir>/Stage_4/samples_<sample_id>_stage4.yaml \
   --references ../control_plane/references.yaml \
   --thresholds ../control_plane/thresholds.yaml \
-  --outdir tests/mini_control
+  --outdir results
 ```
 
 Optional signer override:
 
 ```bash
 nextflow run main.nf -profile docker \
-  --input ../Stage_4_Ancestry_Phasing_Highway/tests/mini_control/samples_<sample_id>_banked_stage4.yaml \
+  --input <stage4_outdir>/Stage_4/samples_<sample_id>_stage4.yaml \
   --signer_key_path ../keys/clinical_signer.pem \
   --signer_pub_path ../keys/clinical_signer.pub.pem
 ```
@@ -180,5 +208,5 @@ python3 tests/fmea/run_stage5_fmea_suite.py
 
 ## Notes
 
-- Stage 5 emits Stage 6-compatible annotation/PRS/SF/PGx artifact names and a complete banked manifest.
-- Signed bundle/provenance artifacts are generated per sample and referenced in `samples_<sample_id>_banked_stage5.yaml`.
+- Stage 5 emits Stage 6-compatible annotation/PRS/SF/PGx artifact names and a complete Stage 5 manifest.
+- Signed bundle/provenance artifacts are generated per sample and referenced in `samples_<sample_id>_stage5.yaml`.

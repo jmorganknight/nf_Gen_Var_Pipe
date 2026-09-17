@@ -1,11 +1,17 @@
-⚠️ **CLINICAL PIPELINE RELEASE-HARDENED** ⚠️
-*Notice: The pipeline now reflects the current production-stage structure and Stage 6 remediation state. Stage 5 branch isolation is enforced, Stage 6 signature verification and release finalization are active, and the repository includes formal audit evidence packaging for regulated review.*
+⚠️⚠️⚠️ **PIPELINE UNDER CONSTRUCTION (ROOT ORCHESTRATION NOT YET FUNCTIONAL)** ⚠️⚠️⚠️
+*Notice: Stage directories generally run and can be validated stage-by-stage, but full end-to-end orchestration from the repository root `main.nf` is currently not functional. Root-level whole-pipeline execution is still being completed.*
 
 # nf_Gen_Var_Pipe
 
 ## Status
 
-This repository contains a production-grade, stage-scoped Nextflow DSL2 clinical WES pipeline with fail-closed governance, externalized control planes, signed downstream reporting artifacts, and Stage 6 release integrity packaging.
+This repository contains an in-progress, stage-scoped Nextflow DSL2 clinical WES pipeline with fail-closed governance, externalized control planes, signed downstream reporting artifacts, and Stage 6 release integrity packaging.
+
+Root execution status (important):
+
+- Stage-by-stage execution (calling each stage `main.nf`) is the current supported validation path.
+- Root whole-pipeline execution from `/main.nf` is currently under construction and not yet a supported production path.
+- Use stage-level manifests and stage-level runs until root orchestration is declared ready.
 
 Current release state:
 
@@ -33,9 +39,9 @@ Runtime container recipes are rooted under containers/ and are split by governed
 
 Production builds do not embed placeholder binaries. The build script pins an official elPrep release source for genvar-core and resolves the PharmCAT JAR for genvar-annotation from control_plane/references.yaml.
 
-The execution model is hub-and-spoke:
+The target execution model is hub-and-spoke:
 
-- The root pipeline orchestrates multi-stage clinical flow.
+- The root pipeline is intended to orchestrate multi-stage clinical flow (currently under construction).
 - Each stage can also run independently from its own directory.
 - Spoke stages resolve shared governance via ${projectDir}/../control_plane/.
 - This preserves a single source of truth for clinical rules while supporting stage-local debugging.
@@ -65,7 +71,7 @@ The production clinical execution path is:
 | Stage 3 | Variant discovery + normalization + schema validation | `VALID_PASS|VARIANTS_HARMONIZED` |
 | Stage 4 | Phasing + ancestry projection | `VALID_PASS|VARIANTS_HARMONIZED` passthrough |
 | Stage 5 | Clinical triage and signed bundle creation | Stage 5 signed bundle + provenance |
-| Stage 6 | Signature verification + zero-loss integrity + workbench + FHIR + telemetry sinks + final checksum packaging | Stage 6 banked manifest + `Stage6_SHA256SUMS.txt` |
+| Stage 6 | Signature verification + zero-loss integrity + workbench + FHIR + telemetry sinks + final checksum packaging | Stage 6 manifest + `Stage6_SHA256SUMS.txt` |
 
 Stage 0 remains the intake/preflight control gate that validates incoming manifests and route decisions before Stage 1.
 
@@ -161,7 +167,7 @@ Purpose:
 The Stage 6 remediation sprint produced formal evidence artifacts for traceability:
 
 - `Stage_6_Clinical_Reporting_Workbench_Gateway/docs/STAGE6_REMEDIATION_CHANGELOG.md`
-- `stage6_audit_evidence.tar.gz`
+- generated `stage6_audit_evidence.tar.gz` bundle (not version-controlled)
 - `Stage_6_Clinical_Reporting_Workbench_Gateway/tests/fmea/stage6_fmea_summary.tsv`
 - `Stage_6_Clinical_Reporting_Workbench_Gateway/tests/fmea/runs/baseline_success/out/Stage6_SHA256SUMS.txt`
 
@@ -305,6 +311,50 @@ nextflow run main.nf \
 	-resume
 ```
 
+## Tunable Features (Quick Index)
+
+The primary tunables are listed below. Stage READMEs contain deeper detail and examples.
+
+| Scope | Tunable | Default | Effect |
+|---|---|---|---|
+| Orchestrator | `--input` / `--samples` | `assets/mini_control/samples_mini_control.yaml` | Input contract for full Stage 0-6 run. |
+| Orchestrator | `--outdir` | `results/master_orchestrator` | Root publish directory for orchestrated outputs. |
+| Orchestrator | `--references` / `--thresholds` / `--infrastructure` | `control_plane/*.yaml` | Governs references, clinical thresholds, and infra policy. |
+| Orchestrator | `--execution_profile` | auto from `infrastructure.yaml` | Forces `small|medium|large` pipeline policy. |
+| Orchestrator | `--max_cpus`, `--max_memory_gb`, `--max_memory` | policy-resolved | Manual resource override (highest precedence). |
+| Orchestrator | `--ref_data_root` / `--ref_dir` | `NXF_REF_DATA_ROOT` or YAML root | Selects reference host root used by stages/containers. |
+| Orchestrator | `--pki_key_dir`, `--signer_key_path`, `--signer_pub_path` | thresholds policy or `keys/` | Stage 5 signing keypair resolution. |
+| Stage 3 | `--stage3_snv_caller` | `deepvariant` | Switches SNV lane (`deepvariant` or `bcftools`). |
+| Stage 3 | `--infrastructure_profile` | auto | Forces Stage 3-specific profile selection. |
+| Stage 3 | `--stage3_*_cpus` | null | Per-branch CPU overrides. |
+| Stage 5 | `--stage5_outdir` | `<outdir>/Stage_5` | Explicit publish root for Stage 5 manifest and signed-release artifacts. |
+| Stage 5 | `--enable_prs_branch`, `--enable_sf_branch` | `true` | Enables/disables optional branch outputs. |
+| Stage 5 | `--prs_min_backbone_coverage` | `0.80` | PRS minimum marker-coverage threshold. |
+| Stage 6 | `--stage6_outdir` | `<outdir>/Stage_6` | Explicit publish root for Stage 6 artifacts. |
+| Stage 6 | `--signer_pub_path`, `--signer_scope`, `--signer_id` | thresholds policy | Stage 5 signature verification identity policy. |
+
+## Output Directory Behavior
+
+- Stage 1 through Stage 4 default to nested publish roots under `--outdir` (`Stage_1` to `Stage_4`).
+- Stage 5 uses mixed roots by design.
+- Stage 5 branch artifacts publish under `--outdir` (for example `annotation/`, `pgx/`, `prs/`, `secondary_findings/`), while signed-release manifest outputs publish under `--stage5_outdir`.
+- Stage 6 publish defaults to `--stage6_outdir`.
+- If you want flat publishing without nested `Stage_5`/`Stage_6`, set both params directly:
+
+```bash
+nextflow run Stage_5_Clinical_Annotation_PGx_Triage/main.nf \
+	-profile docker \
+	--input <stage4_manifest.yaml> \
+	--outdir results \
+	--stage5_outdir results
+
+nextflow run Stage_6_Clinical_Reporting_Workbench_Gateway/main.nf \
+	-profile docker \
+	--input <stage5_manifest.yaml> \
+	--outdir results \
+	--stage6_outdir results
+```
+
 ## FMEA Edge-Case Suites
 
 Root convenience runners:
@@ -338,7 +388,7 @@ Useful options:
 
 ```bash
 scripts/run_stage3_infrastructure_profile_matrix.sh \
-	--input Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control/samples_<sample_id>_banked_stage2_snv_only.yaml \
+	--input <stage2_outdir>/Stage_2/samples_<sample_id>_banked_stage2_snv_only.yaml \
 	--profiles "small medium large"
 ```
 

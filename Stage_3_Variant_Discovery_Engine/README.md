@@ -157,12 +157,30 @@ This prevents silent success on deliberately malformed payloads.
 
 ## Outputs
 
-- `tests/mini_control/samples_<sample_id>_banked_stage3.yaml`
+- `<outdir>/Stage_3/samples_<sample_id>_banked_stage3.yaml`
+
+## Tunable Features
+
+| Tunable | Default | Effect |
+|---|---|---|
+| `--input` / `--samples` | `tests/samples_variant_discovery.yaml` | Stage 2-to-Stage 3 intake manifest. |
+| `--outdir` | `tests/banked_stage3` | Stage 3 publish root; effective path is `<outdir>/Stage_3`. |
+| `--references` / `--thresholds` / `--infrastructure` | `../control_plane/*.yaml` | Governs discovery references, dynamic thresholds, and infra policy. |
+| `--stage3_snv_caller` | `deepvariant` | SNV lane caller selection (`deepvariant` or `bcftools`). |
+| `--infrastructure_profile` | auto | Forces Stage 3 profile (`small|medium|large`) instead of auto selection. |
+| `--stage3_snv_indel_cpus` | null | SNV/indel branch CPU override. |
+| `--stage3_structural_variants_cpus` or `--stage3_sv_cpus` | null | SV branch CPU override. |
+| `--stage3_cnv_cpus` | null | CNV branch CPU override. |
+| `--stage3_str_cpus` | null | STR branch CPU override. |
+| `--stage3_trisomy_cpus` | null | Trisomy branch CPU override. |
+| `--stage3_homologous_cpus` | null | Homologous/pseudogene branch CPU override. |
+| `--stage3_cpus` | null | Global Stage 3 CPU override fallback. |
+| `--stage3_test_mode` | `false` | Enables Stage 3 test-mode behavior used in controlled validation scenarios. |
 
 ## Audit Hygiene
 
-- Production evidence directories: `tests/mini_control/snv`, `tests/mini_control/sv`, `tests/mini_control/cnv`, `tests/mini_control/str`
-- `tests/mini_control/` is production-only. Do not keep smoke/stub outputs under this path.
+- Production evidence directories: `<outdir>/Stage_3/snv`, `<outdir>/Stage_3/sv`, `<outdir>/Stage_3/cnv`, `<outdir>/Stage_3/str`
+- `<outdir>/Stage_3/` is production-only. Do not keep smoke/stub outputs under this path.
 
 Run the production evidence verifier before audit/regulatory packaging:
 
@@ -176,8 +194,8 @@ Run the production evidence verifier before audit/regulatory packaging:
 cd Stage_3_Variant_Discovery_Engine
 nextflow run main.nf \
     -profile docker \
-    --input ../Stage_2_PostAlign_Sample_Validation_Gate/tests/mini_control/samples_<sample_id>_banked_stage2.yaml \
-    --outdir tests/mini_control
+    --input <stage2_outdir>/Stage_2/samples_<sample_id>_banked_stage2.yaml \
+    --outdir results
 ```
 
 ## FMEA

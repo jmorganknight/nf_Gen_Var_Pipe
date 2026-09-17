@@ -125,7 +125,7 @@ Stage 1 now includes explicit runtime guards before alignment execution:
 
 ## Outputs
 
-Published under `tests/mini_control/`:
+Published under `<outdir>/Stage_1/`:
 
 - `aligned/*.identity_verified.bam`
 - `aligned/*.identity_verified.bam.bai`
@@ -143,6 +143,21 @@ Stage 2 handoff fields include:
 - `reference_build.reference_dict`
 - `reference_build.bwa_index_base`
 
+## Tunable Features
+
+| Tunable | Default | Effect |
+|---|---|---|
+| `--input` / `--samples` | `../assets/mini_control/samples_mini_control.yaml` | Stage 0-to-Stage 1 intake contract. |
+| `--outdir` | `tests/banked_stage1` | Stage 1 publish root. Stage 1 auto-normalizes to `<outdir>/Stage_1` unless already provided. |
+| `--references` / `--thresholds` / `--infrastructure` | `../control_plane/*.yaml` | Governance contract sources. |
+| `--ref_data_root` / `--ref_dir` | `NXF_REF_DATA_ROOT` or stage default | Host reference root for container-mounted assets. |
+| `--max_cpus` | `30` | Upper cap for high-label compute tasks (including heavy alignment path). |
+| `--elprep_mem_gb` | `140` | elPrep memory envelope control. |
+| `--gomemlimit` | `140GiB` | Go runtime memory bound passed to elPrep stack. |
+| `--gogc` | `20` | Go garbage-collection aggressiveness for alignment path. |
+| `-profile dev_fast` | off | Reduced resources for quick validation/smoke runs. |
+| `-stub` | off | Stub-mode token/input materialization for integration debugging. |
+
 ## Execute
 
 Run Stage 1 standalone:
@@ -151,8 +166,8 @@ Run Stage 1 standalone:
 cd Stage_1_Alignment_Read_Processing
 nextflow run main.nf \
     -profile docker \
-    --input tests/mini_control/samples_<sample_id>_banked_stage0.yaml \
-    --outdir tests/mini_control
+    --input <stage0_outdir>/Stage_0/samples_<sample_id>_banked_stage0.yaml \
+    --outdir results
 ```
 
 Dev-fast validation:

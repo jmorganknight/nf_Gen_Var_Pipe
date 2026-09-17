@@ -11,7 +11,7 @@ Current state:
 
 ## Clinical Scope
 
-Stage 6 consumes Stage 5 banked artifacts and enforces final fail-closed report governance before clinical handoff.
+Stage 6 consumes Stage 5 artifacts and enforces final fail-closed report governance before clinical handoff.
 
 - Validates Stage 5 token and artifact completeness.
 - Enforces zero-loss candidate VUS accounting.
@@ -28,7 +28,7 @@ Stage 6 consumes Stage 5 banked artifacts and enforces final fail-closed report 
 
 ```mermaid
 flowchart TD
-  A["Stage 5 banked manifest"] --> B["STAGE6_PRECONDITION_GUARD"]
+  A["Stage 5 manifest"] --> B["STAGE6_PRECONDITION_GUARD"]
   B -->|invalid token or missing assets| R["STAGE6_PRECONDITION_FAILURE"]
   B --> C["STAGE6_VARIANT_INTEGRITY_AUDITOR"]
   B --> D["DOWNGRADED_VARIANT_SINK"]
@@ -63,13 +63,13 @@ flowchart TD
 - `audit_sink.nf`: consolidates audit payload lineage.
 - `lab_metrics_sink.nf`: emits operational laboratory metrics.
 - `stage6_release_finalizer.nf`: packages release artifact checksums into `Stage6_SHA256SUMS.txt`.
-- `assemble_stage6_banked_manifest.nf`: renders the Stage 6 banked manifest.
+- `assemble_stage6_manifest.nf`: renders the Stage 6 manifest.
 
 ## Inputs
 
 Expected input:
 
-- `--input ../Stage_5_Clinical_Annotation_PGx_Triage/tests/mini_control/samples_<sample_id>_banked_stage5.yaml`
+- `--input <stage5_outdir>/samples_<sample_id>_stage5.yaml`
 
 Required fields and artifacts:
 
@@ -83,21 +83,50 @@ Required fields and artifacts:
 
 Published under Stage 6 output tree:
 
-- `audit_and_qc/stage6/*.stage6_precondition_guard.json`
-- `audit_and_qc/stage6/*.stage6_variant_integrity_audit.json`
-- `audit_and_qc/stage6/*.stage6_variant_ledger.json`
+- `audit_and_qc/*.stage6_precondition_guard.json`
+- `audit_and_qc/*.stage6_variant_integrity_audit.json`
+- `audit_and_qc/*.stage6_variant_ledger.json`
 - `reporting/fhir_genomics_v3.json`
 - `reporting/clinical_report.html`
 - `reporting/clinical_report.pdf`
 - `reporting/*.provenance_audit.json`
-- Stage 6 banked manifest
+- Stage 6 manifest
 - `Stage6_SHA256SUMS.txt`
 
-Formal audit evidence is also tracked in:
+## Tunable Features
+
+| Tunable | Default | Effect |
+|---|---|---|
+| `--input` / `--samples` | required | Stage 5 manifest input (`samples_<sample_id>_stage5.yaml`). |
+| `--outdir` | `tests/fixtures/stage6` | Stage 6 parent publish root. |
+| `--stage6_outdir` | `<outdir>/Stage_6` | Explicit Stage 6 publish root override. |
+| `--references` / `--thresholds` / `--infrastructure` | `../control_plane/*.yaml` | Governs refs, signer policy, and infra behavior. |
+| `--refs` | `{}` | Optional override map layered on resolved references. |
+| `--ref_data_root` / `--ref_dir` | `NXF_REF_DATA_ROOT` or stage default | Host reference root used for staged asset validation. |
+| `--signer_pub_path` | policy-derived | Public key used to verify Stage 5 signatures. |
+| `--signer_scope`, `--signer_id` | policy or bootstrap defaults | Expected signer identity for signature verification. |
+| `--allow_bootstrap_for_production_run` | policy default | Controls whether bootstrap signer identity is accepted in production. |
+| `-profile docker` / `-profile apptainer` | none | Runtime backend selection. |
+
+Output path behavior:
+
+- Default Stage 6 publishing is nested under `--outdir/Stage_6`.
+- To publish Stage 6 artifacts directly into a flat directory, set `--stage6_outdir` explicitly.
+
+## RUO/Dev Run Semantics
+
+- `run_mode: dev` (or legacy `audit_only`) in Stage 5 inputs requires Stage 5 manifest watermarking:
+  - `CLINICAL_VALIDITY: RESEARCH_USE_ONLY`
+  - `REGULATORY_WARNING: ...`
+- When RUO/dev mode is detected, Stage 6 still executes full report assembly and emits explicit lock evidence:
+  - `RUO_DEV_REPORT_LOCKED.txt`
+- In RUO/dev scenarios, some branch artifacts may be intentionally bypassed; Stage 6 reuses signed provenance where allowed instead of generating placeholder files.
+
+Formal audit evidence is tracked in:
 
 - `docs/STAGE6_REMEDIATION_CHANGELOG.md`
 - `tests/fmea/stage6_fmea_summary.tsv`
-- `stage6_audit_evidence.tar.gz`
+- generated `stage6_audit_evidence.tar.gz` (not version-controlled)
 
 ## Zero-Loss Integrity Gate
 
@@ -152,10 +181,10 @@ Stage 6 consolidates two telemetry channels:
 cd Stage_6_Clinical_Reporting_Workbench_Gateway
 nextflow run main.nf \
   -profile docker \
-  --input ../Stage_5_Clinical_Annotation_PGx_Triage/tests/mini_control/samples_<sample_id>_banked_stage5.yaml \
+  --input <stage5_outdir>/samples_<sample_id>_stage5.yaml \
   --references ../control_plane/references.yaml \
   --thresholds ../control_plane/thresholds.yaml \
-  --outdir tests/mini_control
+  --outdir results
 ```
 
 ## FMEA

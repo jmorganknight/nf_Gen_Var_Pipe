@@ -14,9 +14,9 @@ Date: 2026-09-15
 - Files: `workflows/stage5_germline.nf`, `workflows/stage5_pgx.nf`, `workflows/stage5_sf.nf`, `workflows/stage5_prs.nf`, `workflows/stage5_somatic.nf`
 - Risk: architecture remained partially deployed without single isolated aggregator workflow.
 
-3. Cryptographic multi-branch Stage 5 banked manifest builder script existed without isolated workflow integration.
+3. Cryptographic multi-branch Stage 5 manifest builder script existed without isolated workflow integration.
 - File: `bin/stage5_build_stage5_manifest.py`
-- Risk: branch manifests could be produced without deterministic assembly into canonical `samples_<sid>_banked_stage5.yaml` under isolated flow.
+- Risk: branch manifests could be produced without deterministic assembly into canonical `samples_<sid>_stage5.yaml` under isolated flow.
 
 ## Existing Strengths Verified
 
@@ -39,17 +39,17 @@ Date: 2026-09-15
 
 1. Added isolated multi-branch orchestrator workflow.
 - File: `workflows/stage5_isolated.nf`
-- Behavior: executes Germline/PGx/SF/PRS/Somatic branch workflows as independent lanes, then assembles canonical Stage 5 banked manifest.
+- Behavior: executes Germline/PGx/SF/PRS/Somatic branch workflows as independent lanes, then assembles canonical Stage 5 manifest.
 
 2. Added dedicated isolated manifest builder process for cryptographic assembly.
 - File: `modules/local/stage5_isolated_manifest_builder.nf`
-- Behavior: uses `bin/stage5_build_stage5_manifest.py` and emits `samples_<sample_id>_banked_stage5.yaml`.
+- Behavior: uses `bin/stage5_build_stage5_manifest.py` and emits `samples_<sample_id>_stage5.yaml`.
 
 ## Compliance Posture After Refactor
 
 1. Branch execution separation is explicit at workflow boundaries.
 2. Stage 5 manifest assembly is deterministic and cryptographic per branch manifest SHA-256.
-3. Zero-loss checks are represented in germline branch manifest payload and carried into final banked manifest.
+3. Zero-loss checks are represented in germline branch manifest payload and carried into final Stage 5 manifest.
 
 ## Remaining Optional Hardening
 

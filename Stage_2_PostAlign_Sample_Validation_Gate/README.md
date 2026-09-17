@@ -114,16 +114,31 @@ Stage 2 emits a compact scalar block for Stage 3 calibration:
 - `audit_and_qc/stage2/*.assay_target_router_audit.json`
 - `samples_<sample_id>_banked_stage2.yaml`
 
+## Tunable Features
+
+| Tunable | Default | Effect |
+|---|---|---|
+| `--input` / `--samples` | `tests/samples_identity_gate.yaml` | Stage 1-to-Stage 2 intake manifest. |
+| `--outdir` | `tests/banked_stage2` | Stage 2 publish root. Effective Stage 2 path is `<outdir>/Stage_2`. |
+| `--references` / `--thresholds` / `--infrastructure` | `../control_plane/*.yaml` | Governs contamination/sex/purity and routing thresholds. |
+| `--ref_data_root` / `--ref_dir` | `NXF_REF_DATA_ROOT` or stage default | Reference host root for tools like VerifyBamID2. |
+| `--refs` | `{}` | Emergency/manual reference override map; governed YAML remains authoritative. |
+| `-profile dev_fast` | off | Lower resource profile for faster local iteration. |
+
+Run-mode policy note:
+
+- Stage 2 continuation policy is driven by per-sample `run_mode` in the manifest (`production` fail-closed, `dev` continue-for-audit where configured).
+
 ## Execute
 
 ```bash
 cd Stage_2_PostAlign_Sample_Validation_Gate
 nextflow run main.nf \
   -profile docker \
-  --input ../Stage_1_Alignment_Read_Processing/tests/mini_control/samples_<sample_id>_banked_stage1.yaml \
+  --input <stage1_outdir>/Stage_1/samples_<sample_id>_banked_stage1.yaml \
   --references ../control_plane/references.yaml \
   --thresholds ../control_plane/thresholds.yaml \
-  --outdir tests/mini_control/
+  --outdir results
 ```
 
 ## FMEA

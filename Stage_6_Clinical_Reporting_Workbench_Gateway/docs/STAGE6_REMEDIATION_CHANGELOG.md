@@ -6,7 +6,7 @@ This change set hardens the Stage 6 clinical reporting gateway to a fail-closed,
 ## 1. Multi-sample collision and manifest assembly hardening
 
 ### Fixed item
-- Multi-sample manifest assembly was hardened to prevent cross-sample contamination in the final merged banked manifest.
+- Multi-sample manifest assembly was hardened to prevent cross-sample contamination in the final merged Stage 6 manifest.
 - The final manifest assembly now validates each fragment before consolidating outputs, requiring sample IDs, component contract fields, and complete artifact references for every Stage 6 output.
 
 ### Regulatory / fail-closed justification
@@ -39,7 +39,7 @@ This change set hardens the Stage 6 clinical reporting gateway to a fail-closed,
 ## 4. Manifest and metadata hardening for regulated output assembly
 
 ### Fixed item
-- The Stage 6 banked manifest assembly logic was hardened to reject unresolved template literals, missing fixed fields, malformed metadata, and absent regulated artifacts.
+- The Stage 6 manifest assembly logic was hardened to reject unresolved template literals, missing fixed fields, malformed metadata, and absent regulated artifacts.
 - It now validates the presence and shape of required JSON fragments and rejects work products that do not satisfy the release contract.
 
 ### Regulatory / fail-closed justification

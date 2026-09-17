@@ -37,7 +37,7 @@ flowchart TD
     F --> G["BANK_STAGE4_CONTRACT"]
     D --> G
     G --> H["ASSEMBLE_STAGE4_BANKED_MANIFEST"]
-    H --> I["tests/mini_control/samples_<sample_id>_banked_stage4.yaml"]
+    H --> I["<outdir>/Stage_4/samples_<sample_id>_banked_stage4.yaml"]
     I --> J["Stage 5 intake (requires requested_branches)\nrequested-vs-skipped branch router"]
 ```
 
@@ -68,7 +68,7 @@ Implementation notes:
 
 Expected input:
 
-- [Stage 3 banked manifest](../Stage_3_Variant_Discovery_Engine/tests/mini_control/samples_<sample_id>_banked_stage3.yaml)
+- Stage 3 banked manifest at `<stage3_outdir>/Stage_3/samples_<sample_id>_banked_stage3.yaml`
 
 Required fields:
 
@@ -83,7 +83,7 @@ Required fields:
 
 ## Outputs
 
-Published to `tests/mini_control/`:
+Published to `<outdir>/Stage_4/`:
 
 - `phased/*.phased.vcf.gz`
 - `phased/*.phased.vcf.gz.tbi`
@@ -91,16 +91,27 @@ Published to `tests/mini_control/`:
 - `audit_and_qc/stage4/*.phasing_audit.json`
 - `samples_<sample_id>_banked_stage4.yaml`
 
+## Tunable Features
+
+| Tunable | Default | Effect |
+|---|---|---|
+| `--input` / `--samples` | `tests/samples_ancestry_phasing.yaml` | Stage 3-to-Stage 4 intake manifest. |
+| `--outdir` | `tests/banked_stage4` | Stage 4 publish root; effective path is `<outdir>/Stage_4`. |
+| `--references` / `--thresholds` / `--infrastructure` | `../control_plane/*.yaml` | Governs PopPCA/phasing references and contract checks. |
+| `--ref_data_root` / `--ref_dir` | `NXF_REF_DATA_ROOT` or stage default | Host reference root used to resolve model/panel assets. |
+| `--max_cpus` | `30` | Resource cap for Stage 4 high-label jobs. |
+| `-profile docker` / `-profile apptainer` | none | Runtime backend selection. |
+
 ## Execute
 
 ```bash
 cd Stage_4_Ancestry_Phasing_Highway
 nextflow run main.nf \
     -profile docker \
-    --input ../Stage_3_Variant_Discovery_Engine/tests/mini_control/samples_<sample_id>_banked_stage3.yaml \
+    --input <stage3_outdir>/Stage_3/samples_<sample_id>_banked_stage3.yaml \
     --references ../control_plane/references.yaml \
     --thresholds ../control_plane/thresholds.yaml \
-    --outdir tests/mini_control
+    --outdir results
 ```
 
 ## FMEA

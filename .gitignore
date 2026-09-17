@@ -38,6 +38,7 @@ bin_cache/
 *.token
 *.key
 *.pem
+keys/
 
 # Local agent/editor instruction artifacts
 copilot-instructions.mb
@@ -50,3 +51,8 @@ __pycache__/
 **/tests/fixtures/banked_stage*/
 **/tests/mini_control/
 **/tests/fmea/runs/
+
+# Generated validation/log artifacts
+stage6_audit_evidence.tar.gz
+tests/infrastructure_profile_matrix/*/run.log
+tests/unknown_sample/*.log

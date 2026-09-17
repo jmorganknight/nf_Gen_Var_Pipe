@@ -55,7 +55,7 @@ control_plane/references.yaml + thresholds.yaml + infrastructure.yaml ----^     
 | `EVALUATE_INTAKE_STATUS` | intake payload tuple | route decision JSON + payload passthrough | No direct halt; route decision is deterministic from token prefix. |
 | `INGEST_FAIL_REJECT` | invalid intake payload, signer keypair | `*.ingest_rejection_audit.json` | Emits signed RS256 rejection audit; falls back to SHA256 signature payload only if key usage fails. |
 | `BANK_STAGE0_SUCCESS` | valid intake payload + route decision audit + preflight lock artifacts + infrastructure YAML | banked validated FASTQs, intake token artifact, stage0 audit bundle, manifest fragment | Fails if banking/copy/tar operations fail. |
-| `ASSEMBLE_STAGE0_BANKED_MANIFEST` | all manifest fragments | `tests/mini_control/samples_<sample_id>_banked_stage0.yaml` | Fails on malformed fragments or write errors. |
+| `ASSEMBLE_STAGE0_BANKED_MANIFEST` | all manifest fragments | `<outdir>/Stage_0/samples_<sample_id>_banked_stage0.yaml` | Fails on malformed fragments or write errors. |
 
 ## Wet Lab Fast-Fail Protocol
 
@@ -68,7 +68,7 @@ Stage 0 is configured to fail closed before any downstream analytical stage:
 
 ## Banked Deliverables Contract
 
-Stage 0 publishes to `tests/mini_control/` with the following contract:
+Stage 0 publishes to `<outdir>/Stage_0/` with the following contract:
 
 - `validated_fastqs/`
 - `intake_token/`
@@ -78,10 +78,23 @@ Stage 0 publishes to `tests/mini_control/` with the following contract:
 - `<sample_id>/audit_and_qc/<sample_id>.intake_validation_report.json`
 - `<sample_id>/audit_and_qc/<sample_id>.intake_route_decision.json`
 - `<sample_id>/audit_and_qc/<sample_id>.ingest_rejection_audit.json` (invalid/reject scenarios)
-- `tests/mini_control/samples_<sample_id>_banked_stage0.yaml`
+- `<outdir>/Stage_0/samples_<sample_id>_banked_stage0.yaml`
 
 `reference_snapshot.tokens` includes:
 
 - SHA256 hashes for active YAML contracts (`control_plane/references.yaml`, `control_plane/thresholds.yaml`, `control_plane/infrastructure.yaml`, plus sample manifest path used in run)
 - Reference asset hash map
 - Governed container digest entries for `core`, `annotation`, and `reporting` with `BUILD_PENDING` fallback
+
+## Tunable Features
+
+| Tunable | Default | Effect |
+|---|---|---|
+| `--input` / `--samples` | `../assets/mini_control/samples_mini_control.yaml` | Stage 0 intake manifest. |
+| `--outdir` | `tests/fixtures/banked_stage0` | Stage 0 publish root (`Stage_0` artifacts are emitted beneath this root). |
+| `--references` / `--thresholds` / `--infrastructure` | `../control_plane/*.yaml` | Governance contracts for refs/thresholds/resources. |
+| `--ref_data_root` / `--ref_dir` | `NXF_REF_DATA_ROOT` or stage default | Host reference root used to resolve `/opt/reference` mappings. |
+| `--pki_key_dir` | `../keys` (or `NXF_PKI_KEY_DIR`) | Base directory for signer key lookup. |
+| `--signer_key_path`, `--signer_pub_path` | resolved from thresholds/reporting policy | Explicit signer keypair override for signed rejection audits. |
+| `-profile docker` / `-profile apptainer` | none | Runtime backend selection. |
+| `-stub` | off | Stub-mode test run; avoids full data dependency for fast contract checks. |

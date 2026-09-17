@@ -42,9 +42,9 @@ Every module and subworkflow MUST contribute to an auditable lineage record:
 
 ---
 
-## RULE 6: CONTRACT BANKING & DECOUPLED STAGE ASSETS
-- Every isolated stage (`stage1_alignment.nf`, `stage2_variant_calling.nf`, etc.) MUST publish its final validated outputs into a structured `tests/fixtures/banked_<stage>/` directory.
-- Every stage MUST generate a downstream-compatible input YAML manifest (e.g., `samples_banked_mapped.yaml`) upon completion, allowing the next stage to be tested independently in isolation.
+## RULE 6: CONTRACT MANIFESTS & DECOUPLED STAGE ASSETS
+- Every isolated stage (`stage1_alignment.nf`, `stage2_variant_calling.nf`, etc.) MUST publish final validated outputs into a structured stage output directory rooted at the configured `--outdir` / `--stageX_outdir` path.
+- Every stage MUST generate a downstream-compatible stage manifest (for example `samples_<sample_id>_stage1.yaml`, `samples_<sample_id>_stage2.yaml`, ..., `samples_<sample_id>_stage6.yaml`) so the next stage can be run independently in isolation.
 
 ---
 
