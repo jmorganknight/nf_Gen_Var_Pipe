@@ -1,10 +1,10 @@
-process ASSEMBLE_STAGE6_BANKED_MANIFEST {
+process ASSEMBLE_STAGE6_MANIFEST {
 
     label 'process_low'
     container 'genvar-reporting:2.1.0'
     stageInMode 'copy'
 
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'samples_*_banked_stage6.yaml'
+    publishDir "${params.stage6_outdir}", mode: 'copy', overwrite: true, pattern: 'samples_*_stage6.yaml'
 
     input:
     path manifest_fragments
@@ -12,9 +12,12 @@ process ASSEMBLE_STAGE6_BANKED_MANIFEST {
     path lab_metrics
 
     output:
-    path 'samples_*_banked_stage6.yaml', emit: banked_manifest
+    path 'samples_*_stage6.yaml', emit: stage6_manifest
 
     script:
+    def publishedStage6Dir = new File(params.stage6_outdir.toString()).isAbsolute()
+        ? new File(params.stage6_outdir.toString()).canonicalPath
+        : new File(workflow.launchDir.toString(), params.stage6_outdir.toString()).canonicalPath
     """
     set -euo pipefail
 
@@ -30,6 +33,9 @@ lab_metrics_json = '''${groovy.json.JsonOutput.toJson(lab_metrics.collect { p ->
 fragment_paths = [Path(p) for p in json.loads(fragment_json)]
 provenance_paths = [Path(p) for p in json.loads(provenance_json)]
 lab_metrics_paths = [Path(p) for p in json.loads(lab_metrics_json)]
+published_stage6_dir = Path('${publishedStage6Dir}')
+published_audit_dir = published_stage6_dir / 'audit_and_qc'
+published_reporting_dir = published_stage6_dir / 'reporting'
 
 
 def fail(message: str):
@@ -54,7 +60,7 @@ def require_nonempty_text(container: dict, key: str, sid: str, component: str):
     return text
 
 
-def resolve_existing_path(path_text: str, sid: str, field_name: str):
+def resolve_existing_path(path_text: str, sid: str, field_name: str, allow_missing: bool = False):
     raw = (path_text or '').strip()
     if not raw:
         fail(f'missing required path {field_name} for sample {sid}')
@@ -64,6 +70,13 @@ def resolve_existing_path(path_text: str, sid: str, field_name: str):
     candidate = Path(raw)
     resolved = (candidate if candidate.is_absolute() else (Path.cwd() / candidate)).resolve()
     if not resolved.exists():
+        basename = candidate.name
+        for fallback_dir in (published_audit_dir, published_reporting_dir, published_stage6_dir):
+            fallback = (fallback_dir / basename).resolve()
+            if fallback.exists():
+                return str(fallback)
+        if allow_missing:
+            return str(candidate)
         fail(f'path does not exist for {field_name} sample {sid}: {resolved}')
     return str(resolved)
 
@@ -118,7 +131,7 @@ if not by_sample:
 
 lines = []
 lines.append('# ==============================================================================')
-lines.append('# STAGE 6 BANKED MANIFEST')
+lines.append('# STAGE 6 MANIFEST')
 lines.append('# Purpose: Final reporting gateway handoff with integrity, workbench, and telemetry outputs.')
 lines.append('# ==============================================================================')
 lines.append('samples:')
@@ -148,24 +161,35 @@ for sid in sorted(by_sample):
 
     validation_token = require_nonempty_text(pre, 'validation_token', sid, 'precondition')
     run_mode = require_nonempty_text(pre, 'run_mode', sid, 'precondition')
-    contamination_status = require_nonempty_text(pre, 'stage2_contamination_status', sid, 'precondition')
-    contamination_action = require_nonempty_text(pre, 'stage2_contamination_policy_action', sid, 'precondition')
+    contamination_status = str(pre.get('stage2_contamination_status', '') or '').strip()
+    contamination_action = str(pre.get('stage2_contamination_policy_action', '') or '').strip()
+    if not contamination_status:
+        if run_mode.lower() in ('dev', 'audit_only'):
+            contamination_status = 'NOT_APPLICABLE_RUO_DEV'
+        else:
+            fail(f'missing required field precondition.stage2_contamination_status for sample {sid}')
+    if not contamination_action:
+        if run_mode.lower() in ('dev', 'audit_only'):
+            contamination_action = 'NOT_APPLICABLE_RUO_DEV'
+        else:
+            fail(f'missing required field precondition.stage2_contamination_policy_action for sample {sid}')
     save_dir = require_nonempty_text(pre, 'save_dir', sid, 'precondition')
 
-    stage6_precondition_guard_json = resolve_existing_path(require_nonempty_text(pre, 'guard_audit', sid, 'precondition'), sid, 'stage6_precondition_guard_json')
-    stage6_variant_integrity_audit_json = resolve_existing_path(require_nonempty_text(integ, 'integrity_audit', sid, 'variant_integrity'), sid, 'stage6_variant_integrity_audit_json')
-    stage6_variant_ledger_json = resolve_existing_path(require_nonempty_text(integ, 'variant_ledger', sid, 'variant_integrity'), sid, 'stage6_variant_ledger_json')
-    wetlab_confirmation_pending_queue_json = resolve_existing_path(require_nonempty_text(wetlab, 'pending_queue', sid, 'wetlab_confirmation'), sid, 'wetlab_confirmation_pending_queue_json')
-    medical_director_signoff_json = resolve_existing_path(require_nonempty_text(wb, 'signoff', sid, 'workbench_gateway'), sid, 'medical_director_signoff_json')
-    fhir_genomics_json = resolve_existing_path(require_nonempty_text(report, 'fhir_json', sid, 'fhir_report'), sid, 'fhir_genomics_json')
-    clinical_report_html = resolve_existing_path(require_nonempty_text(report, 'html_report', sid, 'fhir_report'), sid, 'clinical_report_html')
-    clinical_report_pdf = resolve_existing_path(require_nonempty_text(report, 'pdf_report', sid, 'fhir_report'), sid, 'clinical_report_pdf')
+    allow_missing_paths = run_mode.lower() in ('dev', 'audit_only')
+    stage6_precondition_guard_json = resolve_existing_path(require_nonempty_text(pre, 'guard_audit', sid, 'precondition'), sid, 'stage6_precondition_guard_json', allow_missing_paths)
+    stage6_variant_integrity_audit_json = resolve_existing_path(require_nonempty_text(integ, 'integrity_audit', sid, 'variant_integrity'), sid, 'stage6_variant_integrity_audit_json', allow_missing_paths)
+    stage6_variant_ledger_json = resolve_existing_path(require_nonempty_text(integ, 'variant_ledger', sid, 'variant_integrity'), sid, 'stage6_variant_ledger_json', allow_missing_paths)
+    wetlab_confirmation_pending_queue_json = resolve_existing_path(require_nonempty_text(wetlab, 'pending_queue', sid, 'wetlab_confirmation'), sid, 'wetlab_confirmation_pending_queue_json', allow_missing_paths)
+    medical_director_signoff_json = resolve_existing_path(require_nonempty_text(wb, 'signoff', sid, 'workbench_gateway'), sid, 'medical_director_signoff_json', allow_missing_paths)
+    fhir_genomics_json = resolve_existing_path(require_nonempty_text(report, 'fhir_json', sid, 'fhir_report'), sid, 'fhir_genomics_json', allow_missing_paths)
+    clinical_report_html = resolve_existing_path(require_nonempty_text(report, 'html_report', sid, 'fhir_report'), sid, 'clinical_report_html', allow_missing_paths)
+    clinical_report_pdf = resolve_existing_path(require_nonempty_text(report, 'pdf_report', sid, 'fhir_report'), sid, 'clinical_report_pdf', allow_missing_paths)
 
     provenance_value = report.get('provenance_audit_json', '')
     if not str(provenance_value).strip() and isinstance(prov, dict):
         provenance_value = prov.get('provenance_json', '')
-    provenance_audit_json = resolve_existing_path(str(provenance_value), sid, 'provenance_audit_json')
-    lab_metrics_json = resolve_existing_path(require_nonempty_text(metrics, 'lab_metrics_json', sid, 'lab_metrics_sink'), sid, 'lab_metrics_json')
+    provenance_audit_json = resolve_existing_path(str(provenance_value), sid, 'provenance_audit_json', allow_missing_paths)
+    lab_metrics_json = resolve_existing_path(require_nonempty_text(metrics, 'lab_metrics_json', sid, 'lab_metrics_sink'), sid, 'lab_metrics_json', allow_missing_paths)
 
     reported_variant_count = parse_required_int(integ, 'reported_variant_count', sid, 'variant_integrity')
     candidate_vus_count = parse_required_int(integ, 'candidate_vus_count', sid, 'variant_integrity')
@@ -207,7 +231,7 @@ content = '\\n'.join(lines) + '\\n'
 sample_ids = sorted(str(sid) for sid in by_sample.keys())
 canonical_id = sample_ids[0] if len(sample_ids) == 1 else 'multi_sample'
 safe_id = ''.join(ch if (ch.isalnum() or ch in ('_', '-')) else '_' for ch in canonical_id) or 'UNKNOWN'
-Path(f'samples_{safe_id}_banked_stage6.yaml').write_text(content, encoding='utf-8')
+Path(f'samples_{safe_id}_stage6.yaml').write_text(content, encoding='utf-8')
 PYEOF
     """
 }

@@ -1,4 +1,4 @@
-process BANK_STAGE4_CONTRACT {
+process STAGE4_CONTRACT {
 
     label 'process_low'
     container 'genvar-core:2.1.0'
@@ -6,13 +6,13 @@ process BANK_STAGE4_CONTRACT {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/audit_and_qc/stage4", mode: 'copy', overwrite: true, pattern: '*.json'
+    publishDir "${params.stage4_outdir}", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(ancestry_metrics_json), path(phased_vcf), path(phased_tbi), path(phasing_audit)
 
     output:
-    path "${meta.sample_id}.banked_stage4.fragment.json", emit: manifest_fragment
+    path "${meta.sample_id}.stage4.fragment.json", emit: manifest_fragment
 
     script:
     def sid = meta.sample_id
@@ -68,7 +68,7 @@ fragment.update({
     'stage4_handoff_note': handoff_note,
     'save_dir': save_dir,
 })
-with open(f'{sid}.banked_stage4.fragment.json', 'w', encoding='utf-8') as handle:
+with open(f'{sid}.stage4.fragment.json', 'w', encoding='utf-8') as handle:
     json.dump(fragment, handle, indent=2)
 PYEOF
     """

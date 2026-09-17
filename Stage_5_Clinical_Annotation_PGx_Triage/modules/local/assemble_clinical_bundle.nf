@@ -21,17 +21,68 @@ process ASSEMBLE_CLINICAL_BUNDLE {
     """
     set -euo pipefail
 
+    cat > sample_meta.json <<'JSON'
+${metaJson}
+JSON
+    cat > germline_branch_payload.json <<'JSON'
+${germlineJson}
+JSON
+    cat > pgx_branch_payload.json <<'JSON'
+${pgxJson}
+JSON
+    cat > prs_branch_payload.json <<'JSON'
+${prsJson}
+JSON
+    cat > sf_branch_payload.json <<'JSON'
+${sfJson}
+JSON
+    cat > somatic_branch_payload.json <<'JSON'
+${somaticJson}
+JSON
+
     python3 - <<'PY'
 import json
 import sys
 from pathlib import Path
 
-meta = json.loads('''${metaJson}''')
-germline = json.loads('''${germlineJson}''')
-pgx = json.loads('''${pgxJson}''')
-prs = json.loads('''${prsJson}''')
-sf = json.loads('''${sfJson}''')
-somatic = json.loads('''${somaticJson}''')
+meta = json.loads(Path('sample_meta.json').read_text(encoding='utf-8'))
+def parse_branch_payload(payload_path: Path, branch_name: str):
+    text = payload_path.read_text(encoding='utf-8').strip() if payload_path.exists() else ''
+    if not text:
+        return {
+            'status': 'SKIPPED_BY_CLINICAL_DIRECTIVE',
+            'skip_reason': 'EMPTY_BRANCH_PAYLOAD',
+            'branch': branch_name,
+        }
+    try:
+        payload = json.loads(text)
+    except Exception as exc:
+        return {
+            'status': 'SKIPPED_BY_CLINICAL_DIRECTIVE',
+            'skip_reason': f'INVALID_BRANCH_PAYLOAD_JSON:{exc}',
+            'branch': branch_name,
+        }
+    if payload is None:
+        return {
+            'status': 'SKIPPED_BY_CLINICAL_DIRECTIVE',
+            'skip_reason': 'NULL_BRANCH_PAYLOAD',
+            'branch': branch_name,
+        }
+    if not isinstance(payload, dict):
+        return {
+            'status': 'SKIPPED_BY_CLINICAL_DIRECTIVE',
+            'skip_reason': 'NON_OBJECT_BRANCH_PAYLOAD',
+            'branch': branch_name,
+            'payload': payload,
+        }
+    return payload
+
+
+germline = parse_branch_payload(Path('germline_branch_payload.json'), 'germline')
+pgx = parse_branch_payload(Path('pgx_branch_payload.json'), 'pgx')
+prs = parse_branch_payload(Path('prs_branch_payload.json'), 'prs')
+sf = parse_branch_payload(Path('sf_branch_payload.json'), 'sf')
+somatic = parse_branch_payload(Path('somatic_branch_payload.json'), 'somatic')
 
 required_meta = [
     'sample_id',

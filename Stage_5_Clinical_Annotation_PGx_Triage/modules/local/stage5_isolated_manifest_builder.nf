@@ -3,13 +3,13 @@ process STAGE5_BUILD_MULTI_BRANCH_MANIFEST {
     container 'genvar-annotation:2.1.0'
     stageInMode 'copy'
     tag "${sample_id}"
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'samples_*_banked_stage5.yaml'
+    publishDir "${params.stage5_outdir}", mode: 'copy', overwrite: true, pattern: 'samples_*_stage5.yaml'
 
     input:
     tuple val(sample_id), val(run_mode), val(sample_payload), path(germline_manifest), path(pgx_manifest), path(sf_manifest), path(prs_manifest), path(somatic_manifest), path(manifest_builder_script)
 
     output:
-    tuple val(sample_id), path("samples_${sample_id}_banked_stage5.yaml"), emit: banked_manifest
+    tuple val(sample_id), path("samples_${sample_id}_stage5.yaml"), emit: stage5_manifest
 
     script:
     """
@@ -26,6 +26,6 @@ JSON
       --sf "${sf_manifest}" \
       --prs "${prs_manifest}" \
       --somatic "${somatic_manifest}" \
-      --out-yaml "samples_${sample_id}_banked_stage5.yaml"
+      --out-yaml "samples_${sample_id}_stage5.yaml"
     """
 }

@@ -5,7 +5,7 @@ process STAGE1_ONT_LONGREAD_ALIGN {
 
     tag "${meta.sample_id}"
 
-    publishDir { "${meta.save_dir}/${meta.sample_id}/aligned" }, mode: 'copy', overwrite: true, pattern: '*.{bam,bai,json}'
+    publishDir "${params.stage1_outdir}/aligned", mode: 'copy', overwrite: true, pattern: '*.{bam,bai,json}'
 
     input:
     tuple val(meta), path(r1), path(r2)

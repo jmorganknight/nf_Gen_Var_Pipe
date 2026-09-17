@@ -1,5 +1,10 @@
 nextflow.enable.dsl = 2
 
+params.stage1_outdir = ({
+    def p = java.nio.file.Paths.get((params.outdir ?: 'results').toString()).toAbsolutePath().normalize().toString()
+    p.endsWith('/Stage_1') ? p : "${p}/Stage_1"
+}).call()
+
 include { PREFLIGHT_INGESTION_GUARD } from '../Stage_0_Preflight_Ingest_Gate/modules/local/preflight_ingestion_guard.nf'
 include { STAGE1_ALIGNMENT as STAGE1_ALIGNMENT_SUBFLOW } from './workflows/stage1_alignment.nf'
 
@@ -387,7 +392,7 @@ workflow STAGE1_ALIGNMENT {
         refDir = resolved.toString()
         resolved.exists()
     }
-    def preflightLockPublishedPath = "${params.outdir}/audit_and_qc/preflight_lock/preflight_lock.json"
+    def preflightLockPublishedPath = "${params.stage1_outdir}/audit_and_qc/preflight_lock/preflight_lock.json"
 
     def refsDynamic = (params.refs instanceof Map) ? (params.refs as Map) : [:]
     def refGenome = refsDynamic.reference_genome ?: refsDynamic.fasta ?: refsParsed.reference_genome ?: refsParsed.grch38_fasta
@@ -409,7 +414,7 @@ workflow STAGE1_ALIGNMENT {
     ]
     requiredRefMap.each { key, value ->
         if (!value) {
-            writeStage1Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', key)
+            writeStage1Rejection(params.stage1_outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', key)
             throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}'")
         }
     }
@@ -418,7 +423,7 @@ workflow STAGE1_ALIGNMENT {
         def p = requiredRefMap[key].toString()
         def f = hostPathForReference(p, refDir)
         if (f == null || !f.exists()) {
-            writeStage1Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', "${key}=${p}")
+            writeStage1Rejection(params.stage1_outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', "${key}=${p}")
             throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}=${p}'")
         }
     }
@@ -428,7 +433,7 @@ workflow STAGE1_ALIGNMENT {
     indexSuffixes.each { suffix ->
         def idxFile = new File("${hostBwaBase}${suffix}")
         if (!idxFile.exists()) {
-            writeStage1Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', idxFile.toString())
+            writeStage1Rejection(params.stage1_outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', idxFile.toString())
             throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${idxFile}'")
         }
     }
@@ -465,27 +470,27 @@ workflow STAGE1_ALIGNMENT {
 
     samplesParsed.each { sample ->
         def sid = (sample.sample_id ?: 'UNKNOWN').toString()
-        validateVariantBranchesSchema(sample.variant_branches, sid, params.outdir.toString())
-        def tokenInfo = resolveStage1IntakeToken(sample as Map, samplesRoot, params.outdir.toString(), stage1StubRun)
+        validateVariantBranchesSchema(sample.variant_branches, sid, params.stage1_outdir.toString())
+        def tokenInfo = resolveStage1IntakeToken(sample as Map, samplesRoot, params.stage1_outdir.toString(), stage1StubRun)
         def tokenPathRaw = tokenInfo.pathText
         if (!tokenPathRaw) {
-            writeStage1Rejection(params.outdir.toString(), sid, 'MISSING_STAGE0_TOKEN', 'samplesheet missing intake_validation_token path')
+            writeStage1Rejection(params.stage1_outdir.toString(), sid, 'MISSING_STAGE0_TOKEN', 'samplesheet missing intake_validation_token path')
             throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: missing intake_validation_token for sample '${sid}'")
         }
         def tokenFile = tokenInfo.tokenFile as File
         if (!tokenFile.exists()) {
-            writeStage1Rejection(params.outdir.toString(), sid, 'TOKEN_PATH_NOT_FOUND', tokenPathRaw)
+            writeStage1Rejection(params.stage1_outdir.toString(), sid, 'TOKEN_PATH_NOT_FOUND', tokenPathRaw)
             throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: token file not found for sample '${sid}'")
         }
         def token = tokenFile.text.trim()
         if (!token.startsWith('VALID_PASS|INTAKE_VALIDATED')) {
-            writeStage1Rejection(params.outdir.toString(), sid, 'INVALID_STAGE0_TOKEN', token)
+            writeStage1Rejection(params.stage1_outdir.toString(), sid, 'INVALID_STAGE0_TOKEN', token)
             throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: sample '${sid}' token was '${token}'")
         }
 
         def platform = normalizePlatform((sample.sequencing_platform ?: sample.platform ?: sample.sequencer?.platform ?: 'illumina').toString())
         if (!allowedPlatforms.contains(platform)) {
-            writeStage1Rejection(params.outdir.toString(), sid, 'UNSUPPORTED_PLATFORM', platform)
+            writeStage1Rejection(params.stage1_outdir.toString(), sid, 'UNSUPPORTED_PLATFORM', platform)
             throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: unsupported platform '${platform}' for sample '${sid}'")
         }
 
@@ -495,23 +500,23 @@ workflow STAGE1_ALIGNMENT {
         def branchCatalogPath = (sample.branch_target_catalog ?: branchCatalogDefault)?.toString()
         if (branchCatalogRequired) {
             if (!branchCatalogPath) {
-                writeStage1Rejection(params.outdir.toString(), sid, 'REJECT_MISSING_BRANCH_CATALOG', 'branch_target_catalog missing for enabled variant branches')
+                writeStage1Rejection(params.stage1_outdir.toString(), sid, 'REJECT_MISSING_BRANCH_CATALOG', 'branch_target_catalog missing for enabled variant branches')
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: branch_target_catalog missing for sample '${sid}'")
             }
             def branchCatalogFile = branchCatalogPath.startsWith('/opt/reference') ? hostPathForReference(branchCatalogPath, refDir) : resolvePath(branchCatalogPath, samplesRoot)
             if (branchCatalogFile == null || !branchCatalogFile.exists() || branchCatalogFile.length() == 0L) {
-                writeStage1Rejection(params.outdir.toString(), sid, 'REJECT_MISSING_BRANCH_CATALOG', branchCatalogPath)
+                writeStage1Rejection(params.stage1_outdir.toString(), sid, 'REJECT_MISSING_BRANCH_CATALOG', branchCatalogPath)
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: branch_target_catalog missing or empty for sample '${sid}'")
             }
         }
 
         if (sample.mapped_bam) {
-            def mappedBam = resolveStage1SampleInput(sample.mapped_bam.toString(), samplesRoot, params.outdir.toString(), sid, stage1StubRun, "${sid}.mapped.bam")
+            def mappedBam = resolveStage1SampleInput(sample.mapped_bam.toString(), samplesRoot, params.stage1_outdir.toString(), sid, stage1StubRun, "${sid}.mapped.bam")
             def mappedBai = sample.mapped_bai
-                ? resolveStage1SampleInput(sample.mapped_bai.toString(), samplesRoot, params.outdir.toString(), sid, stage1StubRun, "${sid}.mapped.bam.bai")
-                : resolveStage1SampleInput("${mappedBam}.bai", samplesRoot, params.outdir.toString(), sid, stage1StubRun, "${sid}.mapped.bam.bai")
+                ? resolveStage1SampleInput(sample.mapped_bai.toString(), samplesRoot, params.stage1_outdir.toString(), sid, stage1StubRun, "${sid}.mapped.bam.bai")
+                : resolveStage1SampleInput("${mappedBam}.bai", samplesRoot, params.stage1_outdir.toString(), sid, stage1StubRun, "${sid}.mapped.bam.bai")
             if (!mappedBam.exists() || !mappedBai.exists()) {
-                writeStage1Rejection(params.outdir.toString(), sid, 'MAPPED_INPUT_MISSING', "bam=${mappedBam}; bai=${mappedBai}")
+                writeStage1Rejection(params.stage1_outdir.toString(), sid, 'MAPPED_INPUT_MISSING', "bam=${mappedBam}; bai=${mappedBai}")
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: mapped inputs missing for sample '${sid}'")
             }
 
@@ -520,7 +525,7 @@ workflow STAGE1_ALIGNMENT {
             }
 
             if (mappedBam.length() == 0L) {
-                writeStage1Rejection(params.outdir.toString(), sid, 'BAM_HEADER_UNREADABLE', 'empty BAM fixture')
+                writeStage1Rejection(params.stage1_outdir.toString(), sid, 'BAM_HEADER_UNREADABLE', 'empty BAM fixture')
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: unable to read BAM header for sample '${sid}'")
             }
 
@@ -529,7 +534,7 @@ workflow STAGE1_ALIGNMENT {
             def headerErr = new StringBuffer()
             headerCmd.waitForProcessOutput(headerOut, headerErr)
             if (headerCmd.exitValue() != 0) {
-                writeStage1Rejection(params.outdir.toString(), sid, 'BAM_HEADER_UNREADABLE', headerErr.toString().trim())
+                writeStage1Rejection(params.stage1_outdir.toString(), sid, 'BAM_HEADER_UNREADABLE', headerErr.toString().trim())
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: unable to read BAM header for sample '${sid}'")
             }
 
@@ -542,22 +547,22 @@ workflow STAGE1_ALIGNMENT {
                 requiredTags.each { tag -> if (!rgLine.contains(tag)) missingTags << tag }
             }
             if (!missingTags.isEmpty()) {
-                writeStage1Rejection(params.outdir.toString(), sid, 'MISSING_READ_GROUP_TAGS', missingTags.join(','))
+                writeStage1Rejection(params.stage1_outdir.toString(), sid, 'MISSING_READ_GROUP_TAGS', missingTags.join(','))
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: BAM @RG tags missing for sample '${sid}'")
             }
         } else {
             def fq1Raw = sample.fastq_forward?.toString() ?: sample.read_file_paths?.read1?.toString()
             def fq2Raw = sample.fastq_reverse?.toString() ?: sample.read_file_paths?.read2?.toString()
             if (!fq1Raw) {
-                writeStage1Rejection(params.outdir.toString(), sid, 'FASTQ_INPUT_MISSING', 'r1 path missing')
+                writeStage1Rejection(params.stage1_outdir.toString(), sid, 'FASTQ_INPUT_MISSING', 'r1 path missing')
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: FASTQ R1 input missing for sample '${sid}'")
             }
-            def fq1 = resolveStage1SampleInput(fq1Raw, samplesRoot, params.outdir.toString(), sid, stage1StubRun, "${sid}_R1.fastq.gz")
+            def fq1 = resolveStage1SampleInput(fq1Raw, samplesRoot, params.stage1_outdir.toString(), sid, stage1StubRun, "${sid}_R1.fastq.gz")
             def fq2 = fq2Raw
-                ? resolveStage1SampleInput(fq2Raw, samplesRoot, params.outdir.toString(), sid, stage1StubRun, "${sid}_R2.fastq.gz")
+                ? resolveStage1SampleInput(fq2Raw, samplesRoot, params.stage1_outdir.toString(), sid, stage1StubRun, "${sid}_R2.fastq.gz")
                 : fq1
             if (!fq1.exists() || !fq2.exists()) {
-                writeStage1Rejection(params.outdir.toString(), sid, 'FASTQ_INPUT_MISSING', "r1=${fq1}; r2=${fq2}")
+                writeStage1Rejection(params.stage1_outdir.toString(), sid, 'FASTQ_INPUT_MISSING', "r1=${fq1}; r2=${fq2}")
                 throw new IllegalStateException("STAGE1_PRECONDITION_FAILURE: FASTQ inputs missing for sample '${sid}'")
             }
         }
@@ -566,15 +571,15 @@ workflow STAGE1_ALIGNMENT {
     def chPlatformPayload = channel.fromList(samplesParsed.findAll { s -> !s.mapped_bam })
         .combine(PREFLIGHT_INGESTION_GUARD.out.preflight_lock)
         .map { sample, _preflightLock ->
-        def tokenInfo = resolveStage1IntakeToken(sample as Map, samplesRoot, params.outdir.toString(), stage1StubRun)
+        def tokenInfo = resolveStage1IntakeToken(sample as Map, samplesRoot, params.stage1_outdir.toString(), stage1StubRun)
         def normalizedSample = (sample as Map) + [intake_validation_token: tokenInfo.pathText]
-        def meta = buildMetaRow(normalizedSample, params.outdir.toString(), branchTargetCatalogDefault, preflightLockPublishedPath)
+        def meta = buildMetaRow(normalizedSample, params.stage1_outdir.toString(), branchTargetCatalogDefault, preflightLockPublishedPath)
         def fq1Raw = sample.fastq_forward?.toString() ?: sample.read_file_paths?.read1?.toString()
         def fq2Raw = sample.fastq_reverse?.toString() ?: sample.read_file_paths?.read2?.toString()
         def sid = (sample.sample_id ?: 'UNKNOWN').toString()
-        def fq1 = resolveStage1SampleInput(fq1Raw, samplesRoot, params.outdir.toString(), sid, stage1StubRun, "${sid}_R1.fastq.gz")
+        def fq1 = resolveStage1SampleInput(fq1Raw, samplesRoot, params.stage1_outdir.toString(), sid, stage1StubRun, "${sid}_R1.fastq.gz")
         def fq2 = fq2Raw
-            ? resolveStage1SampleInput(fq2Raw, samplesRoot, params.outdir.toString(), sid, stage1StubRun, "${sid}_R2.fastq.gz")
+            ? resolveStage1SampleInput(fq2Raw, samplesRoot, params.stage1_outdir.toString(), sid, stage1StubRun, "${sid}_R2.fastq.gz")
             : fq1
         def tokenPath = tokenInfo.tokenFile as File
         def intakeReport = sample.intake_validation_report ? resolvePath(sample.intake_validation_report.toString(), samplesRoot) : tokenPath
@@ -605,8 +610,8 @@ workflow STAGE1_ALIGNMENT {
         clinvar_db: refsParsed.clinvar_db,
         preflight_lock: preflightLockPublishedPath,
         preflight_lock_status: 'STAGE0_PREFLIGHT_LOCK_PASS',
-        reference_snapshot_tokens: "${params.outdir}/audit_and_qc/preflight_lock/reference_snapshot.tokens",
-        yaml_snapshot_bundle: "${params.outdir}/audit_and_qc/preflight_lock/yaml_snapshot_bundle.tar.gz"
+        reference_snapshot_tokens: "${params.stage1_outdir}/audit_and_qc/preflight_lock/reference_snapshot.tokens",
+        yaml_snapshot_bundle: "${params.stage1_outdir}/audit_and_qc/preflight_lock/yaml_snapshot_bundle.tar.gz"
     ]
     def chReferenceMeta = channel.value(referenceMeta)
 

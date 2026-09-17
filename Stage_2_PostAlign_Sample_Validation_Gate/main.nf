@@ -1,12 +1,15 @@
 nextflow.enable.dsl = 2
 
+params.outdir = java.nio.file.Paths.get((params.outdir ?: 'results').toString()).toAbsolutePath().normalize().toString()
+params.stage2_outdir = "${params.outdir}/Stage_2"
+
 include { VALIDATE_STAGE1_PRECONDITION } from './modules/local/validate_stage1_precondition.nf'
 include { VERIFYBAMID2 } from './modules/local/verify_bam_id2.nf'
 include { VALIDATE_CHROMOSOMAL_SEX } from './modules/local/validate_chromosomal_sex.nf'
 include { SPECIMEN_PARADIGM_PURITY_RESOLVER } from './modules/local/specimen_paradigm_purity_resolver.nf'
 include { ASSAY_TARGET_ROUTER } from './modules/local/assay_target_router.nf'
-include { BANK_STAGE2_CONTRACT } from './modules/local/bank_stage2_contract.nf'
-include { ASSEMBLE_STAGE2_BANKED_MANIFEST } from './modules/local/assemble_stage2_banked_manifest.nf'
+include { STAGE2_CONTRACT } from './modules/local/bank_stage2_contract.nf'
+include { ASSEMBLE_STAGE2_MANIFEST } from './modules/local/assemble_stage2_banked_manifest.nf'
 
 def mapOrEmpty(Object value) {
     value instanceof Map ? (value as Map) : [:]
@@ -182,7 +185,7 @@ def buildStage2InputChannel() {
 
     def samplesFilePath = (params.input ?: params.samples)?.toString()
     if (!samplesFilePath) {
-        throw new IllegalArgumentException('STAGE2_PRECONDITION_FAILURE: missing --input Stage 1 banked manifest')
+        throw new IllegalArgumentException('STAGE2_PRECONDITION_FAILURE: missing --input Stage 1 manifest')
     }
     def samplesFile = file(samplesFilePath)
     if (!samplesFile.exists()) {
@@ -240,12 +243,12 @@ def buildStage2InputChannel() {
         sf_bed          : refsNormalized.sf_bed
     ].each { key, value ->
         if (!value) {
-            writeStage2Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', key)
+            writeStage2Rejection(params.stage2_outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', key)
             throw new IllegalStateException("STAGE2_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}'")
         }
         def resolved = hostPathForReference(value.toString(), refDir)
         if (resolved == null || !resolved.exists()) {
-            writeStage2Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', "${key}=${value}")
+            writeStage2Rejection(params.stage2_outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', "${key}=${value}")
             throw new IllegalStateException("STAGE2_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}=${value}'")
         }
     }
@@ -260,7 +263,7 @@ def buildStage2InputChannel() {
         def mappedBaiBasename = (sample.mapped_bai_basename ?: sample.mapped_bai)?.toString()
         def sortedBamRaw = (sample.sorted_bam ?: mappedBamBasename)?.toString()
         if (!sortedBamRaw) {
-            writeStage2Rejection(params.outdir.toString(), sid, 'MISSING_SORTED_BAM', 'sample did not declare sorted_bam or mapped_bam')
+            writeStage2Rejection(params.stage2_outdir.toString(), sid, 'MISSING_SORTED_BAM', 'sample did not declare sorted_bam or mapped_bam')
             throw new IllegalStateException("STAGE2_PRECONDITION_FAILURE: sorted_bam/mapped_bam missing for sample '${sid}'")
         }
         def sortedBam = resolveAssetPath(sortedBamRaw, samplesRoot, stage1AssetBase)
@@ -268,20 +271,20 @@ def buildStage2InputChannel() {
         def sortedBai = resolveAssetPath(sortedBaiRaw, samplesRoot, stage1AssetBase)
 
         if (!sortedBam.exists() || !sortedBai.exists()) {
-            writeStage2Rejection(params.outdir.toString(), sid, 'SORTED_BAM_OR_BAI_MISSING', "bam=${sortedBam}; bai=${sortedBai}")
+            writeStage2Rejection(params.stage2_outdir.toString(), sid, 'SORTED_BAM_OR_BAI_MISSING', "bam=${sortedBam}; bai=${sortedBai}")
             throw new IllegalStateException("STAGE2_PRECONDITION_FAILURE: sorted BAM/BAI missing for sample '${sid}'")
         }
 
         def tokenField = (sample.intake_validation_token ?: sample.validation_token)?.toString()
         if (!tokenField) {
-            writeStage2Rejection(params.outdir.toString(), sid, 'MISSING_INTAKE_VALIDATION_TOKEN', 'intake_validation_token/validation_token missing from Stage 1 contract')
+            writeStage2Rejection(params.stage2_outdir.toString(), sid, 'MISSING_INTAKE_VALIDATION_TOKEN', 'intake_validation_token/validation_token missing from Stage 1 contract')
             throw new IllegalStateException("STAGE2_PRECONDITION_FAILURE: intake_validation_token missing for sample '${sid}'")
         }
 
         def tokenPath = resolvePath(tokenField, samplesRoot)
         def token = tokenPath.exists() ? tokenPath.text.trim() : tokenField.trim()
         if (!validTokenMarkers.any { marker -> token.contains(marker) }) {
-            writeStage2Rejection(params.outdir.toString(), sid, 'INVALID_STAGE1_PRECONDITION_TOKEN', token)
+            writeStage2Rejection(params.stage2_outdir.toString(), sid, 'INVALID_STAGE1_PRECONDITION_TOKEN', token)
             throw new IllegalStateException("STAGE2_PRECONDITION_FAILURE: invalid intake token for sample '${sid}' -> '${token}'")
         }
 
@@ -290,11 +293,11 @@ def buildStage2InputChannel() {
         def targetCatalog = (sample.branch_target_catalog ?: refsNormalized.capture_wes_bed ?: refsNormalized.onco_target_bed)?.toString()
         def targetCatalogResolved = targetCatalog ? hostPathForReference(targetCatalog, refDir) : null
         if (branchCatalogRequired && (!targetCatalogResolved || !targetCatalogResolved.exists())) {
-            writeStage2Rejection(params.outdir.toString(), sid, 'REJECT_MISSING_BRANCH_CATALOG', targetCatalog ?: 'missing')
+            writeStage2Rejection(params.stage2_outdir.toString(), sid, 'REJECT_MISSING_BRANCH_CATALOG', targetCatalog ?: 'missing')
             throw new IllegalStateException("STAGE2_PRECONDITION_FAILURE: REJECT_MISSING_BRANCH_CATALOG for sample '${sid}' -> ${targetCatalog ?: 'missing'}")
         }
 
-        def baseMeta = buildMetaRow(sample as Map, params.outdir.toString()) + [
+        def baseMeta = buildMetaRow(sample as Map, params.stage2_outdir.toString()) + [
             intake_validation_token: sample.intake_validation_token ?: sample.validation_token,
             intake_validation_token_value: token,
             run_mode: (sample.run_mode ?: 'production').toString(),
@@ -395,11 +398,11 @@ workflow STAGE2_SAMPLE_VALIDATION {
         tuple(enriched, bam, bai, refs, thresholds, preAudit, contaminationAudit, purityAudit, routerAudit)
     }
 
-    BANK_STAGE2_CONTRACT(ch_stage2_for_bank)
-    ASSEMBLE_STAGE2_BANKED_MANIFEST(BANK_STAGE2_CONTRACT.out.manifest_fragment.collect())
+    STAGE2_CONTRACT(ch_stage2_for_bank)
+    ASSEMBLE_STAGE2_MANIFEST(STAGE2_CONTRACT.out.manifest_fragment.collect())
 
     emit:
-    stage2_contract = ASSEMBLE_STAGE2_BANKED_MANIFEST.out.banked_manifest
+    stage2_manifest = ASSEMBLE_STAGE2_MANIFEST.out.stage2_manifest
 }
 
 workflow STAGE2_POSTALIGN_VALIDATION {
@@ -407,7 +410,7 @@ workflow STAGE2_POSTALIGN_VALIDATION {
     STAGE2_SAMPLE_VALIDATION(buildStage2InputChannel())
 
     emit:
-    stage2_contract = STAGE2_SAMPLE_VALIDATION.out.stage2_contract
+    stage2_manifest = STAGE2_SAMPLE_VALIDATION.out.stage2_manifest
 }
 
 workflow {

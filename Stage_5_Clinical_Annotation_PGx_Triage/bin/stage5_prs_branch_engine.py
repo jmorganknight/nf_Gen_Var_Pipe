@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 
 
@@ -188,18 +189,46 @@ def require_numeric(node, path):
     return float(current)
 
 
-def resolve_reference_path(raw_path: str, ref_data_root: str):
+def resolve_reference_path(raw_path: str, ref_yaml_doc: dict):
     if not raw_path:
         raise SystemExit('STAGE5_PRS_FATAL: empty reference path')
     path = Path(raw_path)
+    ref_root_text = str(ref_yaml_doc.get('ref_data_root') or '').strip()
+    ref_root = Path(ref_root_text).resolve(strict=False) if ref_root_text else None
+    hint_text = str(os.environ.get('STAGE5_REFERENCE_ROOT_HINT') or '').strip()
+    hint_root = Path(hint_text).resolve(strict=False) if hint_text else None
+
+    candidates = []
     if path.is_absolute():
-        return path
-    root = Path(ref_data_root) if ref_data_root else None
-    if root is not None:
-        candidate = root / raw_path
-        if candidate.exists():
+        candidates.append(path)
+        if ref_root is not None:
+            try:
+                rel = path.relative_to(ref_root)
+                if hint_root is not None:
+                    candidates.append((hint_root / rel).resolve(strict=False))
+            except ValueError:
+                pass
+    else:
+        candidates.append(path.resolve(strict=False))
+        if ref_root is not None:
+            candidates.append((ref_root / path).resolve(strict=False))
+        if hint_root is not None:
+            candidates.append((hint_root / path).resolve(strict=False))
+
+    local_name = Path(path.name)
+    candidates.append(local_name.resolve(strict=False) if local_name.exists() else local_name)
+
+    seen = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        if candidate.exists() and candidate.is_file():
             return candidate
-        return candidate
+
+    if candidates:
+        return candidates[0]
     return path
 
 
@@ -379,12 +408,11 @@ def main():
         raise SystemExit('STAGE5_PRS_FATAL: clinical.prs.no_call_min_markers_required must be a non-negative integer')
     min_markers = int(min_markers)
 
-    ref_root = str(references_doc.get('ref_data_root') or '').strip()
     prs_refs = require_mapping(references_doc, ('references', 'prs')) if 'references' in references_doc else require_mapping(references_doc, ('prs',))
     marker_weights_path_raw = require_path(prs_refs, ('marker_weights_tsv',))
     if not isinstance(marker_weights_path_raw, str) or not marker_weights_path_raw.strip():
         raise SystemExit('STAGE5_PRS_FATAL: references.prs.marker_weights_tsv must be a non-empty string')
-    marker_weights_path = resolve_reference_path(marker_weights_path_raw.strip(), ref_root)
+    marker_weights_path = resolve_reference_path(marker_weights_path_raw.strip(), references_doc)
     if not marker_weights_path.exists() or not marker_weights_path.is_file():
         raise SystemExit(f'STAGE5_PRS_FATAL: marker weights file not found: {marker_weights_path}')
 

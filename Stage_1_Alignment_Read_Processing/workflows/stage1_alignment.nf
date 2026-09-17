@@ -14,8 +14,8 @@ include { COORDINATE_STANDARDIZED_CRAM_JUNCTION_HUB } from '../modules/local/coo
 include { CROSS_SAMPLE_IDENTITY_GATE } from '../modules/local/cross_sample_identity_gate.nf'
 include { STAGE1_FLAGSTAT } from '../modules/local/stage1_flagstat.nf'
 include { STAGE1_AUDIT_SINK } from '../modules/local/stage1_audit_sink.nf'
-include { BANK_STAGE1_CONTRACT } from '../modules/local/bank_stage1_contract.nf'
-include { ASSEMBLE_STAGE1_BANKED_MANIFEST } from '../modules/local/assemble_stage1_banked_manifest.nf'
+include { STAGE1_CONTRACT } from '../modules/local/bank_stage1_contract.nf'
+include { ASSEMBLE_STAGE1_MANIFEST } from '../modules/local/assemble_stage1_banked_manifest.nf'
 
 workflow STAGE1_ALIGNMENT {
 
@@ -139,8 +139,8 @@ workflow STAGE1_ALIGNMENT {
         ch_junction_audits
     )
 
-    BANK_STAGE1_CONTRACT(CROSS_SAMPLE_IDENTITY_GATE.out.audited_stream, ch_reference_meta)
-    ASSEMBLE_STAGE1_BANKED_MANIFEST(BANK_STAGE1_CONTRACT.out.manifest_fragment.collect())
+    STAGE1_CONTRACT(CROSS_SAMPLE_IDENTITY_GATE.out.audited_stream, ch_reference_meta)
+    ASSEMBLE_STAGE1_MANIFEST(STAGE1_CONTRACT.out.manifest_fragment.collect())
 
     def ch_stage2_handoff = CROSS_SAMPLE_IDENTITY_GATE.out.audited_stream.map { meta, identityAudit, bam, bai ->
         def sampleMeta = (meta as Map) + [identity_audit: identityAudit.toString()]
@@ -148,7 +148,7 @@ workflow STAGE1_ALIGNMENT {
     }
 
     emit:
-    aligned_contract = ASSEMBLE_STAGE1_BANKED_MANIFEST.out.banked_manifest
+    aligned_manifest = ASSEMBLE_STAGE1_MANIFEST.out.stage1_manifest
     stage1_audit_payload = STAGE1_AUDIT_SINK.out.payload
     aligned_bam_bai = CROSS_SAMPLE_IDENTITY_GATE.out.audited_stream
     stage2_handoff = ch_stage2_handoff

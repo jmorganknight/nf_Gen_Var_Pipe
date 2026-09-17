@@ -3,7 +3,7 @@ process VALIDATE_STAGE1_PRECONDITION {
     label 'process_low'
     container 'genvar-core:2.1.0'
 
-    publishDir "${params.outdir}/audit_and_qc/stage2", mode: 'copy', overwrite: true, pattern: '*.stage2_precondition_audit.json'
+    publishDir "${params.stage2_outdir}/audit_and_qc/stage2", mode: 'copy', overwrite: true, pattern: '*.stage2_precondition_audit.json'
 
     input:
     tuple val(meta), path(bam), path(bai), val(refs), val(thresholds)

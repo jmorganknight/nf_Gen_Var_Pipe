@@ -15,7 +15,7 @@ container 'genvar-core:2.1.0'
 
 tag "${meta.sample_id}"
 
-publishDir "${meta.save_dir}/${meta.sample_id}/aligned", mode: 'copy', overwrite: true,
+publishDir "${params.stage1_outdir}/aligned", mode: 'copy', overwrite: true,
     pattern: "*.{bam,bai,txt,json}"
 
 input:

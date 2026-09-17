@@ -4,7 +4,7 @@ process STAGE6_RELEASE_FINALIZER {
     container 'genvar-reporting:2.1.0'
     stageInMode 'copy'
 
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'Stage6_SHA256SUMS.txt'
+    publishDir "${params.stage6_outdir}", mode: 'copy', overwrite: true, pattern: 'Stage6_SHA256SUMS.txt'
 
     input:
     path release_artifacts

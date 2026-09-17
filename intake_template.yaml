@@ -29,7 +29,7 @@ samples:
     sequencing_platform: "illumina"                                       # REQUIRED enum: illumina|ultima|element|ont|complete_genomics
     sequencer_model: "NovaSeqX"                                           # REQUIRED: Sequencer model/chemistry
     flowcell_geometry: "native"                                           # OPTIONAL: Flow cell geometry enum
-    library_strategy: "WGS"                                               # REQUIRED enum: WES|WGS|TARGETED|AMPLICON
+    library_strategy: "WES"                                               # REQUIRED enum: WES|WGS|TARGETED|AMPLICON
     target_bed: ""                                                         # OPTIONAL: Target regions if TARGETED strategy
 
     # Consent and routing decisions

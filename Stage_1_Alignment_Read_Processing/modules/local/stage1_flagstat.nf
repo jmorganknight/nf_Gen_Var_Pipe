@@ -5,7 +5,6 @@ process STAGE1_FLAGSTAT {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/audit_and_qc/stage1", mode: 'copy', overwrite: true
 
     input:
     tuple val(meta), path(identity_audit), path(bam), path(bai)

@@ -1,4 +1,4 @@
-process BANK_STAGE1_CONTRACT {
+process STAGE1_CONTRACT {
 
     label 'process_low'
     container 'genvar-core:2.1.0'
@@ -6,15 +6,19 @@ process BANK_STAGE1_CONTRACT {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/aligned", mode: 'rellink', overwrite: true, pattern: '*.bam'
-    publishDir "${params.outdir}/aligned", mode: 'rellink', overwrite: true, pattern: '*.bai'
+    publishDir "${params.stage1_outdir}/aligned", mode: 'rellink', overwrite: true, pattern: '*.identity_verified.bam'
+    publishDir "${params.stage1_outdir}/aligned", mode: 'rellink', overwrite: true, pattern: '*.identity_verified.bam.bai'
+    publishDir "${params.stage1_outdir}/aligned", mode: 'copy', overwrite: true, pattern: '*.identity_audit.json'
 
     input:
     tuple val(meta), path(identity_audit), path(bam), path(bai)
     val reference_meta
 
     output:
-    path "${meta.sample_id}.banked_stage1.fragment.json", emit: manifest_fragment
+    path "${meta.sample_id}.stage1.fragment.json", emit: manifest_fragment
+    path "${meta.sample_id}.identity_verified.bam", emit: published_bam
+    path "${meta.sample_id}.identity_verified.bam.bai", emit: published_bai
+    path "${meta.sample_id}.identity_audit.json", emit: published_identity_audit
 
     script:
     def sid = meta.sample_id
@@ -42,6 +46,16 @@ process BANK_STAGE1_CONTRACT {
     """
     set -euo pipefail
 
+    if [ "${bam}" != "${sid}.identity_verified.bam" ]; then
+        cp -L "${bam}" "${sid}.identity_verified.bam"
+    fi
+    if [ "${bai}" != "${sid}.identity_verified.bam.bai" ]; then
+        cp -L "${bai}" "${sid}.identity_verified.bam.bai"
+    fi
+    if [ "${identity_audit}" != "${sid}.identity_audit.json" ]; then
+        cp -L "${identity_audit}" "${sid}.identity_audit.json"
+    fi
+
     python3 - <<'PYEOF'
 import json
 from pathlib import Path
@@ -49,8 +63,8 @@ from pathlib import Path
 ref = json.loads('''${refJson}''')
 meta = json.loads('''${metaJson}''')
 sid = '${sid}'
-base = '${params.outdir}'
-asset_base_uri = f"{base}/{sid}/audit_and_qc/identity"
+base = Path('${params.stage1_outdir}').joinpath('aligned').as_posix()
+asset_base_uri = base
 fragment = dict(meta)
 fragment.update({
     'sample_id': sid,
@@ -93,9 +107,9 @@ fragment.update({
     'mapped_bai_basename': f"{sid}.identity_verified.bam.bai",
     'identity_audit': f"{asset_base_uri}/{sid}.identity_audit.json",
     'reference_build': ref,
-    'save_dir': base
+    'save_dir': str(Path('${params.stage1_outdir}'))
 })
-with open(f"{sid}.banked_stage1.fragment.json", 'w', encoding='utf-8') as out:
+with open(f"{sid}.stage1.fragment.json", 'w', encoding='utf-8') as out:
     json.dump(fragment, out, indent=2)
 PYEOF
     """

@@ -189,7 +189,7 @@ def normalizeVariantBranches(Object rawBranches) {
 
 
 def writeStage0Rejection(String outdir, String sampleId, String reason, String detail, Map extra = [:]) {
-    def auditDir = new File("${outdir}/audit_and_qc/stage0")
+    def auditDir = new File("${outdir}/Stage_0/audit_and_qc/stage0")
     auditDir.mkdirs()
     def payload = [
         failure_code: 'STAGE0_PRECONDITION_FAILURE',
@@ -237,7 +237,7 @@ def validateReferenceAsset(String key, String rawPath, String refDir, String out
     }
     def hostPath = hostPathForReference(rawPath.toString(), refDir)
     if (hostPath == null || !hostPath.exists()) {
-        def auditDir = new File("${outdir}/audit_and_qc/stage0")
+        def auditDir = new File("${outdir}/Stage_0/audit_and_qc/stage0")
         auditDir.mkdirs()
         def payload = [
             failure_code: 'STAGE0_PRECONDITION_FAILURE',
@@ -288,7 +288,7 @@ def buildMetaRow(Map sample, String outdir) {
         ingest_manifest         : mapOrEmpty(sample.ingest_manifest),
         sequencer               : mapOrEmpty(sample.sequencer),
         variant_branches        : normalizeVariantBranches(sample.variant_branches),
-        save_dir                : outdir
+        save_dir                : "${outdir}/Stage_0"
     ]
 }
 

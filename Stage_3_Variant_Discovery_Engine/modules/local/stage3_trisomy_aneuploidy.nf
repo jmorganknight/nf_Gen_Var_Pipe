@@ -1,3 +1,15 @@
+def toSerializableValue(Object value) {
+    if (value instanceof Map) {
+        def copied = new LinkedHashMap()
+        (value as Map).each { key, nested -> copied[key] = toSerializableValue(nested) }
+        return copied
+    }
+    if (value instanceof List) {
+        return (value as List).collect { nested -> toSerializableValue(nested) }
+    }
+    value
+}
+
 process STAGE3_TRISOMY_ANEUPLOIDY {
     label 'process_medium'
     container 'genvar-core:2.1.0'
@@ -11,8 +23,8 @@ process STAGE3_TRISOMY_ANEUPLOIDY {
     path 'stage3.trisomy_aneuploidy.audit.json', emit: audit
 
     script:
-    def sampleMetaMap = (sample_meta instanceof Map) ? (sample_meta as Map) : [:]
-    def sampleMetaJson = groovy.json.JsonOutput.toJson(sampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
+    def safeSampleMetaMap = (sample_meta instanceof Map) ? (toSerializableValue(sample_meta) as Map) : [:]
+    def sampleMetaJson = groovy.json.JsonOutput.toJson(safeSampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
     """
     set -euo pipefail
 

@@ -1,5 +1,8 @@
 nextflow.enable.dsl = 2
 
+params.outdir = java.nio.file.Paths.get((params.outdir ?: 'results').toString()).toAbsolutePath().normalize().toString()
+params.stage6_outdir = java.nio.file.Paths.get((params.stage6_outdir ?: "${params.outdir}/Stage_6").toString()).toAbsolutePath().normalize().toString()
+
 include { STAGE6_PRECONDITION_GUARD } from './modules/local/stage6_precondition_guard.nf'
 include { VERIFY_STAGE5_SIGNATURE } from './modules/local/verify_stage5_signature.nf'
 include { STAGE6_VARIANT_INTEGRITY_AUDITOR } from './modules/local/stage6_variant_integrity_auditor.nf'
@@ -9,7 +12,7 @@ include { MEDICAL_DIRECTOR_WORKBENCH_GATEWAY } from './modules/local/medical_dir
 include { FHIR_REPORT_BUILDER } from './modules/local/fhir_report_builder.nf'
 include { AUDIT_SINK } from './modules/local/audit_sink.nf'
 include { LAB_METRICS_SINK } from './modules/local/lab_metrics_sink.nf'
-include { ASSEMBLE_STAGE6_BANKED_MANIFEST } from './modules/local/assemble_stage6_banked_manifest.nf'
+include { ASSEMBLE_STAGE6_MANIFEST } from './modules/local/assemble_stage6_manifest.nf'
 include { STAGE6_RELEASE_FINALIZER } from './modules/local/stage6_release_finalizer.nf'
 
 
@@ -141,7 +144,7 @@ def hostPathForReference(String pathText, String refDir) {
 
 
 def writeStage6Rejection(String outdir, String sampleId, String reason, String detail, Map extra = [:]) {
-    def auditDir = new File("${outdir}/audit_and_qc/stage6")
+    def auditDir = new File("${outdir}/audit_and_qc")
     auditDir.mkdirs()
     def payload = [
         failure_code: 'STAGE6_PRECONDITION_FAILURE',
@@ -151,6 +154,76 @@ def writeStage6Rejection(String outdir, String sampleId, String reason, String d
         timestamp_utc: new Date().format("yyyy-MM-dd'T'HH:mm:ssXXX")
     ] + extra
     new File(auditDir, "${sampleId}.stage6_rejection_audit.json").text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(payload)) + '\n'
+}
+
+
+def resolveGovernedAssetPath(String rawPath, File anchorFile = null) {
+    def candidate = new File(rawPath)
+    if (candidate.isAbsolute()) {
+        return candidate.absoluteFile
+    }
+    if (candidate.exists()) {
+        return candidate.absoluteFile
+    }
+
+    def roots = [] as List<File>
+    if (anchorFile?.parentFile != null) {
+        roots << anchorFile.parentFile
+        if (anchorFile.parentFile.parentFile != null) {
+            roots << anchorFile.parentFile.parentFile
+        }
+    }
+    roots << new File(projectDir.toString())
+    if (new File(projectDir.toString()).parentFile != null) {
+        roots << new File(projectDir.toString()).parentFile
+    }
+    def launchRoot = workflow.hasProperty('launchDir') ? workflow.launchDir?.toString() : null
+    if (launchRoot) {
+        roots << new File(launchRoot)
+    }
+
+    roots.findAll { rootDir -> rootDir != null }.each { rootDir ->
+        def resolved = new File(rootDir, rawPath)
+        if (resolved.exists()) {
+            candidate = resolved.absoluteFile
+            return
+        }
+    }
+
+    if (candidate.exists()) {
+        return candidate.absoluteFile
+    }
+    def defaultRoot = roots.find { rootDir -> rootDir != null }
+    return defaultRoot != null ? new File(defaultRoot, rawPath).absoluteFile : candidate.absoluteFile
+}
+
+Map resolveStage6SignerPolicy(File thresholdsFile) {
+    def thresholdsDoc = mapOrEmpty(new groovy.yaml.YamlSlurper().parse(thresholdsFile))
+    def reporting = mapOrEmpty(mapOrEmpty(thresholdsDoc.clinical).reporting)
+
+    def rawPubPath = readOptionalParam('signer_pub_path')?.toString()?.trim() ?: reporting.pki_pub_key_path?.toString()?.trim()
+    if (!rawPubPath) {
+        throw new IllegalStateException('STAGE6_PRECONDITION_FAILURE: missing governed signer public-key path (reporting.pki_pub_key_path or --signer_pub_path)')
+    }
+
+    def pubFile = resolveGovernedAssetPath(rawPubPath, thresholdsFile)
+    if (!pubFile.exists() || !pubFile.isFile()) {
+        throw new IllegalStateException("STAGE6_PRECONDITION_FAILURE: signer public key not found: ${pubFile}")
+    }
+
+    def signerScope = readOptionalParam('signer_scope')?.toString()?.trim() ?: reporting.pki_signer_scope?.toString()?.trim() ?: 'bootstrap'
+    def signerId = readOptionalParam('signer_id')?.toString()?.trim() ?: reporting.pki_signer_id?.toString()?.trim() ?: "${signerScope}-signer"
+    def allowBootstrapRaw = readOptionalParam('allow_bootstrap_for_production_run')
+    def allowBootstrap = allowBootstrapRaw != null
+        ? ((allowBootstrapRaw instanceof Boolean) ? (allowBootstrapRaw as boolean) : ['1', 'true', 't', 'yes', 'y', 'on'].contains(allowBootstrapRaw.toString().trim().toLowerCase()))
+        : ((reporting.allow_bootstrap_for_production_run instanceof Boolean) ? (reporting.allow_bootstrap_for_production_run as boolean) : ['1', 'true', 't', 'yes', 'y', 'on'].contains((reporting.allow_bootstrap_for_production_run ?: '').toString().trim().toLowerCase()))
+
+    [
+        pub_file: pubFile.absoluteFile,
+        signer_scope: signerScope,
+        signer_id: signerId,
+        allow_bootstrap_for_production_run: allowBootstrap,
+    ]
 }
 
 
@@ -174,7 +247,7 @@ process STAGE6_RUO_DEV_REPORT_LOCK {
     label 'process_low'
     container 'genvar-reporting:2.1.0'
     stageInMode 'copy'
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'RUO_DEV_REPORT_LOCKED.txt'
+    publishDir "${params.stage6_outdir}", mode: 'copy', overwrite: true, pattern: 'RUO_DEV_REPORT_LOCKED.txt'
 
     input:
     path stage5_manifest
@@ -193,7 +266,7 @@ Reason: Stage 5 manifest is marked RESEARCH_USE_ONLY from dev mode.
 Manifest: ${stage5_manifest}
 CLINICAL_VALIDITY: ${clinical_validity}
 REGULATORY_WARNING: ${regulatory_warning}
-Action: Clinical PDF generation and EMR transmission were bypassed.
+Action: Full Stage 6 report artifacts were generated with explicit research-use-only labeling.
 TXT
     """
 }
@@ -207,7 +280,7 @@ workflow STAGE6_CLINICAL_REPORTING_WORKBENCH_GATEWAY {
     STAGE6_PRECONDITION_GUARD(ch_stage6_inputs)
     def verificationInput = STAGE6_PRECONDITION_GUARD.out.validated_bundle
         .map { meta, stage5_manifest, clinical_bundle_tar_gz, stage5_provenance_json, acmg_tiered_variants_json, candidate_vus_json, vus_queue_json, sf_artifact, prs_artifact, pgx_artifact, reference_meta ->
-            tuple(meta, stage5_manifest, clinical_bundle_tar_gz, stage5_provenance_json, acmg_tiered_variants_json, candidate_vus_json, vus_queue_json, sf_artifact, prs_artifact, pgx_artifact, reference_meta, file(meta.stage5_production_release_json, checkIfExists: true))
+            tuple(meta, stage5_manifest, clinical_bundle_tar_gz, stage5_provenance_json, acmg_tiered_variants_json, candidate_vus_json, vus_queue_json, sf_artifact, prs_artifact, pgx_artifact, reference_meta, file(meta.stage5_production_release_json, checkIfExists: true), file(meta.stage5_signer_public_key, checkIfExists: true))
         }
 
     VERIFY_STAGE5_SIGNATURE(verificationInput)
@@ -236,20 +309,20 @@ workflow STAGE6_CLINICAL_REPORTING_WORKBENCH_GATEWAY {
     def labMetrics = LAB_METRICS_SINK.out.lab_metrics_json
         .map { _meta, metrics -> metrics }
 
-    ASSEMBLE_STAGE6_BANKED_MANIFEST(allFragments.collect(), provenanceAudits.collect(), labMetrics.collect())
+    ASSEMBLE_STAGE6_MANIFEST(allFragments.collect(), provenanceAudits.collect(), labMetrics.collect())
 
     def releaseArtifacts = FHIR_REPORT_BUILDER.out.fhir_json
         .mix(FHIR_REPORT_BUILDER.out.html_report)
         .mix(FHIR_REPORT_BUILDER.out.pdf_report)
         .mix(MEDICAL_DIRECTOR_WORKBENCH_GATEWAY.out.signoff)
-        .mix(ASSEMBLE_STAGE6_BANKED_MANIFEST.out.banked_manifest)
+        .mix(ASSEMBLE_STAGE6_MANIFEST.out.stage6_manifest)
         .mix(AUDIT_SINK.out.provenance_json.map { _meta, provenance -> provenance })
         .mix(LAB_METRICS_SINK.out.lab_metrics_json.map { _meta, metrics -> metrics })
 
     STAGE6_RELEASE_FINALIZER(releaseArtifacts.collect())
 
     emit:
-    banked_manifest = ASSEMBLE_STAGE6_BANKED_MANIFEST.out.banked_manifest
+    stage6_manifest = ASSEMBLE_STAGE6_MANIFEST.out.stage6_manifest
     integrity_manifest = STAGE6_RELEASE_FINALIZER.out.sha256_manifest
 }
 
@@ -258,7 +331,7 @@ workflow {
 
     def stage5InputPath = (params.input ?: params.samples)?.toString()
     if (!stage5InputPath) {
-        throw new IllegalArgumentException('STAGE6_PRECONDITION_FAILURE: --input is required and must reference Stage 5 banked manifest')
+        throw new IllegalArgumentException('STAGE6_PRECONDITION_FAILURE: --input is required and must reference Stage 5 manifest')
     }
     def stage5ManifestFile = file(stage5InputPath)
     def referencesFile = resolveStageConfigPath(readOptionalParam('ref_config'), params.references, 'references.yaml')
@@ -266,10 +339,10 @@ workflow {
     def infrastructureFile = resolveStageConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
 
     if (!stage5ManifestFile.exists()) {
-        throw new IllegalArgumentException('STAGE6_PRECONDITION_FAILURE: missing Stage 5 banked manifest')
+        throw new IllegalArgumentException('STAGE6_PRECONDITION_FAILURE: missing Stage 5 manifest')
     }
-    if (!stage5ManifestFile.name.contains('banked_stage5')) {
-        throw new IllegalArgumentException('STAGE6_PRECONDITION_FAILURE: input does not appear to be a Stage 5 banked manifest')
+    if (!stage5ManifestFile.name.contains('_stage5.yaml')) {
+        throw new IllegalArgumentException('STAGE6_PRECONDITION_FAILURE: input does not appear to be a Stage 5 manifest')
     }
     if (referencesFile != null && !referencesFile.exists()) {
         throw new IllegalArgumentException('STAGE6_PRECONDITION_FAILURE: missing references manifest')
@@ -285,6 +358,7 @@ workflow {
     def refsParsed = mapOrEmpty(referenceInfo.refs)
     def refsMerged = mapOrEmpty(refsParsed) + mapOrEmpty(params.refs)
     def thresholdsParsed = thresholdsFile ? mapOrEmpty(ys.parse(thresholdsFile)) : [:]
+    def signerPolicy = thresholdsFile ? resolveStage6SignerPolicy(new File(thresholdsFile.toString())) : null
     def infrastructureParsed = infrastructureFile ? mapOrEmpty(ys.parse(infrastructureFile)) : [:]
     def samples = stage5Parsed.samples
     def infrastructureRoot = infrastructureFile?.parent ? infrastructureFile.parent.toString() : projectDir.toString()
@@ -314,7 +388,7 @@ workflow {
 
     if (hasDevModeSample && !isRuoDevManifest) {
         writeStage6Rejection(
-            params.outdir.toString(),
+            params.stage6_outdir.toString(),
             'GLOBAL',
             'DEV_MODE_MANIFEST_WATERMARK_MISSING',
             "run_mode=dev detected but CLINICAL_VALIDITY is not RESEARCH_USE_ONLY"
@@ -322,15 +396,6 @@ workflow {
         throw new IllegalStateException(
             'STAGE6_PRECONDITION_FAILURE: dev-mode Stage 5 manifest missing required CLINICAL_VALIDITY watermark'
         )
-    }
-
-    if (isRuoDevManifest) {
-        STAGE6_RUO_DEV_REPORT_LOCK(
-            channel.value(file(stage5ManifestFile, checkIfExists: true)),
-            channel.value(clinicalValidity),
-            channel.value(regulatoryWarning)
-        )
-        return
     }
 
     def runModeBySample = samples.collectEntries { sample ->
@@ -353,7 +418,7 @@ workflow {
         gnomad_db        : refsMerged.gnomad_db,
         hgmd_db          : refsMerged.hgmd_db ?: refsMerged.hgmd_pro_db,
         sf_bed           : refsMerged.sf_bed,
-        prs_weights      : refsMerged.prs_weights,
+        prs_weights      : refsMerged.prs_weights ?: refsMerged.prs?.marker_weights_tsv,
         cyp2d6_mask      : refsMerged.stage3?.cyp2d6_paralog_mask_bed,
         reference_checksum_manifest: refsMerged.reference_checksum_manifest ?: "${projectDir}/../assets/reference_checksums.sha256",
         reference_asset_checksums  : mapOrEmpty(refsMerged.reference_asset_checksums),
@@ -364,12 +429,12 @@ workflow {
     ['reference_genome', 'reference_fai', 'reference_dict', 'hotspot_registry', 'clinvar_db', 'gnomad_db', 'hgmd_db', 'sf_bed', 'prs_weights'].each { key ->
         def value = referencesMeta[key]
         if (!value) {
-            writeStage6Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', key)
+            writeStage6Rejection(params.stage6_outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', key)
             throw new IllegalStateException("STAGE6_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}'")
         }
         def resolved = hostPathForReference(value.toString(), refDir)
         if (resolved == null || !resolved.exists()) {
-            writeStage6Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', "${key}=${value}")
+            writeStage6Rejection(params.stage6_outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', "${key}=${value}")
             throw new IllegalStateException("STAGE6_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}=${value}'")
         }
     }
@@ -378,7 +443,7 @@ workflow {
         def sid = (sample.sample_id ?: 'UNKNOWN').toString()
         def token = sample.validation_token?.toString() ?: ''
         if (!token.contains('VALID_PASS|VARIANTS_HARMONIZED')) {
-            writeStage6Rejection(params.outdir.toString(), sid, 'INVALID_STAGE5_TOKEN', token ?: 'missing')
+            writeStage6Rejection(params.stage6_outdir.toString(), sid, 'INVALID_STAGE5_TOKEN', token ?: 'missing')
             throw new IllegalStateException("STAGE6_PRECONDITION_FAILURE: invalid Stage 5 validation token for sample '${sid}'")
         }
 
@@ -401,28 +466,44 @@ workflow {
         def hasStage5Provenance = stage5Provenance != null && stage5Provenance.exists()
         def hasStage5ProductionRelease = stage5ProductionRelease != null && stage5ProductionRelease.exists()
         if (!hasClinicalBundle) {
-            writeStage6Rejection(params.outdir.toString(), sid, 'MISSING_STAGE5_SIGNED_BUNDLE', sample.stage5_outputs?.clinical_bundle_tar_gz?.toString() ?: 'unset')
+            writeStage6Rejection(params.stage6_outdir.toString(), sid, 'MISSING_STAGE5_SIGNED_BUNDLE', sample.stage5_outputs?.clinical_bundle_tar_gz?.toString() ?: 'unset')
             throw new IllegalStateException("STAGE6_PRECONDITION_FAILURE: missing Stage 5 signed clinical bundle for sample '${sid}'")
         }
         if (!hasStage5Provenance) {
-            writeStage6Rejection(params.outdir.toString(), sid, 'MISSING_STAGE5_PROVENANCE', sample.stage5_outputs?.provenance_json?.toString() ?: 'unset')
+            writeStage6Rejection(params.stage6_outdir.toString(), sid, 'MISSING_STAGE5_PROVENANCE', sample.stage5_outputs?.provenance_json?.toString() ?: 'unset')
             throw new IllegalStateException("STAGE6_PRECONDITION_FAILURE: missing Stage 5 provenance payload for sample '${sid}'")
         }
         if (!hasStage5ProductionRelease) {
-            writeStage6Rejection(params.outdir.toString(), sid, 'MISSING_STAGE5_PRODUCTION_RELEASE', sample.stage5_outputs?.production_release_json?.toString() ?: 'unset')
+            writeStage6Rejection(params.stage6_outdir.toString(), sid, 'MISSING_STAGE5_PRODUCTION_RELEASE', sample.stage5_outputs?.production_release_json?.toString() ?: 'unset')
             throw new IllegalStateException("STAGE6_PRECONDITION_FAILURE: missing Stage 5 production release payload for sample '${sid}'")
         }
 
-        [acmgTiered, candidateVus, vusQueue, sfArtifact, prsArtifact, pgxArtifact].each { pathObj ->
-            if (pathObj == null || !pathObj.exists()) {
-                writeStage6Rejection(params.outdir.toString(), sid, 'MISSING_STAGE5_ARTIFACT', pathObj?.toString() ?: 'null')
-                throw new IllegalStateException("STAGE6_PRECONDITION_FAILURE: missing Stage 5 artifact for sample '${sid}'")
+        def isRuoDevSample = isRuoDevManifest || ['dev', 'audit_only'].contains((runModeBySample[sid] ?: '').toString().trim().toLowerCase())
+
+        if (!isRuoDevSample) {
+            [acmgTiered, candidateVus, vusQueue, sfArtifact, prsArtifact, pgxArtifact].each { pathObj ->
+                if (pathObj == null || !pathObj.exists()) {
+                    writeStage6Rejection(params.stage6_outdir.toString(), sid, 'MISSING_STAGE5_ARTIFACT', pathObj?.toString() ?: 'null')
+                    throw new IllegalStateException("STAGE6_PRECONDITION_FAILURE: missing Stage 5 artifact for sample '${sid}'")
+                }
             }
         }
+
+        // RUO/dev runs may legitimately have zero or bypassed branch artifacts;
+        // reuse signed provenance as a real file fallback instead of creating placeholders.
+        def acmgTieredResolved = isRuoDevSample ? ((acmgTiered != null && acmgTiered.exists()) ? acmgTiered : stage5Provenance) : acmgTiered
+        def candidateVusResolved = isRuoDevSample ? ((candidateVus != null && candidateVus.exists()) ? candidateVus : stage5Provenance) : candidateVus
+        def vusQueueResolved = isRuoDevSample ? ((vusQueue != null && vusQueue.exists()) ? vusQueue : stage5Provenance) : vusQueue
+        def sfArtifactResolved = isRuoDevSample ? ((sfArtifact != null && sfArtifact.exists()) ? sfArtifact : stage5Provenance) : sfArtifact
+        def prsArtifactResolved = isRuoDevSample ? ((prsArtifact != null && prsArtifact.exists()) ? prsArtifact : stage5Provenance) : prsArtifact
+        def pgxArtifactResolved = isRuoDevSample ? ((pgxArtifact != null && pgxArtifact.exists()) ? pgxArtifact : stage5Provenance) : pgxArtifact
 
         def meta = [
             sample_id        : sid,
             run_mode         : runModeBySample[sid] ?: 'production',
+            clinical_validity: clinicalValidity ?: '',
+            regulatory_warning: regulatoryWarning,
+            research_grade_report: isRuoDevSample,
             stage2_contamination_status: stage2StatusBySample[sid] ?: '',
             stage2_contamination_policy_action: stage2PolicyBySample[sid] ?: '',
             validation_token : token,
@@ -432,12 +513,16 @@ workflow {
             stage5_bundle    : clinicalBundle.toString(),
             stage5_provenance: stage5Provenance.toString(),
             stage5_production_release_json: stage5ProductionRelease.toString(),
+            stage5_signer_public_key: signerPolicy.pub_file.toString(),
+            expected_stage5_signer_scope: signerPolicy.signer_scope,
+            expected_stage5_signer_id: signerPolicy.signer_id,
+            allow_bootstrap_for_production_run: signerPolicy.allow_bootstrap_for_production_run,
             stage5_bundle_present: hasClinicalBundle,
             stage5_provenance_present: hasStage5Provenance,
             reference_build  : mapOrEmpty(sample.reference_build),
             references_meta  : referencesMeta,
             thresholds_meta  : thresholdsParsed,
-            save_dir         : params.outdir.toString(),
+            save_dir         : params.stage6_outdir.toString(),
             workbench_note   : 'Stage 6 clinical reporting workbench gateway.'
         ]
 
@@ -446,13 +531,21 @@ workflow {
             file(stage5ManifestFile, checkIfExists: true),
             file(clinicalBundle, checkIfExists: true),
             file(stage5Provenance, checkIfExists: true),
-            file(acmgTiered, checkIfExists: true),
-            file(candidateVus, checkIfExists: true),
-            file(vusQueue, checkIfExists: true),
-            file(sfArtifact, checkIfExists: true),
-            file(prsArtifact, checkIfExists: true),
-            file(pgxArtifact, checkIfExists: true),
+            file(acmgTieredResolved, checkIfExists: true),
+            file(candidateVusResolved, checkIfExists: true),
+            file(vusQueueResolved, checkIfExists: true),
+            file(sfArtifactResolved, checkIfExists: true),
+            file(prsArtifactResolved, checkIfExists: true),
+            file(pgxArtifactResolved, checkIfExists: true),
             referencesMeta
+        )
+    }
+
+    if (isRuoDevManifest) {
+        STAGE6_RUO_DEV_REPORT_LOCK(
+            channel.value(file(stage5ManifestFile, checkIfExists: true)),
+            channel.value(clinicalValidity),
+            channel.value(regulatoryWarning)
         )
     }
 

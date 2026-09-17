@@ -8,15 +8,15 @@ process STAGE4_PGX_PHASE_FILTER {
     container 'genvar-core:2.1.0'
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/phased", mode: 'copy', overwrite: true, pattern: '*.vcf.gz*'
-    publishDir "${params.outdir}/audit_and_qc/stage4", mode: 'copy', overwrite: true, pattern: '*.json'
+    publishDir "${params.stage4_outdir}/phased", mode: 'copy', overwrite: true, pattern: '*.vcf.gz*'
+    publishDir "${params.stage4_outdir}/audit_and_qc/stage4", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(ancestry_metrics_json), path(phased_vcf), path(phased_tbi), path(phasing_audit)
 
     output:
     tuple val(meta.sample_id), path("${meta.sample_id}.pgx_phased.vcf.gz"), path("${meta.sample_id}.pgx_phased.vcf.gz.tbi"), path(ancestry_metrics_json), path("${meta.sample_id}.pgx_phasing_audit.json"), emit: pgx_phase_bundle
-    tuple val(meta), path(ancestry_metrics_json), path("${meta.sample_id}.pgx_phased.vcf.gz"), path("${meta.sample_id}.pgx_phased.vcf.gz.tbi"), path("${meta.sample_id}.pgx_phasing_audit.json"), emit: banked_phase_bundle
+    tuple val(meta), path(ancestry_metrics_json), path("${meta.sample_id}.pgx_phased.vcf.gz"), path("${meta.sample_id}.pgx_phased.vcf.gz.tbi"), path("${meta.sample_id}.pgx_phasing_audit.json"), emit: stage4_contract_bundle
 
     script:
     def sid = meta.sample_id
@@ -58,5 +58,5 @@ workflow STAGE4_PHASING {
 
     emit:
     phase_bundle = STAGE4_PGX_PHASE_FILTER.out.pgx_phase_bundle
-    banking_bundle = STAGE4_PGX_PHASE_FILTER.out.banked_phase_bundle
+    contract_bundle = STAGE4_PGX_PHASE_FILTER.out.stage4_contract_bundle
 }

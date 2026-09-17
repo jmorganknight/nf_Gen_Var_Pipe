@@ -20,8 +20,13 @@ process STAGE5_INPUT_NORMALIZER {
 
     script:
     def sid = sample_id
+    def refJson = groovy.json.JsonOutput.toJson(reference_meta ?: [:])
     """
     set -euo pipefail
+
+    cat > reference_meta.json <<'JSON'
+${refJson}
+JSON
 
     python3 - <<'PYEOF'
 import json
@@ -81,7 +86,7 @@ audit = {
 Path(f'{sample_id}.stage5_input_normalizer.json').write_text(json.dumps(audit, indent=2) + '\\n', encoding='utf-8')
 
 with open(f'{sample_id}.stage5_input_normalizer_meta.json', 'w', encoding='utf-8') as handle:
-    json.dump({'meta': meta, 'reference_meta': json.loads('''${groovy.json.JsonOutput.toJson(reference_meta).replace("\\n", " ").replace("\\r", "")}''')}, handle, indent=2)
+    json.dump({'meta': meta, 'reference_meta': json.loads(Path('reference_meta.json').read_text(encoding='utf-8'))}, handle, indent=2)
 PYEOF
     """
 }

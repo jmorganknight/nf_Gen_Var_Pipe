@@ -6,10 +6,24 @@ process FHIR_REPORT_BUILDER {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/reporting", mode: 'copy', overwrite: true, pattern: '*.*'
+    publishDir "${params.stage6_outdir}/reporting", mode: 'copy', overwrite: true, pattern: '*.fhir_genomics_v3.json'
+    publishDir "${params.stage6_outdir}/reporting", mode: 'copy', overwrite: true, pattern: '*.clinical_report.html'
+    publishDir "${params.stage6_outdir}/reporting", mode: 'copy', overwrite: true, pattern: '*.clinical_report.pdf'
+    publishDir "${params.stage6_outdir}/reporting", mode: 'copy', overwrite: true, pattern: '*.provenance_audit.json'
+    publishDir "${params.stage6_outdir}/reporting", mode: 'copy', overwrite: true, pattern: '*.stage6_report.fragment.json'
 
     input:
-    tuple val(meta), path(stage5_manifest), path(clinical_bundle_tar_gz), path(stage5_provenance_json), path(acmg_tiered_variants_json), path(candidate_vus_json), path(vus_queue_json), path(sf_artifact), path(prs_artifact), path(pgx_artifact), val(reference_meta)
+    tuple val(meta),
+        path(stage5_manifest, stageAs: 'stage5_manifest/*'),
+        path(clinical_bundle_tar_gz, stageAs: 'clinical_bundle/*'),
+        path(stage5_provenance_json, stageAs: 'stage5_provenance/*'),
+        path(acmg_tiered_variants_json, stageAs: 'acmg_tiered/*'),
+        path(candidate_vus_json, stageAs: 'candidate_vus/*'),
+        path(vus_queue_json, stageAs: 'vus_queue/*'),
+        path(sf_artifact, stageAs: 'secondary_findings/*'),
+        path(prs_artifact, stageAs: 'prs/*'),
+        path(pgx_artifact, stageAs: 'pgx/*'),
+        val(reference_meta)
 
     output:
     path "${meta.sample_id}.fhir_genomics_v3.json", emit: fhir_json
@@ -45,6 +59,13 @@ prs_payload = json.loads(Path('${prs_artifact}').read_text(encoding='utf-8')) if
 pgx_payload = json.loads(Path('${pgx_artifact}').read_text(encoding='utf-8')) if Path('${pgx_artifact}').exists() else {}
 stage5_provenance = json.loads(Path('${stage5_provenance_json}').read_text(encoding='utf-8')) if Path('${stage5_provenance_json}').exists() else {}
 stage5_signature = stage5_provenance.get('digital_signature', {}) if isinstance(stage5_provenance, dict) else {}
+run_mode = str('${meta.run_mode ?: "production"}').strip().lower()
+clinical_validity = str('${meta.clinical_validity ?: ""}').strip()
+regulatory_warning = str('${meta.regulatory_warning ?: ""}').strip()
+is_research_grade = ('${meta.research_grade_report ? "true" : "false"}' == 'true') or (run_mode in {'dev', 'audit_only'}) or (clinical_validity == 'RESEARCH_USE_ONLY')
+grade_label = 'RESEARCH_GRADE_NOT_FOR_CLINICAL_USE' if is_research_grade else 'CLINICAL_GRADE_PENDING_SIGNOFF'
+report_status = 'RESEARCH_GRADE_NOT_FOR_CLINICAL_USE' if is_research_grade else 'PRELIMINARY'
+report_banner = 'RESEARCH USE ONLY - NOT FOR DIAGNOSTIC OR TREATMENT DECISIONS' if is_research_grade else 'CLINICAL WORKBENCH OUTPUT - PENDING FINAL MEDICAL DIRECTOR SIGN-OFF'
 
 reported = []
 for tier_name, tier_rows in (acmg.get('tiers', {}) if isinstance(acmg, dict) else {}).items():
@@ -202,7 +223,7 @@ bundle = {
                 'status': 'final' if signoff_payload.get('signoff_status') == 'APPROVED' else 'preliminary',
                 'code': {'text': 'Stage 6 Clinical Reporting Workbench Gateway'},
                 'subject': {'reference': f'Patient/{sid}'},
-                'conclusion': f"Reported={len(reported)} Pending={len(pending_payload.get('pending_variants', []))} Sink={sink_count}",
+                'conclusion': f"{report_banner}; Reported={len(reported)} Pending={len(pending_payload.get('pending_variants', []))} Sink={sink_count}",
             }
         },
         {
@@ -225,6 +246,9 @@ bundle = {
         },
     ],
     'extension': [
+        {'url': 'urn:stage6:report_grade', 'valueString': grade_label},
+        {'url': 'urn:stage6:clinical_validity', 'valueString': clinical_validity or 'UNSPECIFIED'},
+        {'url': 'urn:stage6:regulatory_warning', 'valueString': regulatory_warning},
         {'url': 'urn:stage6:signoff_status', 'valueString': signoff_payload.get('signoff_status', 'PENDING_DIRECTOR_REVIEW')},
         {'url': 'urn:stage6:manual_variant_overrides', 'valueString': json.dumps(signoff_payload.get('manual_variant_overrides', []))},
         {'url': 'urn:stage6:sanger_inputs', 'valueString': json.dumps(signoff_payload.get('sanger_confirmation_inputs', []))},
@@ -272,6 +296,12 @@ html = f'''<!doctype html>
 </head>
 <body>
   <h1>Stage 6 Clinical Reporting Workbench Gateway</h1>
+    <div class='card'>
+        <h2>{grade_label}</h2>
+        <p><strong>{report_banner}</strong></p>
+        <p>Clinical validity flag: <strong>{clinical_validity or 'UNSPECIFIED'}</strong></p>
+        <p>Regulatory warning: <strong>{regulatory_warning or 'N/A'}</strong></p>
+    </div>
   <div class='card'>
     <div class='pill'>{signoff_payload.get('signoff_status', 'PENDING_DIRECTOR_REVIEW')}</div>
     <p>Sample: <strong>{sid}</strong></p>
@@ -305,6 +335,10 @@ Path(html_name).write_text(html, encoding='utf-8')
 # Minimal valid PDF generation without external dependencies.
 lines = [
     'Stage 6 Clinical Reporting Workbench Gateway',
+    f'Report grade: {grade_label}',
+    f'Banner: {report_banner}',
+    f'Clinical validity: {clinical_validity or "UNSPECIFIED"}',
+    f'Regulatory warning: {regulatory_warning or "N/A"}',
     f'Sample: {sid}',
     f'Signoff: {signoff_payload.get("signoff_status", "PENDING_DIRECTOR_REVIEW")}',
     f'Reported variants: {len(reported)}',
@@ -324,6 +358,7 @@ lines = [
     f'  items={len(section_wetlab)}',
 ]
 content = ['BT', '/F1 12 Tf', '72 750 Td']
+content.append('14 TL')
 first = True
 for line in lines:
     escaped = line
@@ -363,7 +398,8 @@ fragment = {
     'html_report': str(Path(html_name).resolve()),
     'pdf_report': str(Path(pdf_name).resolve()),
     'provenance_audit_json': str(Path(provenance_name).resolve()),
-    'report_status': 'PRELIMINARY',
+    'report_status': report_status,
+    'report_grade': grade_label,
     'status': 'PASS',
 }
 Path(f'{sid}.stage6_report.fragment.json').write_text(json.dumps(fragment, indent=2) + "\\n", encoding='utf-8')

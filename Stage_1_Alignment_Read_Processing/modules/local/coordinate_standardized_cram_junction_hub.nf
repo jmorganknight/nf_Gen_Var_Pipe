@@ -9,7 +9,7 @@ process COORDINATE_STANDARDIZED_CRAM_JUNCTION_HUB {
 
     tag "${meta.sample_id}"
 
-    publishDir { "${meta.save_dir}/${meta.sample_id}/audit_and_qc/junction_hub" }, mode: 'copy', overwrite: true
+    publishDir "${params.stage1_outdir}/audit_and_qc/junction_hub", mode: 'copy', overwrite: true
 
     input:
     tuple val(meta), path(bam_cram), path(index)

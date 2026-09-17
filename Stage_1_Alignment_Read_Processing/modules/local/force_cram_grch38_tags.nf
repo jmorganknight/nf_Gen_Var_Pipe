@@ -9,7 +9,6 @@ process FORCE_CRAM_GRCh38_TAGS {
 
     tag "${meta.sample_id}"
 
-    publishDir { "${meta.save_dir}/${meta.sample_id}/audit_and_qc/reheader" }, mode: 'copy', overwrite: true
 
     input:
     tuple val(meta), path(bam), path(bai), val(ref_dict)

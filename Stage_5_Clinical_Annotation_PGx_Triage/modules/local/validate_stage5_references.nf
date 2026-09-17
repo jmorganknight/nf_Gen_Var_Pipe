@@ -1,13 +1,46 @@
 nextflow.enable.dsl = 2
 
+String stage5DockerReferenceBind() {
+    def root = stage5ReferenceRoot()
+    root ? "-v \"${root}:${root}:ro\"" : ''
+}
+
+String stage5ReferenceRoot() {
+    def direct = [params.reference_mount_root, params.ref_dir, params.ref_data_root, System.getenv('NXF_REF_DATA_ROOT')]
+        .collect { value -> value?.toString()?.trim() }
+        .find { value -> value }
+    if (direct) {
+        return direct
+    }
+
+    def referencesPath = params.references?.toString()?.trim()
+    if (!referencesPath) {
+        return ''
+    }
+
+    def refsFile = new File(referencesPath)
+    if (!refsFile.isAbsolute()) {
+        refsFile = new File(projectDir.toString(), referencesPath)
+    }
+    if (!refsFile.exists()) {
+        return ''
+    }
+
+    def refsDoc = new groovy.yaml.YamlSlurper().parse(refsFile)
+    return refsDoc?.ref_data_root?.toString()?.trim() ?: ''
+}
+
 process VALIDATE_STAGE5_REFERENCES {
     label 'process_low'
     container 'genvar-annotation:2.1.0'
+    containerOptions { stage5DockerReferenceBind() }
+    cache false
     stageInMode 'copy'
     tag 'references'
 
     input:
     path references_yaml
+    path staged_reference_assets
 
     output:
     path 'references_validated.txt', emit: validated_signal
@@ -16,8 +49,12 @@ process VALIDATE_STAGE5_REFERENCES {
     """
     set -euo pipefail
 
+    export STAGE5_REFERENCE_VALIDATOR_REV="dynamic-bind-v3"
+    export STAGE5_REFERENCE_ROOT_HINT="${stage5ReferenceRoot()}"
+
     python3 - <<'PY'
 from pathlib import Path
+import os
 import sys
 
 
@@ -180,19 +217,50 @@ def require_string(node, path):
     return current.strip()
 
 
-def resolve_reference_path(raw_path: str, ref_data_root: str):
+def resolve_reference_path(raw_path: str, ref_data_root: str, reference_root_hint: str):
     if not raw_path:
         raise SystemExit('STAGE5_REFERENCE_FATAL: empty reference path')
     path = Path(raw_path)
+    ref_root = Path(ref_data_root).resolve(strict=False) if ref_data_root else None
+    hint_root = Path(reference_root_hint).resolve(strict=False) if reference_root_hint else None
+
+    candidates = []
+
+    if path.is_absolute():
+        candidates.append(path)
+        if ref_root is not None:
+            try:
+                rel = path.relative_to(ref_root)
+                if hint_root is not None:
+                    candidates.append((hint_root / rel).resolve(strict=False))
+            except ValueError:
+                pass
+    else:
+        candidates.append(path.resolve(strict=False))
+        if ref_root is not None:
+            candidates.append((ref_root / path).resolve(strict=False))
+        if hint_root is not None:
+            candidates.append((hint_root / path).resolve(strict=False))
+
+    local_rel = Path(path.name)
+    candidates.append(local_rel.resolve(strict=False) if local_rel.exists() else local_rel)
+
+    seen = set()
+    for candidate in candidates:
+        candidate_key = str(candidate)
+        if candidate_key in seen:
+            continue
+        seen.add(candidate_key)
+        if candidate.exists():
+            return candidate
+
     if path.is_absolute():
         return path
-    if not ref_data_root:
-        raise SystemExit('STAGE5_REFERENCE_FATAL: ref_data_root is required for relative reference paths')
-    root = Path(ref_data_root).resolve()
-    candidate = (root / raw_path).resolve(strict=False)
-    if not candidate.is_relative_to(root):
-        raise SystemExit(f'STAGE5_REFERENCE_FATAL: unsafe reference path escapes ref_data_root: {raw_path}')
-    return candidate
+    if ref_root is not None:
+        return (ref_root / path).resolve(strict=False)
+    if hint_root is not None:
+        return (hint_root / path).resolve(strict=False)
+    return path
 
 
 references_path = Path('${references_yaml}')
@@ -201,6 +269,7 @@ if not references_path.exists() or not references_path.is_file():
 
 references_doc = parse_yaml_document(references_path.read_text(encoding='utf-8', errors='replace'))
 ref_data_root = str(references_doc.get('ref_data_root') or '').strip()
+reference_root_hint = os.environ.get('STAGE5_REFERENCE_ROOT_HINT', '').strip()
 
 required_refs = {
     'references.sf.acmg_registry_json': require_string(references_doc, ('references', 'sf', 'acmg_registry_json')),
@@ -211,7 +280,7 @@ required_refs = {
 
 validated_lines = []
 for label, raw_path in required_refs.items():
-    resolved = resolve_reference_path(raw_path, ref_data_root)
+    resolved = resolve_reference_path(raw_path, ref_data_root, reference_root_hint)
     if not resolved.exists() or not resolved.is_file():
         raise SystemExit(f'STAGE5_REFERENCE_FATAL: missing required reference for {label}: {resolved}')
     if resolved.stat().st_size <= 0:

@@ -1,5 +1,8 @@
 nextflow.enable.dsl = 2
 
+params.outdir = java.nio.file.Paths.get((params.outdir ?: 'tests/stage5').toString()).toAbsolutePath().normalize().toString()
+params.stage5_outdir = java.nio.file.Paths.get((params.stage5_outdir ?: "${params.outdir}/Stage_5").toString()).toAbsolutePath().normalize().toString()
+
 include { VALIDATE_STAGE0_TOKEN } from './modules/local/validate_stage0_token.nf'
 include { VALIDATE_STAGE5_REFERENCES } from './modules/local/validate_stage5_references.nf'
 include { VALIDATE_STAGE5_CONTRACT } from './modules/local/validate_stage5_contract.nf'
@@ -34,6 +37,29 @@ boolean branchEnabled(Map meta, String branchName) {
         return ['1', 'true', 't', 'yes', 'y'].contains(text)
     }
     return false
+}
+
+boolean asBool(Object rawValue, boolean defaultValue = false) {
+    if (rawValue == null) {
+        return defaultValue
+    }
+    if (rawValue instanceof Boolean) {
+        return rawValue as boolean
+    }
+    if (rawValue instanceof Number) {
+        return rawValue.intValue() != 0
+    }
+    def text = rawValue.toString().trim().toLowerCase()
+    if (!text) {
+        return defaultValue
+    }
+    if (['1', 'true', 't', 'yes', 'y', 'on'].contains(text)) {
+        return true
+    }
+    if (['0', 'false', 'f', 'no', 'n', 'off'].contains(text)) {
+        return false
+    }
+    return defaultValue
 }
 
 Set<String> allowedStage5Branches() {
@@ -110,6 +136,154 @@ def resolveStageConfigPath(Object overridePath, Object configuredPath, String fi
     return configuredText ? file(configuredText) : file(primary.path)
 }
 
+String requireNestedString(Map root, List<String> pathParts, String failurePrefix) {
+    def current = root
+    pathParts.each { key ->
+        if (!(current instanceof Map) || !current.containsKey(key)) {
+            throw new IllegalStateException("${failurePrefix}: missing required governance key ${pathParts.join('.')}")
+        }
+        current = current[key]
+    }
+    def text = current?.toString()?.trim()
+    if (!text) {
+        throw new IllegalStateException("${failurePrefix}: governance key ${pathParts.join('.')} must be a non-empty string")
+    }
+    return text
+}
+
+File resolveGovernedAssetPath(String rawPath, File anchorFile = null) {
+    def candidate = new File(rawPath)
+    if (candidate.isAbsolute()) {
+        return candidate.absoluteFile
+    }
+    if (candidate.exists()) {
+        return candidate.absoluteFile
+    }
+
+    def roots = [] as List<File>
+    if (anchorFile?.parentFile != null) {
+        roots << anchorFile.parentFile
+        if (anchorFile.parentFile.parentFile != null) {
+            roots << anchorFile.parentFile.parentFile
+        }
+    }
+    roots << new File(projectDir.toString())
+    if (new File(projectDir.toString()).parentFile != null) {
+        roots << new File(projectDir.toString()).parentFile
+    }
+    def launchRoot = workflow.hasProperty('launchDir') ? workflow.launchDir?.toString() : null
+    if (launchRoot) {
+        roots << new File(launchRoot)
+    }
+
+    roots.findAll { rootDir -> rootDir != null }.each { rootDir ->
+        def resolved = new File(rootDir, rawPath)
+        if (resolved.exists()) {
+            candidate = resolved.absoluteFile
+            return
+        }
+    }
+
+    if (candidate.exists()) {
+        return candidate.absoluteFile
+    }
+    def defaultRoot = roots.find { rootDir -> rootDir != null }
+    return defaultRoot != null ? new File(defaultRoot, rawPath).absoluteFile : candidate.absoluteFile
+}
+
+Map resolveStage5SignerPolicy(File thresholdsFile) {
+    def thresholdsDoc = mapOrEmpty(new groovy.yaml.YamlSlurper().parse(thresholdsFile))
+    def reporting = mapOrEmpty(mapOrEmpty(thresholdsDoc.clinical).reporting)
+
+    def rawKeyPath = readOptionalParam('signer_key_path')?.toString()?.trim() ?: reporting.pki_key_path?.toString()?.trim()
+    def rawPubPath = readOptionalParam('signer_pub_path')?.toString()?.trim() ?: reporting.pki_pub_key_path?.toString()?.trim()
+    if (!rawKeyPath) {
+        throw new IllegalStateException('STAGE5_PRECONDITION_FAILURE: missing governed signer private-key path (reporting.pki_key_path or --signer_key_path)')
+    }
+    if (!rawPubPath) {
+        throw new IllegalStateException('STAGE5_PRECONDITION_FAILURE: missing governed signer public-key path (reporting.pki_pub_key_path or --signer_pub_path)')
+    }
+
+    def keyFile = resolveGovernedAssetPath(rawKeyPath, thresholdsFile)
+    def pubFile = resolveGovernedAssetPath(rawPubPath, thresholdsFile)
+    if (!keyFile.exists() || !keyFile.isFile()) {
+        throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: signer private key not found: ${keyFile}")
+    }
+    if (!pubFile.exists() || !pubFile.isFile()) {
+        throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: signer public key not found: ${pubFile}")
+    }
+
+    def signerScope = readOptionalParam('signer_scope')?.toString()?.trim() ?: reporting.pki_signer_scope?.toString()?.trim() ?: 'bootstrap'
+    def signerId = readOptionalParam('signer_id')?.toString()?.trim() ?: reporting.pki_signer_id?.toString()?.trim() ?: "${signerScope}-signer"
+    def allowBootstrapRaw = readOptionalParam('allow_bootstrap_for_production_run')
+    def allowBootstrap = allowBootstrapRaw != null
+        ? asBool(allowBootstrapRaw, false)
+        : asBool(reporting.allow_bootstrap_for_production_run, false)
+
+    [
+        key_file: keyFile.absoluteFile,
+        pub_file: pubFile.absoluteFile,
+        signer_scope: signerScope,
+        signer_id: signerId,
+        allow_bootstrap_for_production_run: allowBootstrap,
+    ]
+}
+
+File resolveReferenceAssetPath(String rawPath, String refDataRoot, File referencesFile) {
+    def candidate = new File(rawPath)
+    if (candidate.isAbsolute()) {
+        return candidate.absoluteFile
+    }
+    if (candidate.exists()) {
+        return candidate.absoluteFile
+    }
+
+    def roots = [] as List<File>
+    if (refDataRoot?.trim()) {
+        roots << new File(refDataRoot)
+    }
+    if (referencesFile?.parentFile != null) {
+        roots << referencesFile.parentFile
+    }
+    roots << new File(projectDir.toString())
+    def launchRoot = workflow.hasProperty('launchDir') ? workflow.launchDir?.toString() : null
+    if (launchRoot) {
+        roots << new File(launchRoot)
+    }
+
+    roots.findAll { rootDir -> rootDir != null }.each { rootDir ->
+        def resolved = new File(rootDir, rawPath)
+        if (resolved.exists()) {
+            candidate = resolved.absoluteFile
+            return
+        }
+    }
+
+    if (candidate.exists()) {
+        return candidate.absoluteFile
+    }
+    return refDataRoot?.trim() ? new File(refDataRoot, rawPath).absoluteFile : candidate.absoluteFile
+}
+
+List<File> collectStage5ReferenceAssets(File referencesFile) {
+    def refsDoc = mapOrEmpty(new groovy.yaml.YamlSlurper().parse(referencesFile))
+    def refDataRoot = refsDoc.ref_data_root?.toString()?.trim() ?: ''
+    def requiredRawPaths = [
+        requireNestedString(refsDoc, ['references', 'sf', 'acmg_registry_json'], 'STAGE5_PRECONDITION_FAILURE'),
+        requireNestedString(refsDoc, ['references', 'somatic', 'hotspots_bed'], 'STAGE5_PRECONDITION_FAILURE'),
+        requireNestedString(refsDoc, ['references', 'prs', 'marker_weights_tsv'], 'STAGE5_PRECONDITION_FAILURE'),
+        requireNestedString(refsDoc, ['references', 'stage3', 'stage3_vcf_schema'], 'STAGE5_PRECONDITION_FAILURE')
+    ]
+
+    requiredRawPaths.collect { rawPath ->
+        def resolved = resolveReferenceAssetPath(rawPath, refDataRoot, referencesFile)
+        if (!resolved.exists() || !resolved.isFile()) {
+            throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: required reference asset not found: ${resolved}")
+        }
+        resolved
+    }.unique { fileObj -> fileObj.absolutePath }
+}
+
 String resolveGitCommitSha() {
     def explicit = readOptionalParam('git_commit_sha')?.toString()?.trim()
     if (explicit) {
@@ -152,7 +326,7 @@ String skipTimestampUtc(Map meta) {
     return java.time.Instant.now().toString()
 }
 
-String skippedBranchPayload(Map _meta, String branchName) {
+String skippedBranchPayload(Map _meta, String branchName, String skipReason = 'BRANCH_NOT_REQUESTED_IN_VARIANT_DIRECTIVE') {
     def reportedContent
     if (branchName == 'germline') {
         reportedContent = [reported_variants: []]
@@ -178,7 +352,7 @@ String skippedBranchPayload(Map _meta, String branchName) {
     def payload = [
         summary: [
             status: 'SKIPPED_BY_CLINICAL_DIRECTIVE',
-            reason: 'BRANCH_NOT_REQUESTED_IN_VARIANT_DIRECTIVE',
+            reason: skipReason,
             input_variant_count: 0,
             reported_variant_count: 0,
             ruleset_version: 'skip-policy-v1',
@@ -187,6 +361,60 @@ String skippedBranchPayload(Map _meta, String branchName) {
     ] + reportedContent
 
     groovy.json.JsonOutput.toJson(payload)
+}
+
+Map resolveConsentMap(Map sample) {
+    def candidates = [
+        mapOrEmpty(sample.consent),
+        mapOrEmpty(sample.stage0_consent_tokens),
+        mapOrEmpty(sample.consent_tokens)
+    ]
+    def selected = candidates.find { cand -> !cand.isEmpty() } ?: [:]
+    selected as Map
+}
+
+Map deriveBranchTogglePolicy(Map consent) {
+    def runGermline = asBool(consent.run_germline, true)
+    def runPgx = asBool(consent.run_pgx, true)
+    def runPrsRequested = asBool(consent.run_prs, true)
+    def runSfRequested = asBool(consent.run_secondary_findings, true)
+    def runSomatic = asBool(consent.run_somatic, false)
+
+    def prsOptIn = asBool(consent.prs_opt_in, false)
+    def sfOptIn = asBool(consent.sf_opt_in, false)
+
+    def runPrs = runPrsRequested && prsOptIn
+    def runSf = runSfRequested && sfOptIn
+
+    def requestedBranches = [] as List<String>
+    if (runGermline) requestedBranches << 'germline'
+    if (runPgx) requestedBranches << 'pgx'
+    if (runPrsRequested) requestedBranches << 'prs'
+    if (runSfRequested) requestedBranches << 'sf'
+    if (runSomatic) requestedBranches << 'somatic'
+
+    def effectiveBranches = [] as List<String>
+    if (runGermline) effectiveBranches << 'germline'
+    if (runPgx) effectiveBranches << 'pgx'
+    if (runPrs) effectiveBranches << 'prs'
+    if (runSf) effectiveBranches << 'sf'
+    if (runSomatic) effectiveBranches << 'somatic'
+
+    def skipReasons = [
+        germline: runGermline ? '' : 'RUN_GERMLINE_DISABLED_BY_CONSENT_TOGGLE',
+        pgx     : runPgx ? '' : 'RUN_PGX_DISABLED_BY_CONSENT_TOGGLE',
+        prs     : runPrs ? '' : (runPrsRequested ? 'RUN_PRS_BLOCKED_BY_OPT_IN_POLICY' : 'RUN_PRS_DISABLED_BY_CONSENT_TOGGLE'),
+        sf      : runSf ? '' : (runSfRequested ? 'RUN_SECONDARY_FINDINGS_BLOCKED_BY_OPT_IN_POLICY' : 'RUN_SECONDARY_FINDINGS_DISABLED_BY_CONSENT_TOGGLE'),
+        somatic : runSomatic ? '' : 'RUN_SOMATIC_DISABLED_BY_CONSENT_TOGGLE'
+    ]
+
+    [
+        requested_branches: requestedBranches,
+        effective_branches: effectiveBranches,
+        skip_reasons: skipReasons,
+        prs_opt_in: prsOptIn,
+        sf_opt_in: sfOptIn
+    ]
 }
 
 List<String> normalizeRequestedBranches(Object rawBranches, String sampleId) {
@@ -250,7 +478,10 @@ Map buildStage5Meta(Map sample, File manifestDir, def thresholdsFile, def refere
     def intakeTokenPath = resolvePath(intakeTokenRaw, manifestDir.toString())
     def intakeToken = intakeTokenPath.exists() ? intakeTokenPath.toString() : intakeTokenRaw
 
-    def requestedBranches = normalizeRequestedBranches(sample.requested_branches, sampleId)
+    def consent = resolveConsentMap(sample)
+    def branchPolicy = deriveBranchTogglePolicy(consent)
+    def requestedBranches = branchPolicy.requested_branches as List<String>
+    def effectiveBranches = branchPolicy.effective_branches as List<String>
     def containerDigest = sample.container_digest?.toString()?.trim() ?: readOptionalParam('container_digest')?.toString()?.trim()
     if (!containerDigest && infrastructureFile != null) {
         def infraFile = infrastructureFile instanceof File ? infrastructureFile : new File(infrastructureFile.toString())
@@ -280,8 +511,13 @@ Map buildStage5Meta(Map sample, File manifestDir, def thresholdsFile, def refere
         ancestry_metrics_json: ancestryMetrics.toString(),
         phasing_audit_json: phasingAudit.toString(),
         intake_validation_token: intakeToken,
+        consent: consent,
+        consent_tokens: consent,
+        stage0_consent_tokens: consent,
         requested_branches: requestedBranches,
-        variant_branches: buildBranchDirectiveFlags(requestedBranches),
+        effective_requested_branches: effectiveBranches,
+        branch_skip_reasons: branchPolicy.skip_reasons,
+        variant_branches: buildBranchDirectiveFlags(effectiveBranches),
         git_commit_sha: sample.git_commit_sha?.toString()?.trim() ?: resolveGitCommitSha(),
         container_digest: containerDigest,
         policy_version: policyVersion,
@@ -294,9 +530,13 @@ workflow STAGE5_CLINICAL_TRIAGE {
     ch_intake_payload
     ch_thresholds_yaml
     ch_references_yaml
+    ch_reference_assets
     ch_references_validated
-    ch_infrastructure_yaml
-    ch_container_digest
+    ch_signer_private_key
+    ch_signer_public_key
+    ch_signer_policy
+    _ch_infrastructure_yaml
+    _ch_container_digest
 
     main:
     VALIDATE_STAGE0_TOKEN(ch_intake_payload)
@@ -313,38 +553,43 @@ workflow STAGE5_CLINICAL_TRIAGE {
         .filter { meta, _vcf -> !branchEnabled(meta as Map, 'snv_indel') }
         .map { meta, _vcf ->
         def normalizedMeta = meta as Map
-        tuple(normalizedMeta, 'SKIPPED_BY_CLINICAL_DIRECTIVE', skippedBranchPayload(normalizedMeta, 'germline'))
+        def reason = mapOrEmpty(normalizedMeta.branch_skip_reasons).germline?.toString() ?: 'BRANCH_NOT_REQUESTED_IN_VARIANT_DIRECTIVE'
+        tuple(normalizedMeta, 'SKIPPED_BY_CLINICAL_DIRECTIVE', skippedBranchPayload(normalizedMeta, 'germline', reason))
     }
     def ch_skipped_pgx = chValidatedIntake
         .filter { meta, _vcf -> !branchEnabled(meta as Map, 'pgx') }
         .map { meta, _vcf ->
         def normalizedMeta = meta as Map
-        tuple(normalizedMeta, 'SKIPPED_BY_CLINICAL_DIRECTIVE', skippedBranchPayload(normalizedMeta, 'pgx'))
+        def reason = mapOrEmpty(normalizedMeta.branch_skip_reasons).pgx?.toString() ?: 'BRANCH_NOT_REQUESTED_IN_VARIANT_DIRECTIVE'
+        tuple(normalizedMeta, 'SKIPPED_BY_CLINICAL_DIRECTIVE', skippedBranchPayload(normalizedMeta, 'pgx', reason))
     }
     def ch_skipped_prs = chValidatedIntake
         .filter { meta, _vcf -> !branchEnabled(meta as Map, 'prs') }
         .map { meta, _vcf ->
         def normalizedMeta = meta as Map
-        tuple(normalizedMeta, 'SKIPPED_BY_CLINICAL_DIRECTIVE', skippedBranchPayload(normalizedMeta, 'prs'))
+        def reason = mapOrEmpty(normalizedMeta.branch_skip_reasons).prs?.toString() ?: 'BRANCH_NOT_REQUESTED_IN_VARIANT_DIRECTIVE'
+        tuple(normalizedMeta, 'SKIPPED_BY_CLINICAL_DIRECTIVE', skippedBranchPayload(normalizedMeta, 'prs', reason))
     }
     def ch_skipped_sf = chValidatedIntake
         .filter { meta, _vcf -> !branchEnabled(meta as Map, 'sf') }
         .map { meta, _vcf ->
         def normalizedMeta = meta as Map
-        tuple(normalizedMeta, 'SKIPPED_BY_CLINICAL_DIRECTIVE', skippedBranchPayload(normalizedMeta, 'sf'))
+        def reason = mapOrEmpty(normalizedMeta.branch_skip_reasons).sf?.toString() ?: 'BRANCH_NOT_REQUESTED_IN_VARIANT_DIRECTIVE'
+        tuple(normalizedMeta, 'SKIPPED_BY_CLINICAL_DIRECTIVE', skippedBranchPayload(normalizedMeta, 'sf', reason))
     }
     def ch_skipped_somatic = chValidatedIntake
         .filter { meta, _vcf -> !branchEnabled(meta as Map, 'somatic') }
         .map { meta, _vcf ->
         def normalizedMeta = meta as Map
-        tuple(normalizedMeta, 'SKIPPED_BY_CLINICAL_DIRECTIVE', skippedBranchPayload(normalizedMeta, 'somatic'))
+        def reason = mapOrEmpty(normalizedMeta.branch_skip_reasons).somatic?.toString() ?: 'BRANCH_NOT_REQUESTED_IN_VARIANT_DIRECTIVE'
+        tuple(normalizedMeta, 'SKIPPED_BY_CLINICAL_DIRECTIVE', skippedBranchPayload(normalizedMeta, 'somatic', reason))
     }
 
     GERMLINE_BRANCH_ENGINE(ch_snv_indel, ch_thresholds_yaml, ch_references_yaml)
     PGX_BRANCH_ENGINE(ch_pgx, ch_thresholds_yaml, ch_references_yaml)
-    PRS_BRANCH_ENGINE(ch_prs, ch_thresholds_yaml, ch_references_yaml, ch_references_validated)
-    SF_BRANCH_ENGINE(ch_sf, ch_thresholds_yaml, ch_references_yaml, ch_references_validated)
-    SOMATIC_BRANCH_ENGINE(ch_somatic, ch_thresholds_yaml, ch_references_yaml, ch_references_validated)
+    PRS_BRANCH_ENGINE(ch_prs, ch_thresholds_yaml, ch_references_yaml, ch_reference_assets, ch_references_validated)
+    SF_BRANCH_ENGINE(ch_sf, ch_thresholds_yaml, ch_references_yaml, ch_reference_assets, ch_references_validated)
+    SOMATIC_BRANCH_ENGINE(ch_somatic, ch_thresholds_yaml, ch_references_yaml, ch_reference_assets, ch_references_validated)
 
     def ch_germline_all = GERMLINE_BRANCH_ENGINE.out.branch_output.mix(ch_skipped_snv_indel)
     def ch_pgx_all = PGX_BRANCH_ENGINE.out.branch_output.mix(ch_skipped_pgx)
@@ -396,37 +641,32 @@ workflow STAGE5_CLINICAL_TRIAGE {
 
     ASSEMBLE_CLINICAL_BUNDLE(chBundleInput)
 
-    def releaseGitCommitSha = resolveGitCommitSha()
-    def releaseContainerDigest = readOptionalParam('container_digest')?.toString()?.trim() ?: ch_container_digest?.toString()?.trim()
-    if (!releaseContainerDigest) {
-        throw new IllegalStateException('STAGE5_PRECONDITION_FAILURE: container_digest is required for release sign-off (CLI override or control_plane/infrastructure.yaml)')
-    }
+    def chSignOffMeta = ASSEMBLE_CLINICAL_BUNDLE.out.clinical_bundle.map { meta, _bundleJson -> meta }
+    def chSignOffSampleId = ASSEMBLE_CLINICAL_BUNDLE.out.clinical_bundle.map { meta, _bundleJson -> meta.sample_id.toString() }
+    def chSignOffBundleJson = ASSEMBLE_CLINICAL_BUNDLE.out.clinical_bundle.map { _meta, bundleJson -> bundleJson }
 
-    def chSignOffInput = ASSEMBLE_CLINICAL_BUNDLE.out.clinical_bundle.map { meta, bundleJson ->
-        tuple(meta.sample_id.toString(), bundleJson)
-    }
-
-    SIGN_OFF_CLINICAL_BUNDLE(chSignOffInput, channel.value(releaseGitCommitSha), channel.value(releaseContainerDigest))
+    SIGN_OFF_CLINICAL_BUNDLE(chSignOffMeta, chSignOffSampleId, chSignOffBundleJson, ch_signer_private_key, ch_signer_public_key, ch_signer_policy)
 
     VALIDATE_STAGE5_CONTRACT(ASSEMBLE_CLINICAL_BUNDLE.out.clinical_bundle)
 
-    def chManifestInput = SIGN_OFF_CLINICAL_BUNDLE.out.production_release.map { sampleId, releaseJson, _sha256 ->
-        tuple(sampleId, releaseJson)
+    def chManifestInput = SIGN_OFF_CLINICAL_BUNDLE.out.production_release.map { meta, releaseJson, _sha256, _bundleTarGz, _provenanceJson ->
+        tuple(meta.sample_id.toString(), releaseJson)
     }
 
     ASSEMBLE_STAGE5_MANIFEST_FROM_RELEASE(chManifestInput)
+    def chStage5Manifest = ASSEMBLE_STAGE5_MANIFEST_FROM_RELEASE.out.stage5_manifest
 
     emit:
     validated_bundle = VALIDATE_STAGE5_CONTRACT.out.validated_bundle
     production_release = SIGN_OFF_CLINICAL_BUNDLE.out.production_release
-    banked_manifest = ASSEMBLE_STAGE5_MANIFEST_FROM_RELEASE.out.banked_manifest
+    stage5_manifest = chStage5Manifest
 }
 
 workflow {
     main:
     def inputPath = params.input?.toString()?.trim()
     if (!inputPath) {
-        throw new IllegalStateException('STAGE5_PRECONDITION_FAILURE: --input is required and must reference a Stage 4 banked manifest')
+        throw new IllegalStateException('STAGE5_PRECONDITION_FAILURE: --input is required and must reference a Stage 4 manifest')
     }
 
     def stage4ManifestFile = file(inputPath)
@@ -438,10 +678,14 @@ workflow {
     if (!thresholdsFile.exists()) {
         throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: thresholds config not found: ${thresholdsFile}")
     }
+    def signerPolicy = resolveStage5SignerPolicy(new File(thresholdsFile.toString()))
 
     def referencesFile = resolveStageConfigPath(readOptionalParam('ref_config'), params.references, 'references.yaml')
     if (!referencesFile.exists()) {
         throw new IllegalStateException("STAGE5_PRECONDITION_FAILURE: references config not found: ${referencesFile}")
+    }
+    def stage5ReferenceAssets = collectStage5ReferenceAssets(new File(referencesFile.toString())).collect { asset ->
+        file(asset.toString())
     }
 
     def infrastructureFile = resolveStageConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
@@ -452,7 +696,7 @@ workflow {
         governedContainerDigest = containers?.annotation?.digest?.toString()?.trim() ?: containers?.reporting?.digest?.toString()?.trim()
     }
 
-    VALIDATE_STAGE5_REFERENCES(channel.value(referencesFile))
+    VALIDATE_STAGE5_REFERENCES(channel.value(referencesFile), channel.value(stage5ReferenceAssets))
     def chReferencesValidated = VALIDATE_STAGE5_REFERENCES.out.validated_signal
 
     def manifest = mapOrEmpty(new groovy.yaml.YamlSlurper().parse(stage4ManifestFile))
@@ -467,5 +711,16 @@ workflow {
         tuple(meta, file(meta.phased_vcf.toString(), checkIfExists: true))
     }
 
-    STAGE5_CLINICAL_TRIAGE(chIntakePayload, channel.value(thresholdsFile), channel.value(referencesFile), chReferencesValidated, channel.value(infrastructureFile), channel.value(governedContainerDigest))
+    STAGE5_CLINICAL_TRIAGE(
+        chIntakePayload,
+        channel.value(thresholdsFile),
+        channel.value(referencesFile),
+        channel.value(stage5ReferenceAssets),
+        chReferencesValidated,
+        channel.value(file(signerPolicy.key_file.toString(), checkIfExists: true)),
+        channel.value(file(signerPolicy.pub_file.toString(), checkIfExists: true)),
+        channel.value(signerPolicy),
+        channel.value(infrastructureFile),
+        channel.value(governedContainerDigest)
+    )
 }

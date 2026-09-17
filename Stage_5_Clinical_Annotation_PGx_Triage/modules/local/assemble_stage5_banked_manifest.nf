@@ -1,16 +1,16 @@
-process ASSEMBLE_STAGE5_BANKED_MANIFEST {
+process ASSEMBLE_STAGE5_MANIFEST {
 
     label 'process_low'
     container 'genvar-annotation:2.1.0'
     stageInMode 'copy'
 
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'samples_*_banked_stage5.yaml'
+    publishDir "${params.stage5_outdir}", mode: 'copy', overwrite: true, pattern: 'samples_*_stage5.yaml'
 
     input:
     path manifest_fragments
 
     output:
-    path 'samples_*_banked_stage5.yaml', emit: banked_manifest
+    path 'samples_*_stage5.yaml', emit: stage5_manifest
 
     script:
     """
@@ -33,7 +33,7 @@ for path in fragment_paths:
 
 lines = []
 lines.append('# ==============================================================================')
-lines.append('# STAGE 5 BANKED MANIFEST')
+lines.append('# STAGE 5 MANIFEST')
 lines.append('# Purpose: Clinical annotation, SF/PRS triage, and phased PGx handoff.')
 lines.append('# ==============================================================================')
 lines.append('samples:')
@@ -90,13 +90,13 @@ for sid in sorted(by_sample):
     lines.append(f'      pgx_report_json: "{pgx.get("pgx_actionability_json", pgx.get("pgx_report", ""))}"')
     lines.append(f'      clinical_bundle_tar_gz: "{pgx.get("clinical_bundle_tar_gz", "")}"')
     lines.append(f'      provenance_json: "{pgx.get("provenance_json", "")}"')
-    lines.append('    save_dir: "${params.outdir}"')
+    lines.append('    save_dir: "${params.stage5_outdir}"')
 
 content = "\\n".join(lines) + "\\n"
 sample_ids = sorted(str(sid) for sid in by_sample.keys())
 canonical_id = sample_ids[0] if len(sample_ids) == 1 else 'multi_sample'
 safe_id = ''.join(ch if (ch.isalnum() or ch in ('_', '-')) else '_' for ch in canonical_id) or 'UNKNOWN'
-Path(f'samples_{safe_id}_banked_stage5.yaml').write_text(content, encoding='utf-8')
+Path(f'samples_{safe_id}_stage5.yaml').write_text(content, encoding='utf-8')
 PYEOF
     """
 }

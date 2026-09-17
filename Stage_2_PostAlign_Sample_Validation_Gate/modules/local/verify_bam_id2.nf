@@ -3,7 +3,7 @@ process VERIFYBAMID2 {
     label 'process_low'
     container 'genvar-core:2.1.0'
 
-    publishDir "${params.outdir}/audit_and_qc/stage2", mode: 'copy', overwrite: true, pattern: '*.contamination_audit.json'
+    publishDir "${params.stage2_outdir}/audit_and_qc/stage2", mode: 'copy', overwrite: true, pattern: '*.contamination_audit.json'
 
     input:
     tuple val(meta), path(bam), path(bai), val(refs), val(thresholds), path(precondition_audit)

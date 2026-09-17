@@ -25,7 +25,7 @@ process REF_MANIFEST_SNAPSHOT_LOCK {
     label 'process_low'
     container 'genvar-core:2.1.0'
 
-    publishDir "${params.outdir}/audit_and_qc/ref_snapshot", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/Stage_0/audit_and_qc/ref_snapshot", mode: 'copy', overwrite: true
 
     input:
     path references_yaml

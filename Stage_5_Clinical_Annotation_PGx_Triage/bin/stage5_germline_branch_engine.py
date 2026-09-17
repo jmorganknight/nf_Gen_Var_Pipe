@@ -735,6 +735,19 @@ def determine_sample_name(meta, sample_names):
     )
 
 
+def is_symbolic_or_structural_alt(alt: str) -> bool:
+    text = str(alt or '').strip()
+    if not text:
+        return True
+    if text in {'.', '*'}:
+        return True
+    if text.startswith('<') or text.endswith('>'):
+        return True
+    if '[' in text or ']' in text:
+        return True
+    return any(base not in {'A', 'C', 'G', 'T', 'N'} for base in text.upper())
+
+
 def run_engine(meta, vcf_path: Path, thresholds_path: Path, references_path: Path):
     for required in (vcf_path, thresholds_path, references_path):
         if not required.exists() or not required.is_file():
@@ -787,14 +800,24 @@ def run_engine(meta, vcf_path: Path, thresholds_path: Path, references_path: Pat
             break
 
     input_count = 0
+    excluded_variant_count = 0
     reported_variants = []
 
     for record in records:
         input_count += 1
 
-        if not record['alts'] or len(record['alts']) != 1:
+        alt_values = tuple(record['alts'] or ())
+        if not alt_values:
             raise SystemExit(
                 'STAGE5_GERMLINE_FATAL: multiallelic or ALT-missing record reached germline engine despite atomization policy; '
+                f"variant={record['contig']}:{record['pos']}:{record['ref']}:{record['alts']}"
+            )
+        if any(is_symbolic_or_structural_alt(alt) for alt in alt_values):
+            excluded_variant_count += 1
+            continue
+        if len(alt_values) != 1:
+            raise SystemExit(
+                'STAGE5_GERMLINE_FATAL: multiallelic sequence-alternate record reached germline engine despite atomization policy; '
                 f"variant={record['contig']}:{record['pos']}:{record['ref']}:{record['alts']}"
             )
 
@@ -888,6 +911,7 @@ def run_engine(meta, vcf_path: Path, thresholds_path: Path, references_path: Pat
             'status': 'COMPLETED',
             'reason': reason,
             'input_variant_count': input_count,
+            'excluded_unsupported_variant_count': excluded_variant_count,
             'reported_variant_count': len(reported_variants),
             'ruleset_version': ruleset_version,
             'content_sha256': content_sha256,

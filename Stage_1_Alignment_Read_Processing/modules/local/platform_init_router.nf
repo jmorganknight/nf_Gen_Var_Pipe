@@ -12,7 +12,7 @@ process PLATFORM_INIT_ROUTER {
 
     tag "${meta.sample_id}"
 
-    publishDir { "${meta.save_dir}/${meta.sample_id}/audit_and_qc" }, mode: 'copy', overwrite: true, pattern: '*.platform_init_route.json'
+    publishDir "${params.stage1_outdir}/audit_and_qc", mode: 'copy', overwrite: true, pattern: '*.platform_init_route.json'
 
     input:
     tuple val(meta), path(fastq_1), path(fastq_2), path(intake_token, stageAs: 'intake_token/*'), path(intake_report, stageAs: 'intake_report/*')

@@ -42,7 +42,7 @@ def write_text(path: Path, text: str) -> None:
 
 def pick_base_input() -> Path:
     candidates = [
-        REPO_ROOT / 'Stage_5_Clinical_Annotation_PGx_Triage' / 'tests' / 'mini_control' / 'samples_mini_control_banked_stage5.yaml',
+        REPO_ROOT / 'Stage_5_Clinical_Annotation_PGx_Triage' / 'tests' / 'mini_control' / 'samples_mini_control_stage5.yaml',
     ]
     for candidate in candidates:
         if candidate.exists():
@@ -50,12 +50,12 @@ def pick_base_input() -> Path:
 
     search_roots = [
         REPO_ROOT / 'Stage_5_Clinical_Annotation_PGx_Triage' / 'tests' / 'mini_control',
-        REPO_ROOT / 'Stage_5_Clinical_Annotation_PGx_Triage' / 'tests' / 'fixtures' / 'banked_stage5',
+        REPO_ROOT / 'Stage_5_Clinical_Annotation_PGx_Triage' / 'tests' / 'fixtures' / 'stage5',
         REPO_ROOT / 'Stage_5_Clinical_Annotation_PGx_Triage' / 'tests' / 'fmea' / 'runs',
         REPO_ROOT / 'results' / 'master_orchestrator',
     ]
     for root in search_roots:
-        matches = sorted(root.rglob('samples_*_banked_stage5.yaml'))
+        matches = sorted(root.rglob('samples_*_stage5.yaml'))
         if matches:
             return matches[0]
 
@@ -162,7 +162,7 @@ def ensure_stage5_seed_fixture() -> Path:
         info.size = len(payload_bytes)
         tar.addfile(info, BytesIO(payload_bytes))
 
-    manifest = seed_root / 'samples_seed_banked_stage5.yaml'
+    manifest = seed_root / 'samples_seed_stage5.yaml'
     manifest_text = f"""samples:
   - sample_id: \"{sid}\"
     validation_token: \"VALID_PASS|VARIANTS_HARMONIZED|STAGE5_COMPLETE\"
@@ -281,7 +281,7 @@ def mutate_invalid_token(base_text: str) -> str:
 
 def copy_stage5_fixture(name: str) -> Path:
     tmp_dir = Path(tempfile.mkdtemp(prefix=f'stage6_fmea_{name}_'))
-    stage5_copy = tmp_dir / 'banked_stage5'
+    stage5_copy = tmp_dir / 'stage5'
     shutil.copytree(pick_base_input().parent, stage5_copy)
     return stage5_copy
 
@@ -343,16 +343,16 @@ def run_manifest_assembly_case(
     outdir.mkdir(parents=True, exist_ok=True)
 
     harness = run_dir / 'assemble_harness.nf'
-    module_path = (STAGE6_ROOT / 'modules' / 'local' / 'assemble_stage6_banked_manifest.nf').resolve().as_posix()
+    module_path = (STAGE6_ROOT / 'modules' / 'local' / 'assemble_stage6_manifest.nf').resolve().as_posix()
     harness_template = """nextflow.enable.dsl = 2
 
-include { ASSEMBLE_STAGE6_BANKED_MANIFEST } from '__MODULE_PATH__'
+include { ASSEMBLE_STAGE6_MANIFEST } from '__MODULE_PATH__'
 
 workflow {
-    def fragments = Channel.fromPath(params.fragments_glob, checkIfExists: true)
-    def provenance = Channel.fromPath(params.provenance_glob, checkIfExists: true)
-    def metrics = Channel.fromPath(params.metrics_glob, checkIfExists: true)
-    ASSEMBLE_STAGE6_BANKED_MANIFEST(fragments.collect(), provenance.collect(), metrics.collect())
+    def fragments = channel.fromPath(params.fragments_glob, checkIfExists: true)
+    def provenance = channel.fromPath(params.provenance_glob, checkIfExists: true)
+    def metrics = channel.fromPath(params.metrics_glob, checkIfExists: true)
+    ASSEMBLE_STAGE6_MANIFEST(fragments.collect(), provenance.collect(), metrics.collect())
 }
 """
     harness.write_text(
@@ -501,7 +501,7 @@ def ensure_stage6_reference_fixture() -> tuple[Path, Path, Path]:
 def write_input(text: str, name: str, stage5_copy: Path | None = None) -> Path:
     if stage5_copy is None:
         stage5_copy = copy_stage5_fixture(name)
-    path = stage5_copy / 'samples_stage5_fmea_input_banked_stage5.yaml'
+    path = stage5_copy / 'samples_stage5_fmea_input_stage5.yaml'
     write_text(path, text)
     return path
 

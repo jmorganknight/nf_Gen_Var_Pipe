@@ -1,9 +1,21 @@
+def toSerializableValue(Object value) {
+    if (value instanceof Map) {
+        def copied = new LinkedHashMap()
+        (value as Map).each { key, nested -> copied[key] = toSerializableValue(nested) }
+        return copied
+    }
+    if (value instanceof List) {
+        return (value as List).collect { nested -> toSerializableValue(nested) }
+    }
+    value
+}
+
 process MASTER_HARMONIZED_VCF_PAYLOAD {
 
     label 'process_low'
     container 'genvar-core:2.1.0'
 
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true
+    publishDir "${params.stage3_outdir}/harmonized_vcf", mode: 'copy', overwrite: true
 
     input:
     tuple val(sample_id), path(mane_selected_vcf), path(mane_audit), path(vcf_schema), val(stage3_refs), val(sample_meta), path(calibration_audit)
@@ -11,13 +23,17 @@ process MASTER_HARMONIZED_VCF_PAYLOAD {
     output:
     tuple val(sample_id), path("${sample_id}.normalized.vcf.gz"), path("${sample_id}.harmonization_audit.json"), path("${sample_id}.stage3.contract.fragment.json"), emit: harmonized
     tuple val(sample_id), path("${sample_id}.normalized.vcf.gz.tbi"), emit: normalized_tbi
+    path "${sample_id}.merged.selected.vcf", emit: merged_selected_vcf
+    path "${sample_id}.mane_transcript_selector.audit.json", emit: mane_selector_audit_json
+    path "${sample_id}.dynamic_calibration.audit.json", emit: dynamic_calibration_audit_json
 
     script:
-    def stage3RefsMap = (stage3_refs instanceof Map) ? (stage3_refs as Map) : [:]
-    def refsJson = groovy.json.JsonOutput.toJson(stage3RefsMap).replace('\\', '\\\\').replace("'", "\\'")
-    def sampleMetaMap = (sample_meta instanceof Map) ? (sample_meta as Map) : [:]
-    def metaJson = groovy.json.JsonOutput.toJson(sampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
-    def publishedOutDir = new File(params.outdir.toString()).isAbsolute() ? new File(params.outdir.toString()).canonicalPath : new File(workflow.launchDir.toString(), params.outdir.toString()).canonicalPath
+    def safeStage3RefsMap = (stage3_refs instanceof Map) ? (toSerializableValue(stage3_refs) as Map) : [:]
+    def refsJson = groovy.json.JsonOutput.toJson(safeStage3RefsMap).replace('\\', '\\\\').replace("'", "\\'")
+    def safeSampleMetaMap = (sample_meta instanceof Map) ? (toSerializableValue(sample_meta) as Map) : [:]
+    def metaJson = groovy.json.JsonOutput.toJson(safeSampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
+    def publishedStage3Dir = new File(params.stage3_outdir.toString()).isAbsolute() ? new File(params.stage3_outdir.toString()).canonicalPath : new File(workflow.launchDir.toString(), params.stage3_outdir.toString()).canonicalPath
+    def publishedHarmonizedDir = new File(publishedStage3Dir, 'harmonized_vcf').canonicalPath
     """
     set -euo pipefail
 
@@ -96,6 +112,12 @@ normalized_vcf = Path('${sample_id}.normalized.vcf')
 normalized_vcf.write_text(chr(10).join(lines) + chr(10), encoding='utf-8')
 normalized_vcf_gz = Path('${sample_id}.normalized.vcf.gz')
 normalized_vcf_tbi = Path('${sample_id}.normalized.vcf.gz.tbi')
+published_source_vcf_local = Path('${sample_id}.merged.selected.vcf')
+published_source_vcf_local.write_text(chr(10).join(lines) + chr(10), encoding='utf-8')
+published_mane_audit_local = Path('${sample_id}.mane_transcript_selector.audit.json')
+published_mane_audit_local.write_text(Path('${mane_audit}').read_text(encoding='utf-8', errors='replace'), encoding='utf-8')
+published_calibration_audit_local = Path('${sample_id}.dynamic_calibration.audit.json')
+published_calibration_audit_local.write_text(Path('${calibration_audit}').read_text(encoding='utf-8', errors='replace'), encoding='utf-8')
 
 import subprocess
 with normalized_vcf.open('rb') as src, normalized_vcf_gz.open('wb') as dst:
@@ -106,9 +128,14 @@ if proc.returncode != 0:
 subprocess.run(['tabix', '-f', '-p', 'vcf', str(normalized_vcf_gz)], check=True)
 normalized_vcf.unlink()
 
-published_dir = Path('${publishedOutDir}')
-published_vcf = published_dir / '${sample_id}.normalized.vcf.gz'
-published_tbi = published_dir / '${sample_id}.normalized.vcf.gz.tbi'
+published_stage3_dir = Path('${publishedStage3Dir}')
+published_harmonized_dir = Path('${publishedHarmonizedDir}')
+published_vcf = published_harmonized_dir / '${sample_id}.normalized.vcf.gz'
+published_tbi = published_harmonized_dir / '${sample_id}.normalized.vcf.gz.tbi'
+published_harmonization_audit = published_harmonized_dir / '${sample_id}.harmonization_audit.json'
+published_source_vcf = published_harmonized_dir / '${sample_id}.merged.selected.vcf'
+published_mane_audit = published_harmonized_dir / '${sample_id}.mane_transcript_selector.audit.json'
+published_calibration_audit = published_harmonized_dir / '${sample_id}.dynamic_calibration.audit.json'
 
 def sha256(path: Path):
     h = hashlib.sha256()
@@ -123,9 +150,9 @@ schema_validation_audit = {
     'schema_path': str(schema_file.resolve()),
     'schema_path_declared': str(declared_schema_path),
     'schema_sha256': sha256(schema_file),
-    'validated_vcf': str(vcf_path.resolve()),
-    'normalized_vcf': str(normalized_vcf_gz.resolve()),
-    'normalized_vcf_tbi': str(normalized_vcf_tbi.resolve()),
+    'validated_vcf': str(published_source_vcf),
+    'normalized_vcf': str(published_vcf),
+    'normalized_vcf_tbi': str(published_tbi),
     'published_normalized_vcf': str(published_vcf),
     'published_normalized_vcf_tbi': str(published_tbi),
     'normalized_vcf_sha256': sha256(normalized_vcf_gz),
@@ -144,10 +171,8 @@ harmonization_audit = {
     'active_branches': [k for k, v in (meta.get('variant_branches', {}) or {}).items() if bool(v)],
     'normalized_vcf': str(published_vcf),
     'normalized_vcf_tbi': str(published_tbi),
-    'workdir_normalized_vcf': str(normalized_vcf_gz.resolve()),
-    'workdir_normalized_vcf_tbi': str(normalized_vcf_tbi.resolve()),
-    'mane_selector_audit': str(Path('${mane_audit}').resolve()),
-    'dynamic_calibration_audit': str(Path('${calibration_audit}').resolve()),
+    'mane_selector_audit': str(published_mane_audit),
+    'dynamic_calibration_audit': str(published_calibration_audit),
     'schema_validation': schema_validation_audit,
     'status': 'PASS',
 }
@@ -171,8 +196,9 @@ fragment.update({
     'active_branches': [k for k, v in (meta.get('variant_branches', {}) or {}).items() if bool(v)],
     'normalized_vcf': str(published_vcf),
     'normalized_vcf_tbi': str(published_tbi),
-    'harmonization_audit': str(published_dir / '${sample_id}.harmonization_audit.json'),
+    'harmonization_audit': str(published_harmonization_audit),
     'reference_build': meta.get('reference_build', {}),
+    'save_dir': str(published_stage3_dir),
     'stage4_handoff_note': 'Normalized, atomized, schema-validated VCF ready for annotation.',
 })
 Path('${sample_id}.stage3.contract.fragment.json').write_text(json.dumps(fragment, indent=2) + chr(10), encoding='utf-8')
@@ -180,8 +206,14 @@ PYEOF
     """
 
     stub:
+    def safeSampleMetaMap = (sample_meta instanceof Map) ? (toSerializableValue(sample_meta) as Map) : [:]
+    def safeVariantBranchesJson = groovy.json.JsonOutput.toJson((safeSampleMetaMap.variant_branches instanceof Map) ? (toSerializableValue(safeSampleMetaMap.variant_branches) as Map) : [:]).replace('\\', '\\\\').replace("'", "\\'")
+    def activeBranchesJson = groovy.json.JsonOutput.toJson(((safeSampleMetaMap.variant_branches instanceof Map) ? (toSerializableValue(safeSampleMetaMap.variant_branches) as Map) : [:]).findAll { _key, enabled -> enabled as boolean }.collect { key, _enabled -> key }).replace('\\', '\\\\').replace("'", "\\'")
     """
         cp "${mane_selected_vcf}" "${sample_id}.normalized.vcf"
+        cp "${mane_selected_vcf}" "${sample_id}.merged.selected.vcf"
+        cp "${mane_audit}" "${sample_id}.mane_transcript_selector.audit.json"
+        cp "${calibration_audit}" "${sample_id}.dynamic_calibration.audit.json"
         bgzip -f "${sample_id}.normalized.vcf"
         tabix -f -p vcf "${sample_id}.normalized.vcf.gz"
         cat > "${sample_id}.harmonization_audit.json" <<'JSON'
@@ -197,11 +229,12 @@ JSON
   "sample_id": "${sample_id}",
     "validation_token": "VALID_PASS|VARIANTS_HARMONIZED",
     "run_mode": "${sample_meta.run_mode ?: 'production'}",
-  "variant_branches": ${groovy.json.JsonOutput.toJson(sample_meta.variant_branches ?: [:])},
-    "active_branches": ${groovy.json.JsonOutput.toJson(((sample_meta.variant_branches ?: [:]).findAll { _key, enabled -> enabled as boolean }.collect { key, _enabled -> key }))},
-    "normalized_vcf": "${sample_id}.normalized.vcf.gz",
-    "normalized_vcf_tbi": "${sample_id}.normalized.vcf.gz.tbi",
-    "harmonization_audit": "${sample_id}.harmonization_audit.json",
+    "variant_branches": ${safeVariantBranchesJson},
+        "active_branches": ${activeBranchesJson},
+        "normalized_vcf": "${params.stage3_outdir}/harmonized_vcf/${sample_id}.normalized.vcf.gz",
+        "normalized_vcf_tbi": "${params.stage3_outdir}/harmonized_vcf/${sample_id}.normalized.vcf.gz.tbi",
+        "harmonization_audit": "${params.stage3_outdir}/harmonized_vcf/${sample_id}.harmonization_audit.json",
+        "save_dir": "${params.stage3_outdir}",
   "stage4_handoff_note": "Normalized, atomized, schema-validated VCF ready for annotation."
 }
 JSON

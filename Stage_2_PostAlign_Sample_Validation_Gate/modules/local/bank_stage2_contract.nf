@@ -1,9 +1,9 @@
-process BANK_STAGE2_CONTRACT {
+process STAGE2_CONTRACT {
 
     label 'process_low'
     container 'genvar-core:2.1.0'
 
-    publishDir "${params.outdir}/contracts/stage2", mode: 'copy', overwrite: true, pattern: '*.stage2.contract.fragment.json'
+    publishDir "${params.stage2_outdir}/contracts/stage2", mode: 'copy', overwrite: true, pattern: '*.stage2.contract.fragment.json'
 
     input:
     tuple val(meta), path(bam), path(bai), val(refs), val(thresholds), path(precondition_audit), path(contamination_audit), path(purity_sex_audit), path(router_audit)

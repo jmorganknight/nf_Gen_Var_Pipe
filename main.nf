@@ -4,13 +4,68 @@ include { STAGE0_PREFLIGHT_INGEST } from './Stage_0_Preflight_Ingest_Gate/main'
 include { STAGE1_ALIGNMENT as STAGE1_ALIGNMENT_READ_PROCESSING } from './Stage_1_Alignment_Read_Processing/workflows/stage1_alignment.nf'
 include { STAGE2_SAMPLE_VALIDATION as STAGE2_POSTALIGN_SAMPLE_VALIDATION_GATE } from './Stage_2_PostAlign_Sample_Validation_Gate/main'
 include { STAGE3_VARIANT_DISCOVERY_ENGINE } from './Stage_3_Variant_Discovery_Engine/main'
-include { ASSEMBLE_STAGE3_BANKED_MANIFEST } from './Stage_3_Variant_Discovery_Engine/modules/local/assemble_stage3_banked_manifest.nf'
+include { ASSEMBLE_STAGE3_MANIFEST } from './Stage_3_Variant_Discovery_Engine/modules/local/assemble_stage3_banked_manifest.nf'
 include { STAGE4_ANCESTRY_PHASING as STAGE4_ANCESTRY_PHASING_HIGHWAY } from './Stage_4_Ancestry_Phasing_Highway/main'
 include { STAGE5_ISOLATED_BRANCH_ARCHITECTURE } from './Stage_5_Clinical_Annotation_PGx_Triage/workflows/stage5_isolated.nf'
 include { STAGE6_CLINICAL_REPORTING_WORKBENCH_GATEWAY as STAGE6_CLINICAL_REPORTING_WORKBENCH_GATE } from './Stage_6_Clinical_Reporting_Workbench_Gateway/main'
 
 def mapOrEmpty(Object value) {
     value instanceof Map ? (value as Map) : [:]
+}
+
+def asBool(Object rawValue, boolean defaultValue = false) {
+    if (rawValue == null) {
+        return defaultValue
+    }
+    if (rawValue instanceof Boolean) {
+        return rawValue as boolean
+    }
+    if (rawValue instanceof Number) {
+        return rawValue.intValue() != 0
+    }
+    def text = rawValue.toString().trim().toLowerCase()
+    if (!text) {
+        return defaultValue
+    }
+    if (['1', 'true', 't', 'yes', 'y', 'on'].contains(text)) {
+        return true
+    }
+    if (['0', 'false', 'f', 'no', 'n', 'off'].contains(text)) {
+        return false
+    }
+    defaultValue
+}
+
+def resolveConsentPayload(Map meta) {
+    def direct = mapOrEmpty(meta.consent)
+    if (!direct.isEmpty()) {
+        return direct
+    }
+    def stage0 = mapOrEmpty(meta.stage0_consent_tokens)
+    if (!stage0.isEmpty()) {
+        return stage0
+    }
+    mapOrEmpty(meta.consent_tokens)
+}
+
+def requestedStage5BranchesFromConsent(Map consent) {
+    def requested = [] as List<String>
+    if (asBool(consent.run_germline, true)) {
+        requested << 'germline'
+    }
+    if (asBool(consent.run_pgx, true)) {
+        requested << 'pgx'
+    }
+    if (asBool(consent.run_prs, true)) {
+        requested << 'prs'
+    }
+    if (asBool(consent.run_secondary_findings, true)) {
+        requested << 'sf'
+    }
+    if (asBool(consent.run_somatic, false)) {
+        requested << 'somatic'
+    }
+    requested
 }
 
 def resolveRefPath(String entryPath, String yamlRefDataRoot) {
@@ -725,9 +780,9 @@ workflow MASTER_GEN_VAR_ORCHESTRATOR {
         chStage3Input
     )
 
-    ASSEMBLE_STAGE3_BANKED_MANIFEST(STAGE3_VARIANT_DISCOVERY_ENGINE.out.stage3_manifest.collect())
+    ASSEMBLE_STAGE3_MANIFEST(STAGE3_VARIANT_DISCOVERY_ENGINE.out.stage3_manifest.collect())
 
-    def chStage4Input = ASSEMBLE_STAGE3_BANKED_MANIFEST.out.banked_manifest.flatMap { stage3Manifest ->
+    def chStage4Input = ASSEMBLE_STAGE3_MANIFEST.out.stage3_manifest.flatMap { stage3Manifest ->
         def rows = ys.parse(stage3Manifest)?.samples ?: []
         def stage3Root = params.outdir.toString()
         def stage2ManifestCandidates = new File(params.outdir.toString()).listFiles()?.findAll { f ->
@@ -798,7 +853,25 @@ workflow MASTER_GEN_VAR_ORCHESTRATOR {
     ]
 
     def chStage5Input = STAGE4_ANCESTRY_PHASING_HIGHWAY.out.phase_bundle.map { meta, ancestryMetrics, phasedVcf, phasedTbi, _phasingAudit ->
-        tuple(meta.sample_id.toString(), phasedVcf, phasedTbi, ancestryMetrics, _phasingAudit, stage5ReferencesMeta)
+        def normalizedMeta = mapOrEmpty(meta)
+        def consentPayload = resolveConsentPayload(normalizedMeta)
+        def requestedBranches = requestedStage5BranchesFromConsent(consentPayload)
+        def samplePayload = normalizedMeta + [
+            consent: consentPayload,
+            consent_tokens: consentPayload,
+            stage0_consent_tokens: consentPayload
+        ]
+        tuple(
+            normalizedMeta.sample_id.toString(),
+            phasedVcf,
+            phasedTbi,
+            ancestryMetrics,
+            _phasingAudit,
+            stage5ReferencesMeta,
+            requestedBranches,
+            samplePayload,
+            (normalizedMeta.run_mode ?: 'production').toString()
+        )
     }
 
     STAGE5_ISOLATED_BRANCH_ARCHITECTURE(chStage5Input)
@@ -825,7 +898,7 @@ workflow MASTER_GEN_VAR_ORCHESTRATOR {
     def stage6NoFileBundle = file('NO_FILE', checkIfExists: false)
     def stage6NoFileProvenance = file('NO_FILE', checkIfExists: false)
 
-    def chStage6Input = STAGE5_ISOLATED_BRANCH_ARCHITECTURE.out.banked_manifest.flatMap { stage5Manifest ->
+    def chStage6Input = STAGE5_ISOLATED_BRANCH_ARCHITECTURE.out.stage5_manifest.flatMap { stage5Manifest ->
         def rows = ys.parse(stage5Manifest)?.samples ?: []
         def stage5Root = stage5Manifest.parent ? stage5Manifest.parent.toFile() : new File(projectRoot)
         def stage5OutRoot = new File(params.outdir.toString())
@@ -891,8 +964,8 @@ workflow MASTER_GEN_VAR_ORCHESTRATOR {
     stage2_manifest = STAGE2_POSTALIGN_SAMPLE_VALIDATION_GATE.out.stage2_contract
     stage3_manifest = STAGE3_VARIANT_DISCOVERY_ENGINE.out.stage3_manifest
     stage4_manifest = STAGE4_ANCESTRY_PHASING_HIGHWAY.out.banked_manifest
-    stage5_manifest = STAGE5_ISOLATED_BRANCH_ARCHITECTURE.out.banked_manifest
-    stage6_manifest = STAGE6_CLINICAL_REPORTING_WORKBENCH_GATE.out.banked_manifest
+    stage5_manifest = STAGE5_ISOLATED_BRANCH_ARCHITECTURE.out.stage5_manifest
+    stage6_manifest = STAGE6_CLINICAL_REPORTING_WORKBENCH_GATE.out.stage6_manifest
 }
 
 workflow {

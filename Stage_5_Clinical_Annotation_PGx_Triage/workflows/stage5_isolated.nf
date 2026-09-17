@@ -12,6 +12,79 @@ def branchRequested(List requestedBranches, String branchName) {
     normalized.contains(branchName)
 }
 
+def boolValue(Object rawValue, boolean defaultValue = false) {
+    if (rawValue == null) {
+        return defaultValue
+    }
+    if (rawValue instanceof Boolean) {
+        return rawValue as boolean
+    }
+    if (rawValue instanceof Number) {
+        return rawValue.intValue() != 0
+    }
+    def text = rawValue.toString().trim().toLowerCase()
+    if (!text) {
+        return defaultValue
+    }
+    if (['1', 'true', 't', 'yes', 'y', 'on'].contains(text)) {
+        return true
+    }
+    if (['0', 'false', 'f', 'no', 'n', 'off'].contains(text)) {
+        return false
+    }
+    return defaultValue
+}
+
+Map resolveConsentPayload(Map payload) {
+    if (!(payload instanceof Map)) {
+        return [:]
+    }
+    def consent = payload.consent instanceof Map ? payload.consent as Map : [:]
+    if (!consent.isEmpty()) {
+        return consent
+    }
+    def stage0 = payload.stage0_consent_tokens instanceof Map ? payload.stage0_consent_tokens as Map : [:]
+    if (!stage0.isEmpty()) {
+        return stage0
+    }
+    return payload.consent_tokens instanceof Map ? payload.consent_tokens as Map : [:]
+}
+
+Map branchPolicyFromConsent(Map consent) {
+    def runGermline = boolValue(consent.run_germline, true)
+    def runPgx = boolValue(consent.run_pgx, true)
+    def runPrsRequested = boolValue(consent.run_prs, true)
+    def runSfRequested = boolValue(consent.run_secondary_findings, true)
+    def runSomatic = boolValue(consent.run_somatic, false)
+    def prsOptIn = boolValue(consent.prs_opt_in, false)
+    def sfOptIn = boolValue(consent.sf_opt_in, false)
+
+    def requested = [] as List<String>
+    if (runGermline) requested << 'germline'
+    if (runPgx) requested << 'pgx'
+    if (runPrsRequested) requested << 'prs'
+    if (runSfRequested) requested << 'sf'
+    if (runSomatic) requested << 'somatic'
+
+    def enabled = [
+        germline: runGermline,
+        pgx: runPgx,
+        prs: runPrsRequested && prsOptIn,
+        sf: runSfRequested && sfOptIn,
+        somatic: runSomatic
+    ]
+
+    def skipReasons = [
+        germline: enabled.germline ? '' : 'RUN_GERMLINE_DISABLED_BY_CONSENT_TOGGLE',
+        pgx: enabled.pgx ? '' : 'RUN_PGX_DISABLED_BY_CONSENT_TOGGLE',
+        prs: enabled.prs ? '' : (runPrsRequested ? 'RUN_PRS_BLOCKED_BY_OPT_IN_POLICY' : 'RUN_PRS_DISABLED_BY_CONSENT_TOGGLE'),
+        sf: enabled.sf ? '' : (runSfRequested ? 'RUN_SECONDARY_FINDINGS_BLOCKED_BY_OPT_IN_POLICY' : 'RUN_SECONDARY_FINDINGS_DISABLED_BY_CONSENT_TOGGLE'),
+        somatic: enabled.somatic ? '' : 'RUN_SOMATIC_DISABLED_BY_CONSENT_TOGGLE'
+    ]
+
+    [requested: requested, enabled: enabled, skip_reasons: skipReasons]
+}
+
 process STAGE5_EMIT_BRANCH_SKIP_MANIFEST {
     label 'process_low'
     container 'genvar-annotation:2.1.0'
@@ -19,13 +92,14 @@ process STAGE5_EMIT_BRANCH_SKIP_MANIFEST {
     tag "${sample_id}:${branch_name}"
 
     input:
-    tuple val(sample_id), val(branch_name), val(requested_branches)
+    tuple val(sample_id), val(branch_name), val(requested_branches), val(skip_reason)
 
     output:
     tuple val(sample_id), val(branch_name), path("${sample_id}.${branch_name}.branch_manifest.skip.json"), emit: branch_manifest
 
     script:
     def requestedJson = groovy.json.JsonOutput.toJson(requested_branches ?: [])
+    def reasonText = skip_reason?.toString()?.trim() ?: 'branch_not_requested_in_manifest_control_plane'
     """
     set -euo pipefail
     cat > "${sample_id}.${branch_name}.branch_manifest.skip.json" <<JSON
@@ -33,7 +107,7 @@ process STAGE5_EMIT_BRANCH_SKIP_MANIFEST {
   "sample_id": "${sample_id}",
   "branch": "${branch_name}",
   "status": "SKIPPED_BY_CLINICAL_DIRECTIVE",
-  "skip_reason": "branch_not_requested_in_manifest_control_plane",
+    "skip_reason": "${reasonText}",
   "requested_branches": ${requestedJson},
   "audit_class": "CAP_CLIA_BRANCH_BYPASS",
   "primary_vcf": "",
@@ -89,10 +163,33 @@ workflow STAGE5_ISOLATED_BRANCH_ARCHITECTURE {
     ch_stage5_inputs
 
     main:
-    def ch_branch_routes = ch_stage5_inputs.flatMap { sid, phasedVcf, phasedTbi, ancestryJson, phasingAuditJson, refs, requestedBranches, samplePayload, runMode ->
-        def requested = requestedBranches as List
+    def ch_branch_routes = ch_stage5_inputs.flatMap { row ->
+        def sid = row[0]
+        def phasedVcf = row[1]
+        def phasedTbi = row[2]
+        def ancestryJson = row[3]
+        def phasingAuditJson = row[4]
+        def refs = row[5]
+        def requestedBranches = row.size() > 6 ? row[6] : null
+        def samplePayload = (row.size() > 7 && row[7] instanceof Map) ? (row[7] as Map) : [:]
+        def runMode = row.size() > 8 ? row[8] : null
+
+        def requested = requestedBranches instanceof List
+            ? (requestedBranches as List).collect { item -> item?.toString()?.trim()?.toLowerCase() }.findAll { item -> item }
+            : []
+
+        if (requested.isEmpty()) {
+            requested = branchPolicyFromConsent(resolveConsentPayload(samplePayload)).requested as List<String>
+        }
+
+        def consentPolicy = branchPolicyFromConsent(resolveConsentPayload(samplePayload))
+
         ['germline', 'pgx', 'sf', 'prs', 'somatic'].collect { branchName ->
-            tuple(sid, branchName, branchRequested(requested, branchName), phasedVcf, phasedTbi, ancestryJson, phasingAuditJson, refs, requested, samplePayload, runMode)
+            def isRequested = branchRequested(requested, branchName)
+            def enabledByConsent = (consentPolicy.enabled[branchName] as boolean)
+            def shouldRun = isRequested && enabledByConsent
+            def skipReason = shouldRun ? '' : (isRequested ? consentPolicy.skip_reasons[branchName] : 'branch_not_requested_in_manifest_control_plane')
+            tuple(sid, branchName, shouldRun, phasedVcf, phasedTbi, ancestryJson, phasingAuditJson, refs, requested, samplePayload, runMode, skipReason)
         }
     }
 
@@ -115,7 +212,7 @@ workflow STAGE5_ISOLATED_BRANCH_ARCHITECTURE {
     STAGE5_PRS(ch_requested_by_branch.prs.map { row -> tuple(row[0], row[3], row[4], row[5], row[6], row[7]) })
     STAGE5_SOMATIC(ch_requested_by_branch.somatic.map { row -> tuple(row[0], row[3], row[4], row[5], row[6], row[7]) })
 
-    STAGE5_EMIT_BRANCH_SKIP_MANIFEST(ch_routed.skipped.map { row -> tuple(row[0], row[1], row[8]) })
+    STAGE5_EMIT_BRANCH_SKIP_MANIFEST(ch_routed.skipped.map { row -> tuple(row[0], row[1], row[8], row[11]) })
 
     def ch_requested_meta = ch_routed.requested.map { row ->
         def key = "${row[0]}::${row[1]}"
@@ -139,13 +236,17 @@ workflow STAGE5_ISOLATED_BRANCH_ARCHITECTURE {
         .mix(STAGE5_EMIT_BRANCH_SKIP_MANIFEST.out.branch_manifest)
 
     def ch_sample_payload_by_sample = ch_stage5_inputs
-        .map { sid, _phasedVcf, _phasedTbi, _ancestryJson, _phasingAuditJson, _refs, _requestedBranches, samplePayload, _runMode ->
+        .map { row ->
+            def sid = row[0]
+            def samplePayload = (row.size() > 7 && row[7] instanceof Map) ? (row[7] as Map) : [:]
             tuple(sid, samplePayload)
         }
         .unique()
 
     def ch_run_mode_by_sample = ch_stage5_inputs
-        .map { sid, _phasedVcf, _phasedTbi, _ancestryJson, _phasingAuditJson, _refs, _requestedBranches, _samplePayload, runMode ->
+        .map { row ->
+            def sid = row[0]
+            def runMode = row.size() > 8 ? row[8] : null
             tuple(sid, runMode?.toString()?.trim()?.toLowerCase() ?: 'production')
         }
         .unique()
@@ -185,5 +286,5 @@ workflow STAGE5_ISOLATED_BRANCH_ARCHITECTURE {
     STAGE5_BUILD_MULTI_BRANCH_MANIFEST(ch_manifest_bundle)
 
     emit:
-    banked_manifest = STAGE5_BUILD_MULTI_BRANCH_MANIFEST.out.banked_manifest
+    stage5_manifest = STAGE5_BUILD_MULTI_BRANCH_MANIFEST.out
 }

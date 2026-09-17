@@ -1,7 +1,20 @@
+def toSerializableValue(Object value) {
+    if (value instanceof Map) {
+        def copied = new LinkedHashMap()
+        (value as Map).each { key, nested -> copied[key] = toSerializableValue(nested) }
+        return copied
+    }
+    if (value instanceof List) {
+        return (value as List).collect { nested -> toSerializableValue(nested) }
+    }
+    value
+}
+
 process STAGE3_STRUCTURAL_VARIANTS {
     label 'variant_heavy'
     container 'genvar-core:2.1.0'
     cpus { (params.stage3_structural_variants_cpus ?: params.stage3_sv_cpus ?: params.stage3_cpus ?: params.stage3_variant_heavy_default_cpus ?: 8) as int }
+    publishDir "${params.stage3_outdir}/harmonized_vcf", mode: 'copy', pattern: "*.vcf*|*.json", enabled: true
 
     input:
     tuple val(sample_id), path(stage2_manifest), path(sorted_bam), path(sorted_bai), val(is_wgs), val(target_bed), path(fasta), path(fasta_fai), val(sample_qc_meta), val(stage3_refs), val(sample_meta)
@@ -10,12 +23,10 @@ process STAGE3_STRUCTURAL_VARIANTS {
     tuple val(sample_id), path('structural_variants.calibrated.vcf'), path('stage3.structural_variants.audit.json'), val(stage3_refs), val(sample_meta), emit: calibrated_vcf
     path 'stage3.structural_variants.audit.json', emit: audit
 
-    publishDir "${params.outdir}/${sample_id}/stage3_structural_variants", mode: 'copy', pattern: "*.vcf*|*.json", enabled: true
-
     script:
     def threads = (task.cpus ?: 1) as int
-    def sampleMetaMap = (sample_meta instanceof Map) ? (sample_meta as Map) : [:]
-    def sampleMetaJson = groovy.json.JsonOutput.toJson(sampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
+    def safeSampleMetaMap = (sample_meta instanceof Map) ? (toSerializableValue(sample_meta) as Map) : [:]
+    def sampleMetaJson = groovy.json.JsonOutput.toJson(safeSampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
     """
     set -euo pipefail
 

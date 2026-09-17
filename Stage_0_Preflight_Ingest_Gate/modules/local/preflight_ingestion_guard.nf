@@ -20,7 +20,7 @@ process PREFLIGHT_INGESTION_GUARD {
     label 'process_low'
     container 'genvar-core:2.1.0'
 
-    publishDir "${params.outdir}/audit_and_qc/preflight_lock", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/Stage_0/audit_and_qc/preflight_lock", mode: 'copy', overwrite: true
 
     input:
     val preflight_sample_rows

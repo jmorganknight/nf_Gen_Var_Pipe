@@ -3,7 +3,6 @@ process STAGE1_AUDIT_SINK {
     label 'process_low'
     container 'genvar-core:2.1.0'
 
-    publishDir "${params.outdir}/audit_and_qc/stage1", mode: 'copy', overwrite: true
 
     input:
     path route_audits

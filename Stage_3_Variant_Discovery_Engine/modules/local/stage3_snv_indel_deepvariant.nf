@@ -1,7 +1,20 @@
+def toSerializableValue(Object value) {
+    if (value instanceof Map) {
+        def copied = new LinkedHashMap()
+        (value as Map).each { key, nested -> copied[key] = toSerializableValue(nested) }
+        return copied
+    }
+    if (value instanceof List) {
+        return (value as List).collect { nested -> toSerializableValue(nested) }
+    }
+    value
+}
+
 process STAGE3_SNV_INDEL_DEEPVARIANT {
     label 'variant_heavy'
     container 'google/deepvariant:1.6.0'
     cpus { (params.stage3_snv_indel_cpus ?: params.stage3_cpus ?: params.stage3_variant_heavy_default_cpus ?: 8) as int }
+    publishDir "${params.stage3_outdir}/harmonized_vcf", mode: 'copy', pattern: "*.vcf*|*.json", enabled: true
 
     input:
     tuple val(sample_id), path(stage2_manifest), path(sorted_bam), path(sorted_bai), val(is_wgs), val(target_bed), path(fasta), path(fasta_fai), val(sample_qc_meta), val(stage3_refs), val(sample_meta)
@@ -10,15 +23,13 @@ process STAGE3_SNV_INDEL_DEEPVARIANT {
     tuple val(sample_id), path('snv_indel.calibrated.vcf'), path('stage3.deepvariant_calibration.json'), val(stage3_refs), val(sample_meta), emit: calibrated_vcf
     path 'stage3.deepvariant_calibration.json', emit: audit
 
-    publishDir "${params.outdir}/${sample_id}/stage3_snv_indel_deepvariant", mode: 'copy', pattern: "*.vcf*|*.json", enabled: true
-
     script:
     def threads = (task.cpus ?: 1) as int
-    def sampleQcMap = (sample_qc_meta instanceof Map) ? (sample_qc_meta as Map) : [:]
-    def sampleQcJson = groovy.json.JsonOutput.toJson(sampleQcMap).replace('\\', '\\\\').replace("'", "\\'")
-    def sampleMetaMap = (sample_meta instanceof Map) ? (sample_meta as Map) : [:]
-    def sampleMetaJson = groovy.json.JsonOutput.toJson(sampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
-    def corruptHeaderFault = ((sampleMetaMap.stage3_faults instanceof Map) && (sampleMetaMap.stage3_faults.corrupt_vcf_header as boolean)) ? 'true' : 'false'
+    def safeSampleQcMap = (sample_qc_meta instanceof Map) ? (toSerializableValue(sample_qc_meta) as Map) : [:]
+    def sampleQcJson = groovy.json.JsonOutput.toJson(safeSampleQcMap).replace('\\', '\\\\').replace("'", "\\'")
+    def safeSampleMetaMap = (sample_meta instanceof Map) ? (toSerializableValue(sample_meta) as Map) : [:]
+    def sampleMetaJson = groovy.json.JsonOutput.toJson(safeSampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
+    def corruptHeaderFault = ((safeSampleMetaMap.stage3_faults instanceof Map) && (safeSampleMetaMap.stage3_faults.corrupt_vcf_header as boolean)) ? 'true' : 'false'
     """
     set -euo pipefail
 

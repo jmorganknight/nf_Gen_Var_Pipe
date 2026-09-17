@@ -6,7 +6,7 @@ process VEP_ACMG_VUSTRIAGE {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/annotation", mode: 'copy', overwrite: true, pattern: '*.json'
+    publishDir "${params.stage5_outdir}", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(phased_vcf), path(phased_tbi), val(reference_meta), path(router_json)
@@ -18,8 +18,17 @@ process VEP_ACMG_VUSTRIAGE {
     script:
     def sid = meta.sample_id
     def metaJson = groovy.json.JsonOutput.toJson(meta).replace('\n', ' ').replace('\r', '')
+    def thresholdsMap = new groovy.yaml.YamlSlurper().parse(file(params.thresholds)) ?: [:]
+    def thresholdsJson = groovy.json.JsonOutput.toJson(thresholdsMap)
     """
     set -euo pipefail
+
+    cat > sample_meta.json <<'JSON'
+${metaJson}
+JSON
+    cat > thresholds_payload.json <<'JSON'
+${thresholdsJson}
+JSON
 
     python3 - <<'PYEOF'
 import gzip
@@ -27,7 +36,7 @@ import json
 from pathlib import Path
 
 sid = '${sid}'
-meta = json.loads('''${metaJson}''')
+meta = json.loads(Path('sample_meta.json').read_text(encoding='utf-8'))
 router = json.loads(Path('${router_json}').read_text(encoding='utf-8'))
 phased = Path('${phased_vcf}')
 
@@ -35,7 +44,7 @@ ancestry = str(meta.get('ancestry_label', 'UNSET')).upper()
 
 # Load gnomad popmax cutoffs from thresholds.yaml (clinical.annotation.gnomad_popmax_cutoffs)
 # and QUAL tiering thresholds (clinical.annotation.acmg_tiering_qual_thresholds)
-thresholds = json.loads('''${thresholdsJson}''')
+thresholds = json.loads(Path('thresholds_payload.json').read_text(encoding='utf-8'))
 annotation_thresholds = thresholds.get('clinical', {}).get('annotation', {})
 af_cutoffs = annotation_thresholds.get('gnomad_popmax_cutoffs', {
     'AFR': 0.005, 'AMR': 0.004, 'EAS': 0.003, 'EUR': 0.002, 'SAS': 0.003, 'ASJ': 0.002, 'FIN': 0.002, 'OTH': 0.002

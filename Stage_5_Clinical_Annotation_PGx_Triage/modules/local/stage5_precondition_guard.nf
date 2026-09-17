@@ -20,12 +20,16 @@ process STAGE5_PRECONDITION_GUARD {
     """
     set -euo pipefail
 
+    cat > sample_meta.json <<'JSON'
+${groovy.json.JsonOutput.toJson(meta ?: [:])}
+JSON
+
     python3 - <<'PYEOF'
 import json
 from pathlib import Path
 
 sid = '${sid}'
-meta = json.loads('''${groovy.json.JsonOutput.toJson(meta).replace("\\n", " ").replace("\\r", "")}''')
+meta = json.loads(Path('sample_meta.json').read_text(encoding='utf-8'))
 required_meta_fields = ['sample_id', 'validation_token', 'phased_vcf', 'phased_vcf_tbi', 'ancestry_metrics_json', 'phasing_audit_json']
 missing_meta = [field for field in required_meta_fields if field not in meta or meta[field] in (None, '')]
 if missing_meta:

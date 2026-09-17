@@ -3,16 +3,18 @@ process STAGE3_ZERO_LOSS_GATE_MANIFEST {
     label 'process_low'
     container 'genvar-core:2.1.0'
 
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true
+    publishDir "${params.stage3_outdir}", mode: 'copy', overwrite: true
 
     input:
     tuple val(sample_id), val(branch_names), path(branch_vcfs), path(merged_vcf), path(normalized_vcf_gz), path(normalized_vcf_tbi), path(harmonization_audit_json), path(contract_fragment_json)
 
     output:
-    tuple val(sample_id), path("samples_${sample_id}_banked_stage3.yaml"), emit: banked_manifest
+    tuple val(sample_id), path("samples_${sample_id}_stage3.yaml"), emit: stage3_manifest
     tuple val(sample_id), path("${sample_id}.stage3.zero_loss_audit.json"), emit: zero_loss_audit
 
     script:
+    def publishedStage3Dir = new File(params.stage3_outdir.toString()).isAbsolute() ? new File(params.stage3_outdir.toString()).canonicalPath : new File(workflow.launchDir.toString(), params.stage3_outdir.toString()).canonicalPath
+    def publishedHarmonizedDir = new File(publishedStage3Dir, 'harmonized_vcf').canonicalPath
     """
     set -euo pipefail
 
@@ -32,6 +34,8 @@ normalized_vcf_gz = Path('${normalized_vcf_gz}')
 normalized_vcf_tbi = Path('${normalized_vcf_tbi}')
 harmonization_audit_path = Path('${harmonization_audit_json}')
 contract_fragment_path = Path('${contract_fragment_json}')
+published_stage3_dir = Path('${publishedStage3Dir}')
+published_harmonized_dir = Path('${publishedHarmonizedDir}')
 
 
 def count_vcf_rows(path: Path) -> int:
@@ -105,10 +109,17 @@ zero_loss_audit = {
 }
 Path(f'{sample_id}.stage3.zero_loss_audit.json').write_text(json.dumps(zero_loss_audit, indent=2) + NL, encoding='utf-8')
 
-harmonization_audit['zero_loss_audit'] = str(Path(f'{sample_id}.stage3.zero_loss_audit.json').resolve())
+harmonization_audit['normalized_vcf'] = str(published_harmonized_dir / f'{sample_id}.normalized.vcf.gz')
+harmonization_audit['normalized_vcf_tbi'] = str(published_harmonized_dir / f'{sample_id}.normalized.vcf.gz.tbi')
+harmonization_audit['harmonization_audit'] = str(published_harmonized_dir / f'{sample_id}.harmonization_audit.json')
+harmonization_audit['zero_loss_audit'] = str(published_stage3_dir / f'{sample_id}.stage3.zero_loss_audit.json')
 harmonization_audit_path.write_text(json.dumps(harmonization_audit, indent=2) + NL, encoding='utf-8')
 
-contract_fragment['zero_loss_audit'] = str(Path(f'{sample_id}.stage3.zero_loss_audit.json').resolve())
+contract_fragment['save_dir'] = str(published_stage3_dir)
+contract_fragment['normalized_vcf'] = str(published_harmonized_dir / f'{sample_id}.normalized.vcf.gz')
+contract_fragment['normalized_vcf_tbi'] = str(published_harmonized_dir / f'{sample_id}.normalized.vcf.gz.tbi')
+contract_fragment['harmonization_audit'] = str(published_harmonized_dir / f'{sample_id}.harmonization_audit.json')
+contract_fragment['zero_loss_audit'] = str(published_stage3_dir / f'{sample_id}.stage3.zero_loss_audit.json')
 contract_fragment['row_counts'] = {
     'pre_merge_branch_sum': pre_merge_row_sum,
     'merged': merged_row_count,
@@ -124,7 +135,7 @@ contract_fragment['normalized_vcf_tbi_sha256'] = normalized_vcf_tbi_sha256
 contract_fragment_path.write_text(json.dumps(contract_fragment, indent=2) + NL, encoding='utf-8')
 
 stage3_manifest = {'samples': [contract_fragment]}
-Path(f'samples_{sample_id}_banked_stage3.yaml').write_text(json.dumps(stage3_manifest, indent=2) + NL, encoding='utf-8')
+Path(f'samples_{sample_id}_stage3.yaml').write_text(json.dumps(stage3_manifest, indent=2) + NL, encoding='utf-8')
 PYEOF
     """
 }

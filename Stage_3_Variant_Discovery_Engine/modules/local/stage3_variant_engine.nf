@@ -1,7 +1,6 @@
 process STAGE3_VARIANT_ENGINE {
     label 'process_low'
     container 'genvar-core:2.1.0'
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true
 
     input:
     tuple path(stage2_manifest), path(staged_sorted_bam), path(staged_sorted_bai)
@@ -10,7 +9,7 @@ process STAGE3_VARIANT_ENGINE {
     path 'normalized.vcf', emit: normalized_vcf
     path 'normalized.vcf.tbi', emit: normalized_tbi
     path 'harmonization_audit.json', emit: audit
-    path 'samples_*_banked_stage3.yaml', emit: banked_manifest
+    path 'samples_*_stage3.yaml', emit: stage3_manifest
 
     script:
     def refsPath = file(params.references).toString().replace('\\', '\\\\').replace("'", "\\'")
@@ -205,7 +204,7 @@ records = manifest.get('samples') or []
 if isinstance(records, dict):
     records = [records]
 if not records:
-    raise SystemExit('STAGE3_PRECONDITION_FAILURE: Stage 2 banked manifest contains no samples')
+    raise SystemExit('STAGE3_PRECONDITION_FAILURE: Stage 2 manifest contains no samples')
 
 rec = records[0]
 sample_id = str(rec.get('sample_id') or 'UNKNOWN')
@@ -482,7 +481,7 @@ banked = {
     }]
 }
 canonical_id = ''.join(ch if (ch.isalnum() or ch in ('_', '-')) else '_' for ch in sample_id) or 'UNKNOWN'
-Path(f'samples_{canonical_id}_banked_stage3.yaml').write_text(json.dumps(banked, indent=2) + chr(10), encoding='utf-8')
+Path(f'samples_{canonical_id}_stage3.yaml').write_text(json.dumps(banked, indent=2) + chr(10), encoding='utf-8')
 PYEOF
     """
 
@@ -519,7 +518,7 @@ records = manifest.get('samples') or []
 if isinstance(records, dict):
     records = [records]
 if not records:
-    raise SystemExit('STAGE3_PRECONDITION_FAILURE: Stage 2 banked manifest contains no samples')
+    raise SystemExit('STAGE3_PRECONDITION_FAILURE: Stage 2 manifest contains no samples')
 
 rec = records[0]
 sample_id = str(rec.get('sample_id') or 'UNKNOWN')
@@ -576,7 +575,7 @@ Path('harmonization_audit.json').write_text(json.dumps({
     'stub': True
 }, indent=2) + chr(10), encoding='utf-8')
 canonical_id = ''.join(ch if (ch.isalnum() or ch in ('_', '-')) else '_' for ch in sample_id) or 'UNKNOWN'
-Path(f'samples_{canonical_id}_banked_stage3.yaml').write_text(json.dumps({'samples': [{
+Path(f'samples_{canonical_id}_stage3.yaml').write_text(json.dumps({'samples': [{
     'sample_id': sample_id,
     'sequencing_type': sequencing_type,
     'validation_token': validation_token,

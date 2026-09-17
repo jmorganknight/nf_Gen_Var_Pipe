@@ -20,6 +20,13 @@ process CLINICAL_PROVENANCE_MANIFEST {
     """
     set -euo pipefail
 
+    cat > run_meta.json <<'JSON'
+${runJson}
+JSON
+    cat > reference_meta.json <<'JSON'
+${refJson}
+JSON
+
     python3 - <<'PYEOF'
 import hashlib
 import json
@@ -31,8 +38,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sid = '${sid}'
-run_meta = json.loads('''${runJson}''')
-reference_meta = json.loads('''${refJson}''')
+run_meta = json.loads(Path('run_meta.json').read_text(encoding='utf-8'))
+reference_meta = json.loads(Path('reference_meta.json').read_text(encoding='utf-8'))
 
 files = {
     'pgx_summary_json': Path('${pgx_summary_json}'),

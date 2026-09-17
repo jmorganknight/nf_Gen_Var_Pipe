@@ -3,7 +3,7 @@ process SPECIMEN_PARADIGM_PURITY_RESOLVER {
     label 'process_medium'
     container 'genvar-core:2.1.0'
 
-    publishDir "${params.outdir}/audit_and_qc/stage2", mode: 'copy', overwrite: true, pattern: '*.purity_and_sex_validation_audit.json'
+    publishDir "${params.stage2_outdir}/audit_and_qc/stage2", mode: 'copy', overwrite: true, pattern: '*.purity_and_sex_validation_audit.json'
 
     input:
     tuple val(meta), path(bam), path(bai), val(refs), val(thresholds), path(precondition_audit), path(contamination_audit), path(sex_purity_audit)

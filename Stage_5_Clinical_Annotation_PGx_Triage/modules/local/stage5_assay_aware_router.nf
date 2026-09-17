@@ -22,13 +22,20 @@ process STAGE5_ASSAY_AWARE_ROUTER {
     """
     set -euo pipefail
 
+    cat > sample_meta.json <<'JSON'
+${metaJson}
+JSON
+    cat > reference_meta.json <<'JSON'
+${refJson}
+JSON
+
     python3 - <<'PYEOF'
 import json
 from pathlib import Path
 
 sid = '${sid}'
-meta = json.loads('''${metaJson}''')
-ref = json.loads('''${refJson}''')
+meta = json.loads(Path('sample_meta.json').read_text(encoding='utf-8'))
+ref = json.loads(Path('reference_meta.json').read_text(encoding='utf-8'))
 
 router_path = Path(f'{sid}.stage5_router.json')
 fragment_path = Path(f'{sid}.stage5_router.fragment.json')

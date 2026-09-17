@@ -1,10 +1,13 @@
 nextflow.enable.dsl = 2
 
+params.outdir = java.nio.file.Paths.get((params.outdir ?: 'results').toString()).toAbsolutePath().normalize().toString()
+params.stage4_outdir = "${params.outdir}/Stage_4"
+
 include { STAGE4_ANCESTRY_PGX } from './workflows/stage4_ancestry_pgx.nf'
 include { POPPCA_REFERENCE_PROJECTION } from './modules/local/poppca_reference_projection.nf'
 include { WHATSHAP_SHAPEIT_PHASER } from './modules/local/whatshap_shapeit_phaser.nf'
-include { BANK_STAGE4_CONTRACT } from './modules/local/bank_stage4_contract.nf'
-include { ASSEMBLE_STAGE4_BANKED_MANIFEST } from './modules/local/assemble_stage4_banked_manifest.nf'
+include { STAGE4_CONTRACT } from './modules/local/bank_stage4_contract.nf'
+include { ASSEMBLE_STAGE4_MANIFEST } from './modules/local/assemble_stage4_banked_manifest.nf'
 
 def mapOrEmpty(Object value) {
     value instanceof Map ? (value as Map) : [:]
@@ -223,11 +226,11 @@ workflow STAGE4_ANCESTRY_PHASING {
     main:
     POPPCA_REFERENCE_PROJECTION(ch_stage4_inputs)
     WHATSHAP_SHAPEIT_PHASER(POPPCA_REFERENCE_PROJECTION.out.ancestry_ready)
-    BANK_STAGE4_CONTRACT(WHATSHAP_SHAPEIT_PHASER.out.phase_bundle)
-    ASSEMBLE_STAGE4_BANKED_MANIFEST(BANK_STAGE4_CONTRACT.out.manifest_fragment.collect())
+    STAGE4_CONTRACT(WHATSHAP_SHAPEIT_PHASER.out.phase_bundle)
+    ASSEMBLE_STAGE4_MANIFEST(STAGE4_CONTRACT.out.manifest_fragment.collect())
 
     emit:
-    banked_manifest = ASSEMBLE_STAGE4_BANKED_MANIFEST.out.banked_manifest
+    stage4_manifest = ASSEMBLE_STAGE4_MANIFEST.out.stage4_manifest
     phase_bundle = WHATSHAP_SHAPEIT_PHASER.out.phase_bundle
 }
 
@@ -240,7 +243,7 @@ workflow {
     def infrastructureFile = resolveStageConfigPath(readOptionalParam('infra_config'), params.infrastructure, 'infrastructure.yaml')
 
     if (!stage3ManifestFile.exists()) {
-        throw new IllegalArgumentException('STAGE4_PRECONDITION_FAILURE: missing Stage 3 banked manifest')
+        throw new IllegalArgumentException('STAGE4_PRECONDITION_FAILURE: missing Stage 3 manifest')
     }
 
     def stage3Parsed = ys.parse(stage3ManifestFile)
@@ -281,7 +284,7 @@ workflow {
     ]
     requiredRefMap.each { key, value ->
         if (!value) {
-            writeStage4Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', key)
+            writeStage4Rejection(params.stage4_outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', key)
             throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}'")
         }
     }
@@ -290,20 +293,20 @@ workflow {
         def p = requiredRefMap[key].toString()
         def hostFile = hostPathForReference(p, refDir)
         if (hostFile == null || !hostFile.exists()) {
-            writeStage4Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', "${key}=${p}")
+            writeStage4Rejection(params.stage4_outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', "${key}=${p}")
             throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET '${key}=${p}'")
         }
     }
 
     def hostPopPcaModels = hostPathForReference(poppcaModels.toString(), refDir)
     if (hostPopPcaModels == null || !hostPopPcaModels.exists()) {
-        writeStage4Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', poppcaModels.toString())
+        writeStage4Rejection(params.stage4_outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', poppcaModels.toString())
         throw new IllegalStateException('STAGE4_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET poppca_models')
     }
 
     def hostPhasingPanel = hostPathForReference(phasingPanel.toString(), refDir)
     if (hostPhasingPanel == null || !hostPhasingPanel.exists()) {
-        writeStage4Rejection(params.outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', phasingPanel.toString())
+        writeStage4Rejection(params.stage4_outdir.toString(), 'GLOBAL', 'MISSING_REFERENCE_ASSET', phasingPanel.toString())
         throw new IllegalStateException('STAGE4_PRECONDITION_FAILURE: MISSING_REFERENCE_ASSET phasing_panel')
     }
 
@@ -312,19 +315,19 @@ workflow {
         def stage1AssetBase = [sample.stage1_asset_base_uri, sample.asset_base_uri].find { v -> v != null && v.toString().trim() }?.toString()
         def token = sample.validation_token?.toString()
         if (!token || !token.contains('VALID_PASS|VARIANTS_HARMONIZED')) {
-            writeStage4Rejection(params.outdir.toString(), sid, 'INVALID_STAGE3_TOKEN', token ?: 'missing')
+            writeStage4Rejection(params.stage4_outdir.toString(), sid, 'INVALID_STAGE3_TOKEN', token ?: 'missing')
             throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: invalid Stage 3 validation token for sample '${sid}'")
         }
 
         ['normalized_vcf', 'normalized_vcf_tbi'].each { field ->
             def raw = sample[field]?.toString()
             if (!raw) {
-                writeStage4Rejection(params.outdir.toString(), sid, 'MISSING_STAGE3_ASSET', field)
+                writeStage4Rejection(params.stage4_outdir.toString(), sid, 'MISSING_STAGE3_ASSET', field)
                 throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: missing '${field}' for sample '${sid}'")
             }
             def resolved = resolvePath(raw, samplesRoot)
             if (!resolved.exists()) {
-                writeStage4Rejection(params.outdir.toString(), sid, 'STAGE3_ASSET_NOT_FOUND', "${field}=${raw}")
+                writeStage4Rejection(params.stage4_outdir.toString(), sid, 'STAGE3_ASSET_NOT_FOUND', "${field}=${raw}")
                 throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: stage 3 asset not found '${field}' for sample '${sid}'")
             }
         }
@@ -335,12 +338,12 @@ workflow {
         ].each { field, candidates ->
             def raw = candidates.find { v -> v != null && v.toString().trim() }?.toString()
             if (!raw) {
-                writeStage4Rejection(params.outdir.toString(), sid, 'MISSING_STAGE3_ASSET', field)
+                writeStage4Rejection(params.stage4_outdir.toString(), sid, 'MISSING_STAGE3_ASSET', field)
                 throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: missing '${field}' for sample '${sid}'")
             }
             def resolved = resolveAssetPath(raw, samplesRoot, stage1AssetBase)
             if (!resolved.exists()) {
-                writeStage4Rejection(params.outdir.toString(), sid, 'STAGE3_ASSET_NOT_FOUND', "${field}=${raw}")
+                writeStage4Rejection(params.stage4_outdir.toString(), sid, 'STAGE3_ASSET_NOT_FOUND', "${field}=${raw}")
                 throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: stage 3 asset not found '${field}' for sample '${sid}'")
             }
         }
@@ -348,13 +351,13 @@ workflow {
         def normalizedVcf = resolvePath(sample.normalized_vcf.toString(), samplesRoot)
         def normalizedVcfShaExpected = sample.normalized_vcf_sha256?.toString()?.trim()
         if (!normalizedVcfShaExpected) {
-            writeStage4Rejection(params.outdir.toString(), sid, 'MISSING_STAGE3_ASSET_HASH', 'normalized_vcf_sha256')
+            writeStage4Rejection(params.stage4_outdir.toString(), sid, 'MISSING_STAGE3_ASSET_HASH', 'normalized_vcf_sha256')
             throw new IllegalStateException("STAGE4_PRECONDITION_FAILURE: missing 'normalized_vcf_sha256' for sample '${sid}'")
         }
         def normalizedVcfShaObserved = sha256Hex(normalizedVcf)
         if (normalizedVcfShaObserved != normalizedVcfShaExpected.toLowerCase()) {
             writeStage4Rejection(
-                params.outdir.toString(),
+                params.stage4_outdir.toString(),
                 sid,
                 'STAGE3_VCF_SHA256_MISMATCH',
                 "normalized_vcf_sha256=${normalizedVcfShaExpected}; observed=${normalizedVcfShaObserved}"
@@ -391,7 +394,7 @@ workflow {
     ]
 
     def chStage4Inputs = channel.fromList(samples).map { sample ->
-        def meta = buildMetaRow(sample as Map, params.outdir.toString())
+        def meta = buildMetaRow(sample as Map, params.stage4_outdir.toString())
         def stage1AssetBase = [sample.stage1_asset_base_uri, sample.asset_base_uri].find { v -> v != null && v.toString().trim() }?.toString()
         def normalizedVcf = resolvePath(sample.normalized_vcf.toString(), samplesRoot)
         def normalizedVcfTbi = resolvePath(sample.normalized_vcf_tbi.toString(), samplesRoot)

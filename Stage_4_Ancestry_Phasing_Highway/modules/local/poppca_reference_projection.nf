@@ -6,7 +6,7 @@ process POPPCA_REFERENCE_PROJECTION {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/audit_and_qc/stage4", mode: 'copy', overwrite: true, pattern: '*.json'
+    publishDir "${params.stage4_outdir}/audit_and_qc/stage4", mode: 'copy', overwrite: true, pattern: '*.json'
 
     input:
     tuple val(meta), path(normalized_vcf), path(normalized_vcf_tbi), path(sorted_bam), path(sorted_bai), val(reference_meta), val(poppca_models_dir), val(phasing_panel_bed)

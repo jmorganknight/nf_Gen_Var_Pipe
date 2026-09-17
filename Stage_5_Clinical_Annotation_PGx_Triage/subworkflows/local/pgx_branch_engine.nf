@@ -1,8 +1,39 @@
 nextflow.enable.dsl = 2
 
+String stage5DockerReferenceBind() {
+    def root = stage5ReferenceRoot()
+    root ? "-v \"${root}:${root}:ro\"" : ''
+}
+
+String stage5ReferenceRoot() {
+    def direct = [params.reference_mount_root, params.ref_dir, params.ref_data_root, System.getenv('NXF_REF_DATA_ROOT')]
+        .collect { value -> value?.toString()?.trim() }
+        .find { value -> value }
+    if (direct) {
+        return direct
+    }
+
+    def referencesPath = params.references?.toString()?.trim()
+    if (!referencesPath) {
+        return ''
+    }
+
+    def refsFile = new File(referencesPath)
+    if (!refsFile.isAbsolute()) {
+        refsFile = new File(projectDir.toString(), referencesPath)
+    }
+    if (!refsFile.exists()) {
+        return ''
+    }
+
+    def refsDoc = new groovy.yaml.YamlSlurper().parse(refsFile)
+    return refsDoc?.ref_data_root?.toString()?.trim() ?: ''
+}
+
 process RUN_PGX_ENGINE {
     label 'process_low'
     container 'genvar-annotation:2.1.0'
+    containerOptions { stage5DockerReferenceBind() }
     stageInMode 'copy'
     tag "${meta?.sample_id ?: 'UNKNOWN'}"
 

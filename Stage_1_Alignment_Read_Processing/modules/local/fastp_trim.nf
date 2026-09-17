@@ -29,7 +29,7 @@ process FASTP_TRIM {
 
     tag "${meta.sample_id}"
 
-    publishDir { "${meta.save_dir}/${meta.sample_id}/qc/fastp" }, mode: 'copy', overwrite: true
+    publishDir "${params.stage1_outdir}/qc/fastp", mode: 'copy', overwrite: true
 
     input:
     tuple val(meta), path(fastq_1), path(fastq_2)

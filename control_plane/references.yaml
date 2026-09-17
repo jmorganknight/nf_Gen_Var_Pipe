@@ -1,6 +1,6 @@
 # Master reference asset map using root-relative entries.
 # Resolution precedence is: absolute literal path, then `ref_data_root`, then
-# `/opt/reference` fallback inside containerized runs.
+# the configured runtime reference mount root derived from Nextflow params.
 # Compatibility aliases are retained under `references` for stage configs that
 # parse `references.yaml` as `references.*`.
 

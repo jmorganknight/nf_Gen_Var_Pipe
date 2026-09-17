@@ -5,7 +5,7 @@ process STAGE1_BWA_FINALIZE {
 
     tag "${meta.sample_id}"
 
-    publishDir { "${meta.save_dir}/${meta.sample_id}/aligned" }, mode: 'copy', overwrite: true, pattern: '*.{bai,json}'
+    publishDir "${params.stage1_outdir}/aligned", mode: 'copy', overwrite: true, pattern: '*.{bai,json}'
 
     input:
     tuple val(meta), path(aligned_bam)

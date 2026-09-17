@@ -6,9 +6,9 @@ process BANK_STAGE0_SUCCESS {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/validated_fastqs", mode: 'rellink', overwrite: true, pattern: '*_R*.validated.fastq.gz'
-    publishDir "${params.outdir}/audit_and_qc", mode: 'copy', overwrite: true, pattern: '*.intake_validation_token'
-    publishDir "${params.outdir}/audit_and_qc", mode: 'copy', overwrite: true, pattern: '*.stage0.audit_bundle.tar.gz'
+    publishDir "${params.outdir}/Stage_0/validated_fastqs", mode: 'rellink', overwrite: true, pattern: '*_R*.validated.fastq.gz'
+    publishDir "${params.outdir}/Stage_0/audit_and_qc", mode: 'copy', overwrite: true, pattern: '*.intake_validation_token'
+    publishDir "${params.outdir}/Stage_0/audit_and_qc", mode: 'copy', overwrite: true, pattern: '*.stage0.audit_bundle.tar.gz'
 
     input:
     tuple val(meta),
@@ -87,16 +87,16 @@ fragment = {
     'ingest_manifest': json.loads('''${ingestManifestJson}'''),
     'sequencer': json.loads('''${sequencerJson}'''),
     'variant_branches': json.loads('''${variantBranchesJson}'''),
-    'fastq_forward': '${params.outdir}/validated_fastqs/${sid}_R1.validated.fastq.gz',
-    'fastq_reverse': '${params.outdir}/validated_fastqs/${sid}_R2.validated.fastq.gz',
-    'intake_validation_token': '${params.outdir}/audit_and_qc/${sid}.intake_validation_token',
-    'preflight_lock': '${params.outdir}/audit_and_qc/preflight_lock/preflight_lock.json',
+    'fastq_forward': '${params.outdir}/Stage_0/validated_fastqs/${sid}_R1.validated.fastq.gz',
+    'fastq_reverse': '${params.outdir}/Stage_0/validated_fastqs/${sid}_R2.validated.fastq.gz',
+    'intake_validation_token': '${params.outdir}/Stage_0/audit_and_qc/${sid}.intake_validation_token',
+    'preflight_lock': '${params.outdir}/Stage_0/audit_and_qc/preflight_lock/preflight_lock.json',
     'preflight_lock_status': 'STAGE0_PREFLIGHT_LOCK_PASS',
-    'reference_snapshot_tokens': '${params.outdir}/audit_and_qc/preflight_lock/reference_snapshot.tokens',
-    'stage0_audit_bundle': '${params.outdir}/audit_and_qc/${sid}.stage0.audit_bundle.tar.gz',
-    'intake_validation_report': '${params.outdir}/audit_and_qc/${sid}.intake_validation_report.json',
-    'intake_route_decision': '${params.outdir}/audit_and_qc/${sid}.intake_route_decision.json',
-    'save_dir': '${params.outdir}'
+    'reference_snapshot_tokens': '${params.outdir}/Stage_0/audit_and_qc/preflight_lock/reference_snapshot.tokens',
+    'stage0_audit_bundle': '${params.outdir}/Stage_0/audit_and_qc/${sid}.stage0.audit_bundle.tar.gz',
+    'intake_validation_report': '${params.outdir}/Stage_0/audit_and_qc/${sid}.intake_validation_report.json',
+    'intake_route_decision': '${params.outdir}/Stage_0/audit_and_qc/${sid}.intake_route_decision.json',
+    'save_dir': '${params.outdir}/Stage_0'
 }
 
 with open('${sid}.banked_stage0.fragment.json', 'w', encoding='utf-8') as handle:

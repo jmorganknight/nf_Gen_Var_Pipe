@@ -1,3 +1,15 @@
+def toSerializableValue(Object value) {
+    if (value instanceof Map) {
+        def copied = new LinkedHashMap()
+        (value as Map).each { key, nested -> copied[key] = toSerializableValue(nested) }
+        return copied
+    }
+    if (value instanceof List) {
+        return (value as List).collect { nested -> toSerializableValue(nested) }
+    }
+    value
+}
+
 process MERGE_STAGE3_BRANCH_VCFS {
 
     label 'process_low'
@@ -10,8 +22,8 @@ process MERGE_STAGE3_BRANCH_VCFS {
     tuple val(sample_id), path('stage3.merged.selected.vcf'), path('stage3.merged.mane_audit.json'), path(vcf_schema), val(stage3_refs), val(sample_meta), path('stage3.merged.calibration_audit.json'), emit: merged_vcf_bundle
 
     script:
-    def sampleMetaMap = (sample_meta instanceof Map) ? (sample_meta as Map) : [:]
-    def sampleMetaJson = groovy.json.JsonOutput.toJson(sampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
+    def safeSampleMetaMap = (sample_meta instanceof Map) ? (toSerializableValue(sample_meta) as Map) : [:]
+    def sampleMetaJson = groovy.json.JsonOutput.toJson(safeSampleMetaMap).replace('\\', '\\\\').replace("'", "\\'")
     """
     set -euo pipefail
 

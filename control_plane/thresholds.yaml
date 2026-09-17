@@ -212,6 +212,9 @@ clinical:
     lis_max_retries: 3  # Maximum retry count for LIS publication attempts.
     pki_key_path: "keys/clinical_signer.pem"  # Repo-governed signer private-key path used for RS256 clinical payload signatures.
     pki_pub_key_path: "keys/clinical_signer.pub.pem"  # Repo-governed signer public-key path used for audit fingerprinting.
+    pki_signer_scope: "bootstrap"  # bootstrap|production signer class; bootstrap is for pre-live validation only.
+    pki_signer_id: "local-bootstrap-20260917"  # Human-readable signer identifier recorded into release metadata.
+    allow_bootstrap_for_production_run: false  # False prevents a bootstrap key from authorizing production-mode releases.
     consent_token_namespace: "CONSENT_V1"  # Namespace label applied to derived consent-routing tokens.
 
 stage2:

@@ -5,7 +5,6 @@ process VALIDATE_MAPPED_BAM_RG {
 
     tag "${meta.sample_id}"
 
-    publishDir "${params.outdir}/audit_and_qc/stage1", mode: 'copy', overwrite: true, pattern: 'stage1_rejection_audit.json'
 
     input:
     tuple val(meta), path(mapped_bam), path(mapped_bai)

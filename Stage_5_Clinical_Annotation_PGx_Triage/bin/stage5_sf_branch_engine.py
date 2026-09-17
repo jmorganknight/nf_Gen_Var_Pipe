@@ -5,6 +5,7 @@ import base64
 import gzip
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 
@@ -204,21 +205,46 @@ def require_list(node, path):
     return current
 
 
-def resolve_reference_path(raw_path: str, ref_data_root: str):
+def resolve_reference_path(raw_path: str, ref_yaml_doc: dict):
     if not raw_path:
         raise SystemExit('STAGE5_SF_FATAL: empty reference path')
     path = Path(raw_path)
+    ref_root_text = str(ref_yaml_doc.get('ref_data_root') or '').strip()
+    ref_root = Path(ref_root_text).resolve(strict=False) if ref_root_text else None
+    hint_text = str(os.environ.get('STAGE5_REFERENCE_ROOT_HINT') or '').strip()
+    hint_root = Path(hint_text).resolve(strict=False) if hint_text else None
+
+    candidates = []
     if path.is_absolute():
-        return path
-    if not ref_data_root:
-        raise SystemExit('STAGE5_SF_FATAL: ref_data_root is required for relative registry paths')
-    root = Path(ref_data_root).resolve()
-    candidate = (root / raw_path).resolve(strict=False)
-    if not candidate.is_relative_to(root):
-        raise SystemExit(f'STAGE5_SF_FATAL: unsafe registry path escapes ref_data_root: {raw_path}')
-    if not candidate.exists() or not candidate.is_file():
-        raise SystemExit(f'STAGE5_SF_FATAL: registry file not found: {candidate}')
-    return candidate
+        candidates.append(path)
+        if ref_root is not None:
+            try:
+                rel = path.relative_to(ref_root)
+                if hint_root is not None:
+                    candidates.append((hint_root / rel).resolve(strict=False))
+            except ValueError:
+                pass
+    else:
+        candidates.append(path.resolve(strict=False))
+        if ref_root is not None:
+            candidates.append((ref_root / path).resolve(strict=False))
+        if hint_root is not None:
+            candidates.append((hint_root / path).resolve(strict=False))
+
+    local_name = Path(path.name)
+    candidates.append(local_name.resolve(strict=False) if local_name.exists() else local_name)
+
+    seen = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        if candidate.exists() and candidate.is_file():
+            return candidate
+
+    unresolved = candidates[0] if candidates else path
+    raise SystemExit(f'STAGE5_SF_FATAL: registry file not found: {unresolved}')
 
 
 def open_text(path: Path):
@@ -499,7 +525,6 @@ def main():
 
     protocol_prefix = require_string(sf_thresholds, ('clinical_protocol_link_base',))
 
-    ref_root = str(references_doc.get('ref_data_root') or '').strip()
     registry_raw_path = None
     if 'references' in references_doc and isinstance(references_doc['references'], dict):
         nested = references_doc['references']
@@ -510,7 +535,7 @@ def main():
         registry_raw_path = str(references_doc['sf'].get('acmg_registry_json') or '').strip()
     if not registry_raw_path:
         raise SystemExit('STAGE5_SF_FATAL: references.sf.acmg_registry_json is required')
-    registry_path = resolve_reference_path(registry_raw_path, ref_root)
+    registry_path = resolve_reference_path(registry_raw_path, references_doc)
     gene_rows, token_index = load_acmg_registry(registry_path)
     approved_genes = sorted(gene_rows.keys())
     if not approved_genes:

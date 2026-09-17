@@ -9,7 +9,6 @@ process CROSS_SAMPLE_IDENTITY_GATE {
 
     tag "${meta.sample_id}"
 
-    publishDir { "${meta.save_dir}/${meta.sample_id}/audit_and_qc/identity" }, mode: 'copy', overwrite: true
 
     input:
     tuple val(meta), path(bam), path(bai), val(svd_panel), val(freemix_limit), val(refs)

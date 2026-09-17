@@ -3,13 +3,13 @@ process ASSEMBLE_STAGE0_BANKED_MANIFEST {
     label 'process_low'
     container 'genvar-core:2.1.0'
 
-    publishDir "${params.outdir}", mode: 'copy', overwrite: true, pattern: 'samples_*_banked_stage0.yaml'
+    publishDir "${params.outdir}/Stage_0", mode: 'copy', overwrite: true, pattern: 'samples_*_stage0.yaml'
 
     input:
     path fragment_jsons
 
     output:
-    path 'samples_*_banked_stage0.yaml', emit: banked_samplesheet
+    path 'samples_*_stage0.yaml', emit: banked_samplesheet
 
     script:
     """
@@ -192,7 +192,7 @@ payload = newline.join(lines) + newline
 sample_ids = sorted({str(rec.get('sample_id', 'UNKNOWN')) for rec in records})
 canonical_id = sample_ids[0] if len(sample_ids) == 1 else 'multi_sample'
 safe_id = ''.join(ch if (ch.isalnum() or ch in ('_', '-')) else '_' for ch in canonical_id) or 'UNKNOWN'
-canonical_name = f'samples_{safe_id}_banked_stage0.yaml'
+canonical_name = f'samples_{safe_id}_stage0.yaml'
 
 Path(canonical_name).write_text(payload, encoding='utf-8')
 PYEOF

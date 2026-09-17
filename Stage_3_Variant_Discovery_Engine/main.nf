@@ -1,4 +1,6 @@
 nextflow.enable.dsl = 2
+params.outdir = java.nio.file.Paths.get((params.outdir ?: 'results').toString()).toAbsolutePath().normalize().toString()
+params.stage3_outdir = "${params.outdir}/Stage_3"
 // Revision marker: Stage 3 scalar-metadata dynamic calibration + schema governance wiring.
 
 include { STAGE3_SNV_INDEL } from './modules/local/stage3_snv_indel.nf'
@@ -382,7 +384,7 @@ workflow STAGE3_VARIANT_DISCOVERY_ENGINE {
     emit:
     snv_indel_vcf = MASTER_HARMONIZED_VCF_PAYLOAD.out.harmonized.map { sid, vcf, _audit, _fragment -> tuple(sid, vcf) }
     snv_indel_audit = MASTER_HARMONIZED_VCF_PAYLOAD.out.harmonized.map { sid, _vcf, audit, _fragment -> tuple(sid, audit) }
-    stage3_manifest = STAGE3_ZERO_LOSS_GATE_MANIFEST.out.banked_manifest
+    stage3_manifest = STAGE3_ZERO_LOSS_GATE_MANIFEST.out.stage3_manifest
 }
 
 workflow STAGE3_VARIANT_DISCOVERY {
@@ -390,7 +392,7 @@ workflow STAGE3_VARIANT_DISCOVERY {
     def ys = new groovy.yaml.YamlSlurper()
     def stage2Manifest = file((params.input ?: params.samples).toString())
     if (!stage2Manifest.exists()) {
-        throw new IllegalArgumentException('STAGE3_PRECONDITION_FAILURE: missing Stage 2 banked manifest')
+        throw new IllegalArgumentException('STAGE3_PRECONDITION_FAILURE: missing Stage 2 manifest')
     }
     def referencesFile = resolveStageConfigPath(readOptionalParam('ref_config'), params.references, 'references.yaml')
     def thresholdsFile = resolveStageConfigPath(readOptionalParam('thresh_config'), params.thresholds, 'thresholds.yaml')
@@ -449,7 +451,7 @@ workflow STAGE3_VARIANT_DISCOVERY {
     def stage2Parsed = ys.parse(stage2Manifest)
     def records = stage2Parsed?.samples
     if (!(records instanceof List) || records.isEmpty()) {
-        throw new IllegalStateException('STAGE3_PRECONDITION_FAILURE: Stage 2 banked manifest contains no samples')
+        throw new IllegalStateException('STAGE3_PRECONDITION_FAILURE: Stage 2 manifest contains no samples')
     }
     def stage3TestMode = asBool(params.stage3_test_mode)
 

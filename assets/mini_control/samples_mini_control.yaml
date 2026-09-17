@@ -44,6 +44,11 @@ samples:
       consent_version: "MINI_CONTROL_DEV"
       consent_signed_utc: null
       consent_source: "DECLARED_IN_SAMPLESHEET"
+      run_germline: true
+      run_pgx: true
+      run_prs: true
+      run_secondary_findings: true
+      run_somatic: false
 
     # Base path for asset resolution
     asset_base_uri: "/media/drive_c/nf_pipes/nf_Gen_Var_Pipe"
@@ -90,9 +95,9 @@ samples:
       snv_indel: true
       structural_variants: true
       copy_number_cnv: true
-      str_expansions: false
+      str_expansions: true
       trisomy_aneuploidy: true
-      homologous_pseudogenes: false
+      homologous_pseudogenes: true
 
     # ========================================================================
     # AUTO-POPULATED BY PIPELINE (DO NOT EDIT MANUALLY)
